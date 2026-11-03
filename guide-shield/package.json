@@ -1,10 +1,33 @@
 {
   "name": "@local/dsh-guide-shield",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./index.js", "./identity": "./identity.js", "./shield": "./shield.js" },
-  "files": ["index.js", "core.js", "identity.js", "shield.js", "cordis.patch.yml", "README.md"],
-  "peerDependencies": { "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.3" },
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+  "exports": {
+    ".": "./index.js",
+    "./identity": "./identity.js",
+    "./shield": "./shield.js",
+    "./contracts": "./contracts.js"
+  },
+  "files": [
+    "index.js",
+    "core.js",
+    "identity.js",
+    "shield.js",
+    "cordis.patch.yml",
+    "README.md",
+    "contracts.js"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-subagent": "0.2.1-rc.3",
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.2.1-rc.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "UNLICENSED"
 }

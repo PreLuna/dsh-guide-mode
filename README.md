@@ -4,7 +4,7 @@
 
 在主会话旁边打开继承上下文的指导对话，用独立 `guide` preset 提供建议或按要求执行修改。指导可使用写工具，并可与主会话 goal 并行。
 
-截至 2026-11-03，两阶段局部注入与独立 Host shield 均已完成并安装到本机 desktop profile：复用原 goal driver，恢复官方 better-sidebar 0.28.2，通过两个独立 adapter 添加兼容行为。支持基线为 DSH 0.2.1-rc.3 / Cordis 4.0.5；两个 adapter 的未知产物会回退原行为，`guide-panel` 自身尚无同等宿主契约预检（O21）。
+截至 2026-11-03，两阶段局部注入与独立 Host shield 均已完成并安装到本机 desktop profile：复用原 goal driver，恢复官方 better-sidebar 0.28.2，通过两个独立 adapter 添加兼容行为。支持基线为 DSH 0.2.1-rc.3 / Cordis 4.0.5；两个 adapter 的未知产物会回退原行为，1.1.0 已为 panel/shield 加入必需源码/形状契约预检，不支持时明确只读/不可用。
 
 ## 从哪里开始看
 
@@ -42,7 +42,7 @@
 | [guide-panel](guide-panel/) | `guide-fork` provider、API、面板、专区和自动归档；连接独立准入与 shield 服务 |
 | [guide-admission](guide-admission/README.md) | 原生同步准入、权威容量/身份/按池快照；生产验收与 desktop 冷部署完成 |
 | [guide-shield](guide-shield/README.md) | 独立 Host 结算防护，panel HMR 时连续持有包装；实际 desktop 新 bundle 已于 2026-11-03 安装并启动确认 |
-| [guide-preset](guide-preset/) | `guide` persona 与工具面，必须和 panel 一起存在 |
+| [guide-preset](guide-preset/README.md) | `guide` persona 与工具面；外部用户级 guide skill 缺失时明确降级为一般建议 |
 | [guide-goal-adapter](guide-goal-adapter/README.md) | 在私有 subagents 作用域复用原 driver/join |
 | [guide-sidebar-adapter](guide-sidebar-adapter/README.md) | 官方 sidebar 的局部数据视图与原任务组件装饰 |
 
@@ -81,15 +81,21 @@ archive:
   holdMs: 120000
 ```
 
-B1 使用每池原生 `used / capacity`，阈值为 25% / 50% / 75%；C3 每池独立保持峰值 120 秒。已释放 activation 的归档不额外释放名额；native busy/未知/无当前池/状态查询失败时跳过自动归档。O20 的候选发现与主视图打开判定仍待补全。
+B1 使用每池原生 `used / capacity`，阈值为 25% / 50% / 75%；C3 每池独立保持峰值 120 秒。已释放 activation 的归档不额外释放名额；native busy/未知/无当前池/状态查询失败时跳过自动归档。1.1.0 已补 records/summary 候选、主视图与保存页签识别；Host 验证自身身份和父关系后调用不强制停止的原生归档。每轮最多 128 条并轮转扫描，历史较多时不会固定遗漏后续候选。
 
 生产隔离验证与实际 desktop 冷部署均已完成。设置页、Host getter/API 与配置来源核对为 C=8、R=2、全局 M=4，正常 desktop 准入组件运行中。部署状态与核对证据见 [实施记录](evidence/O19-production-2026-11-03/report.md)。
+
+## 1.1.0 本机工程基线
+
+六包统一版本、最小 Node CI、生成物检查与加载测试已落实；本地 Git 管理当前源码和文档，依赖、历史 fork、evidence 和恢复数据不进入仓库。用户选择仅本机自用：不上传、不发布市场，维护者与许可按私有工作区处理。托管 CI 尚未运行，本机执行相同命令通过。
+
+`npm test` 跑 Node 基线，`npm run build:check` 核对 sidebar 生成物，`npm run doctor` 核对版本及用户级 guide skill。统一安装/升级/完整卸载/回退见 [本机维护流程](docs/LOCAL-MAINTENANCE.md)，本轮实测见 [实施记录](evidence/O12-O21-engineering-2026-11-03/report.md)。旧 O19/shield 精确迁移脚本作为历史恢复入口保留，新升级必须用新的证据目录。
 
 ## 本机安装、更新与恢复
 
 `@local/dsh-guide-admission` 已于 2026-11-03 完成成对安装与实际 profile 冷启动验证，正常 desktop 组件运行中。安装/回退入口位于 [guide-admission/scripts](guide-admission/scripts/)，原始 profile 与 panel 备份保存在 [本轮证据](evidence/O19-production-2026-11-03/report.md)。准备脚本会保留已经应用的原始迁移计划，后续升级须另建证据目录。
 
-原有自有包已通过 link/bundle 登记到 `C:\Users\wang\.dsh\profiles\desktop`，官方 `dsh-better-sidebar` 保持 registry 版本 0.28.2。没有面向其他用户的统一安装入口。新增 `@local/dsh-guide-shield` 已于 2026-11-03 登记到实际 desktop，并完成冷启动与正常桌面运行状态核对；本机无旧 shield override。证据与备份见 [迁移报告](evidence/O2-R6-desktop-migration-2026-11-03/report.md)，再次迁移参考 [新服务说明](guide-shield/README.md)。
+原有自有包已通过 link/bundle 登记到 `C:\Users\wang\.dsh\profiles\desktop`，官方 `dsh-better-sidebar` 保持 registry 版本 0.28.2。当前提供本机统一安装、升级、完整卸载和恢复工具，不对外发布。新增 `@local/dsh-guide-shield` 已于 2026-11-03 登记到实际 desktop，并完成冷启动与正常桌面运行状态核对；本机无旧 shield override。证据与备份见 [迁移报告](evidence/O2-R6-desktop-migration-2026-11-03/report.md)，再次迁移参考 [新服务说明](guide-shield/README.md)。
 
 关闭 DSH Host 后，两个 adapter 的本机切换入口为：
 
@@ -131,6 +137,6 @@ node guide-goal-adapter/scripts/smoke.mjs --integration
 
 原 driver 和官方消费函数测试使用安装包 Electron Node：设置 `ELECTRON_RUN_AS_NODE=1`，传 `--expose-internals guide-goal-adapter/test/run-host.mjs`；sidebar 加 `--sidebar-core`。详见两个 adapter README。
 
-面板提示 Host 未加载或请求 405 时，检查 `/guide/api` 是否已注册；只刷新客户端不能替换旧 Host 模块。旧 `kind:guide` 页签仍可能残留在布局缓存中，可先手动关闭；已决定的一键清理尚未实现。浏览器同源 SSE 排队（R5）仍待单独复核；O2/R6 的 closing、panel HMR 和父重建已完成支持基线内矩阵，并完成实际 desktop 新 bundle 部署。
+面板提示 Host 未加载或请求 405 时，检查 `/guide/api` 是否已注册；只刷新客户端不能替换旧 Host 模块。已确认的旧 `kind:guide` 指导页签在面板显示提示条，由用户点击清理；只处理历史标题与页面地址均匹配的项，原生开始页及无法确认的项保留。R5 已在当前插件组合的一页/两页/刷新中复核未重现，长期和 HMR 泄漏仍不作已修复承诺；O2/R6 的 closing、panel HMR 和父重建已完成支持基线内矩阵，并完成实际 desktop 新 bundle 部署。
 
 输入问题的草稿按会话保存在 localStorage。输入框诊断可在 DevTools 设置 `window.__guideDebug = true`，观察面板底部事件与焦点信息。

@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-guide-panel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -18,16 +18,18 @@
     "model-projection.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "archive.js",
+    "compatibility.js"
   ],
   "peerDependencies": {
-    "@local/dsh-guide-shield": "1.0.0",
-    "@deepseek-ai/cordis": "~4.0.5",
-    "@deepseek-ai/dsh-scope": ">=0.2.1-rc.3",
-    "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.3",
-    "@deepseek-ai/dsh-tool-subagent-control": ">=0.2.1-rc.3",
-    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.3",
-    "@local/dsh-guide-admission": "1.0.0"
+    "@local/dsh-guide-shield": "1.1.0",
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/dsh-scope": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-subagent": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-subagent-control": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.3",
+    "@local/dsh-guide-admission": "1.1.0"
   },
   "dsh": {
     "bundle": {
@@ -38,5 +40,6 @@
       "immediately": true,
       "inject": []
     }
-  }
+  },
+  "license": "UNLICENSED"
 }

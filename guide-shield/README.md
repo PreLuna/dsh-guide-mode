@@ -2,9 +2,13 @@
 
 独立 Host bundle `@local/dsh-guide-shield`，支持 DSH 0.2.1-rc.3 / Cordis 4.0.5。O2/R6 实现、验收与实际 desktop 部署已关闭，最终判定见 [收尾结论](../docs/O2-R6-CLOSEOUT.md)。panel 的 provider/API/O6 生命周期与结算防护分开：重载或禁用 panel 不卸载此服务，已有指导结算仍受保护。服务自身卸载会失活并释放它持有的包装；第三方保留的旧 wrapper 直通原方法。
 
-`index.js` 静态导入宿主官方 descriptor fold；`core.js` 持有事件监听、父对象包装和释放；`identity.js` 只读子会话自身 first-wins descriptor。`guide-panel/identity.js` 与 `shield.js` 是兼容导出，goal adapter 继续保留独立 reader，但使用同一 first-wins 语义。
+`index.js` 先核验宿主源码与官方 descriptor fold 契约，不通过时报告 unsupported 并不安装半套保护；`core.js` 持有事件监听、父对象包装和释放；`identity.js` 只读子会话自身 first-wins descriptor。`guide-panel/identity.js` 与 `shield.js` 是兼容导出，goal adapter 继续保留独立 reader，但使用同一 first-wins 语义。
 
 子 agent 在 Runtime 通知父会话之前已被释放。释放时对确认的指导保留一次性结算凭据，按**精确父对象**分组，投递时消费；新同 ID 生命周期、父释放或服务卸载会清理。每父最多 128 条、10 分钟惰性过期，仅保存 ID/时间，不持有整个 Session。该界限覆盖当前 Runtime 的 teardown 后立即通知契约；不承诺任意延迟或重复伪造通知。
+
+## 当前维护
+
+1.1.0 的统一安装、升级、完整卸载与恢复使用 [本机维护流程](../docs/LOCAL-MAINTENANCE.md)。官方同步 snapshotEvents(inheritedEventCount) 已 deprecated，目前在固定产物下受控使用并在 state 暴露依赖；升级必须复核，核心更新使用冷重启。以下保留 1.0.0 独立服务迁移记录，不能作为新版本升级计划重复执行。
 
 ## 安装与迁移
 

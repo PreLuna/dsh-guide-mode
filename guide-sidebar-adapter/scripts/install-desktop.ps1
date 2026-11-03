@@ -10,6 +10,8 @@ $recoveryPath = Join-Path $workspacePath 'evidence/LI-stage2-2026-11-02/desktop-
 $receiptPath = Join-Path $recoveryPath 'files.json'
 $sourcePath = Join-Path $workspacePath 'guide-sidebar-adapter'
 $adapterName = '@local/dsh-guide-sidebar-adapter'
+& node (Join-Path $sourcePath 'scripts/build.mjs') --check
+if ($LASTEXITCODE -ne 0) { throw 'Sidebar generated client is stale; build and validate before installation.' }
 $activeHosts = @(Get-CimInstance Win32_Process | Where-Object {
   $_.Name -eq 'DeepSeek Harness.exe' -and $_.CommandLine -match 'dsh-desktop-host[\\/]lib[\\/](index|cli)\.js'
 })

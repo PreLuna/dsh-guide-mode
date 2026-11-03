@@ -1,14 +1,20 @@
 import assert from 'node:assert'
 
 // ── fake browser ─────────────────────────────────────────────────────────
-let tick, clock = 100000, state, requests = 0, fail = false
+let tick, clock = 100000, state, requests = 0, fail = false, archiveFail = false, openMain, rightTabs = []
 const archives = [], archived = new Set()
 const originalNow = Date.now
 Date.now = () => clock
 globalThis.fetch = async (_url, options) => {
   requests++
   if (fail) throw Error('query failed')
-  return { status: 200, ok: true, text: async () => JSON.stringify({ok:true,value:{ archive:{lowDelayMs:600,midDelayMs:180,highDelayMs:30,holdMs:120},admission:{
+  const body = JSON.parse(options.body)
+  if (_url.includes('auto-archive')) {
+    if (archiveFail) throw Error('archive refused')
+    archives.push(body.id); archived.add(body.id)
+    return {status:200,ok:true,text:async()=>JSON.stringify({ok:true,value:{archived:true}})}
+  }
+  return { status: 200, ok: true, text: async () => JSON.stringify({ok:true,value:{ panelCompat:{writable:true},archiveCandidates:Object.fromEntries((body.candidates??[]).map(item=>[item.id,{status:'idle',parentSessionId:item.parentSessionId}])), archive:{lowDelayMs:600,midDelayMs:180,highDelayMs:30,holdMs:120},admission:{
     ...state, sampledAt:clock, enforcement:'native-materialize',unknown:0,busyIds:state.busyIds??[],
   }}}) }
 }
@@ -69,7 +75,7 @@ const services = {
   workspaces: {
     list: { getSnapshot: () => ({ archivedSessionIds: [...archived] }), subscribe: () => () => {} },
   },
-  sidebarRight: { openResource: () => {}, tabsIn: () => [], close: () => {} },
+  sidebarRight: { openTabs: { getSnapshot: () => [], subscribe: () => () => {} }, openResource: () => {}, tabsIn: () => rightTabs, close: () => {} },
   sidebarRightTabs: {
     register: (value) => { descriptor = value; return () => {} },
     get: () => ({}),
@@ -78,7 +84,7 @@ const services = {
     inject: (_key, callback) => callback(),
     register: (options, component) => { body = { options, component }; return () => {} },
   },
-  uiWorkspace: { archiveSession: async id => { archives.push(id); archived.add(id) }, unarchiveSession: async () => {} },
+  uiWorkspace: { openSession() {}, selection:{getSnapshot:()=>({sessionId:openMain})}, archiveSession: async id => { archives.push(id); archived.add(id) }, unarchiveSession: async () => {} },
 }
 const ctx = {
   locale: { register: () => () => {}, bind: () => (key) => key },
@@ -115,6 +121,24 @@ state.poolsBySession.b=pool('B-new-epoch',2);clock+=1;await tick()
 fail=true;clock+=1000;await tick()
 assert.equal(archives.includes('gb2'),false,'query failures skip archival')
 fail=false;clock+=1;await tick()
+// A known record is discoverable even without its parent's projection.
+storage.set('dsh-guide-panel.threads.v1',JSON.stringify({'cached':{parentSessionId:'b',createdAt:1,label:'指导: cached'}}))
+listSnapshot={byId:{cached:{id:'cached',running:false}},projectionsBySession:{}}
+state.poolsBySession={b:pool('B',6)};clock+=1;await tick()
+openMain='cached';clock+=100;await tick()
+assert.equal(archives.includes('cached'),false,'main-view fallback protects an open guide')
+openMain=undefined;clock+=1;await tick()
+archiveFail=true;clock+=31;await tick();await new Promise(resolve=>setImmediate(resolve))
+assert.equal(archives.includes('cached'),false,'failed archive is not marked archived')
+archiveFail=false;clock+=1;await tick();clock+=31;await tick();await new Promise(resolve=>setImmediate(resolve))
+assert.equal(archives.filter(id=>id==='cached').length,1,'retry succeeds once')
+clock+=100;await tick()
+assert.equal(archives.filter(id=>id==='cached').length,1,'repeated scan does not rearchive')
+const many=Object.fromEntries(Array.from({length:130},(_,i)=>[`batch-${i}`,{parentSessionId:'b',label:'指导: batch',createdAt:1}]))
+storage.set('dsh-guide-panel.threads.v1',JSON.stringify(many))
+listSnapshot={byId:{},projectionsBySession:{}}
+for(let i=0;i<5;i++){clock+=31;await tick();await new Promise(resolve=>setImmediate(resolve))}
+assert.equal(archives.filter(id=>id.startsWith('batch-')).length,130,'rotating batches eventually visit every known guide and retain idle history')
 assert.ok(requests>=8)
 Date.now=originalNow
 console.log('guide-panel scheduler integration: per-pool pressure/hold, busy, unknown and query failures passed')

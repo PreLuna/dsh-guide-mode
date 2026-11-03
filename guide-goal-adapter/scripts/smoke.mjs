@@ -8,6 +8,7 @@ const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const sidebar = process.argv.includes('--sidebar')
 const smokeRoot = process.env.DSH_SMOKE_OUTPUT ? resolve(workspace, process.env.DSH_SMOKE_OUTPUT)
   : join(workspace, sidebar ? 'evidence/LI-stage2-2026-11-02' : 'evidence/LI-stage1-2026-11-02')
+mkdirSync(smokeRoot, { recursive: true })
 const desktop = process.argv.includes('--desktop')
 const expectOriginal = process.argv.includes('--expect-original')
 const home = desktop ? join(process.env.USERPROFILE, '.dsh') : join(smokeRoot, 'isolated-home')
@@ -19,6 +20,7 @@ if (sidebar) {
   if (!existsSync(deps)) symlinkSync(join(process.env.USERPROFILE, '.dsh/profiles/desktop/node_modules'), deps, 'junction')
 }
 const integration = process.argv.includes('--integration')
+const combination = process.argv.includes('--combination')
 if (desktop && integration) throw new Error('Runtime fixtures are never mounted into the desktop profile')
 if (!desktop) {
 mkdirSync(join(profile, 'node_modules/@local'), { recursive: true })
@@ -33,9 +35,22 @@ for (const name of packages) {
   } else symlinkSync(source, target, 'junction')
   dependencies[manifest.name] = `link:${source.replaceAll('\\', '/')}`
 }
+let combinationBundles
+if (combination) {
+  const actualProfile=join(process.env.USERPROFILE,'.dsh/profiles/desktop')
+  const actual=JSON.parse(readFileSync(join(actualProfile,'package.json'),'utf8'))
+  for(const name of Object.keys(actual.dependencies)) {
+    if(dependencies[name])continue
+    const source=realpathSync(join(actualProfile,'node_modules',name)),target=join(profile,'node_modules',name)
+    mkdirSync(dirname(target),{recursive:true})
+    if(!existsSync(target))symlinkSync(source,target,'junction')
+    dependencies[name]=`link:${source.replaceAll('\\','/')}`
+  }
+  combinationBundles=[...actual.dsh.profile.bundles,'@local/dsh-guide-browser-fixture']
+}
 writeFileSync(join(profile, 'package.json'), JSON.stringify({
   name: 'dsh-guide-adapter-isolated-smoke', private: true, dependencies,
-  dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...Object.keys(dependencies)] } },
+  dsh: { profile: { bundles: combinationBundles ?? ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...Object.keys(dependencies)] } },
 }, null, 2) + '\n')
 writeFileSync(join(profile, 'cordis.yml'), '[]\n')
 writeFileSync(join(profile, 'cordis.patch.yml'), integration ? JSON.stringify([{ insert: [{
@@ -96,7 +111,7 @@ try {
             const runtimeResponse = await fetch(`${baseUrl}/li-runtime`, { headers: { cookie, origin: baseUrl }, signal: AbortSignal.timeout(1000) })
             if (!runtimeResponse.ok) throw new Error(`Runtime fixture route: ${runtimeResponse.status}`)
             runtime = await runtimeResponse.json()
-            if (runtime.status === 'failed') throw new Error(`Runtime fixture failed: ${JSON.stringify({ runtime, modelProjection: data.modelProjection })}`)
+            if (runtime.status === 'failed') throw new Error(`Runtime fixture failed: ${JSON.stringify({ runtime, modelProjection: data.modelProjection, panelCompat:data.panelCompat })}`)
             if (runtime.status !== 'passed') {
               lastProbeError = `Runtime ${runtime.status}; last assertions: ${JSON.stringify(runtime.assertions?.slice(-5))}`
               await new Promise(resolve => setTimeout(resolve, 50)); continue
@@ -148,6 +163,14 @@ try {
             const code = await new Promise(resolve => browser.on('exit', resolve))
             if (code !== 0) throw new Error(`Runtime fixture browser check failed: ${redact(browserOutput).slice(-2500)}`)
             console.log(browserOutput.trim())
+          }
+          if(combination){
+            const browser=spawn('python',[join(workspace,'scripts/r5-browser.py')],{cwd:workspace,env:{...process.env,PYTHONUTF8:'1'},windowsHide:true,stdio:['pipe','pipe','pipe']})
+            browser.stdin.end(JSON.stringify({entryUrl,output:smokeRoot}))
+            let output='';browser.stdout.on('data',chunk=>output+=chunk);browser.stderr.on('data',chunk=>output+=chunk)
+            const code=await new Promise(resolve=>browser.on('exit',resolve))
+            if(code!==0)throw Error(`Combination browser probe failed: ${redact(output).slice(-2500)}`)
+            console.log(output.trim())
           }
           writeFileSync(join(smokeRoot, desktop ? expectOriginal ? 'desktop-restore-result.json' : 'desktop-mount-result.json' : integration ? 'runtime-result.json' : 'smoke-result.json'), JSON.stringify({ status: 'passed', home, baseUrl, state, runtime, panelStart, sidebarState, scope: desktop ? 'actual desktop profile cold Host startup and fenced guidance API; no test agents or model requests' : integration ? 'real isolated Host, agent loop, goal, subagent runtime, native tool-call and actual PTC run_code; deterministic in-process model; no external model request' : 'real isolated keyless Host startup and fenced guidance API; no model request' }, null, 2) + '\n')
           console.log(JSON.stringify({ status: 'passed', baseUrl, goalAdapter: data.goalAdapter }))

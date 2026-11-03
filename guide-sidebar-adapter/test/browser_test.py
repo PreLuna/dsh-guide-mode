@@ -79,6 +79,33 @@ async def main():
             await section.get_by_text('休眠中', exact=True).wait_for()
             await page.evaluate("(id) => window.__liFixture.ctx.uiWorkspace.unarchiveSession(id)", guides[0])
             await page.wait_for_timeout(150)
+            # O12: seed a real native layout with the historical stored title/address.
+            legacy = await page.evaluate("""(id) => {
+              const right=window.__liFixture.ctx.sidebarRight;
+              right.openTabIn(id,'guide-panel');
+              for(const tab of right.tabsIn(id)) if(tab.kind==='guide') right.closeIn(id,tab.id);
+              const before=right.tabsIn(id).map(tab=>tab.id);
+              right.adopted.get(id).store.actions.openContent(id,{kind:'guide',contentId:'sidebar://guide',title:'指导'},()=>{});
+              const old=right.tabsIn(id).find(tab=>tab.kind==='guide'&&tab.title==='指导');
+              right.openTabIn(id,'guide-panel');
+              return {before,old:old?.id};
+            }""",parent)
+            assert legacy['old'], legacy
+            await page.locator('[data-guide-legacy-layout]').wait_for(timeout=7000)
+            await page.get_by_role('button',name='清理旧指导页签',exact=True).click()
+            await page.locator('[data-guide-legacy-layout]').wait_for(state='detached')
+            current=await page.evaluate('(id)=>window.__liFixture.ctx.sidebarRight.tabsIn(id).map(tab=>tab.id)',parent)
+            assert legacy['old'] not in current and all(id in current for id in legacy['before'])
+            # O21: a missing essential service method becomes explicit read-only state.
+            await page.evaluate("async()=>fetch('./li-runtime/compat-disable',{method:'POST'})")
+            refusal=await page.evaluate("""async(id)=>{
+              const state=await fetch('./guide/api/state',{method:'POST',body:JSON.stringify({sessionId:id}),headers:{'content-type':'application/json'}}).then(r=>r.json());
+              const response=await fetch('./guide/api/start',{method:'POST',body:JSON.stringify({sessionId:id,question:'must not execute'}),headers:{'content-type':'application/json'}});
+              return{mode:state.value.panelCompat.mode,status:response.status};
+            }""",parent)
+            await page.evaluate("async()=>fetch('./li-runtime/compat-restore',{method:'POST'})")
+            assert refusal=={'mode':'unsupported','status':503},refusal
+            await page.evaluate("(id)=>{const r=window.__liFixture.ctx.sidebarRight;for(const t of r.tabsIn(id))if(t.kind==='guide-panel')r.closeIn(id,t.id);r.openTabIn(id,'guide');}",parent)
             await page.screenshot(path=str(output / 'tasks.png'), full_page=True)
             # Observe the real stock auto-open path, not an imitation of its helper.
             await page.evaluate('(id) => window.__liFixture.ctx.uiWorkspace.openSession(id)', config['autoParent'])
@@ -133,7 +160,7 @@ async def main():
                                      'archive/unarchive updates the guidance section', 'actual guidance auto-open suppressed; ordinary work auto-open retained',
                                      'original file explorer, changes and sidechat views render; non-task component implementations survive reload unchanged',
                                      'adapter unload restores original sidebar and reactivation succeeds', 'full page reload succeeds'],
-                      'consoleErrors': errors}
+                      'consoleErrors': errors, 'additionalAssertions':['O12 real persisted legacy layout cleanup preserves other tabs','O21 actual missing method is unsupported and start returns 503']}
             (output / 'browser-result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
             print(json.dumps({'status': 'passed', 'assertions': len(result['assertions']), 'consoleErrors': len(errors)}))
         except Exception as error:

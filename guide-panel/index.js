@@ -1,3 +1,9 @@
+const { loadHostContracts } = await import('@local/dsh-guide-shield/contracts').catch(error => {
+  if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error
+  return import('../guide-shield/contracts.js')
+})
+import { panelCompatibility } from './compatibility.js'
+import { inspectCandidates, autoArchive } from './archive.js'
 /**
  * Host half of the guidance panel bundle.
  *
@@ -348,7 +354,7 @@ async function startThread(ctx, presetId, limits, shield, identity, payload) {
 }
 
 /** Dispatch one POST under the API prefix. */
-async function dispatch(ctx, presetId, limits, shield, identity, projection, req, res) {
+async function dispatch(ctx, presetId, limits, shield, identity, projection, foldDescriptor, compatibility, req, res) {
   const connection = serviceOf(ctx, 'connection')
   const rejection = typeof connection?.requestRejection === 'function'
     ? connection.requestRejection(req)
@@ -376,7 +382,7 @@ async function dispatch(ctx, presetId, limits, shield, identity, projection, req
     if (method === 'ping') {
       // Health check for the panel: proves THIS host half is loaded and
       // reachable before the user types a question.
-      writeOk(res, { service: 'guide-panel', version: 1 })
+      writeOk(res, { service: 'guide-panel', version: 2, panelCompat: compatibility() })
       return
     }
     if (method === 'state') {
@@ -386,6 +392,7 @@ async function dispatch(ctx, presetId, limits, shield, identity, projection, req
       const adapter = serviceOf(ctx, 'guideGoalAdapter')
       let goalAdapter = { mode: 'absent', reason: null }
       try { goalAdapter = adapter?.getState?.() ?? goalAdapter } catch {}
+      const archiveCandidates = compatibility().writable ? await inspectCandidates(ctx, payload?.candidates, foldDescriptor) : {}
       const admission = serviceOf(ctx, 'guideAdmission')
       let capacityState = { mode: 'unsupported', reason: 'admission-service-unavailable', allowed: false, capacity: null }
       try { capacityState = admission?.state(payload) ?? capacityState } catch { capacityState.reason = 'admission-state-failed' }
@@ -395,10 +402,20 @@ async function dispatch(ctx, presetId, limits, shield, identity, projection, req
         reserve: capacityState.reserve,
         maxGuides: capacityState.maxGuides,
         admission: capacityState,
+        archiveCandidates,
+        panelCompat: compatibility(),
         goalAdapter,
         settlementShield: shield.getState(),
         modelProjection: projection.getState(),
       })
+      return
+    }
+    if ((method === 'start' || method === 'auto-archive') && !compatibility().writable) {
+      writeError(res, 503, '指导面板暂不可用，请重启宿主或恢复支持的版本')
+      return
+    }
+    if (method === 'auto-archive') {
+      writeOk(res, await autoArchive(ctx, payload, foldDescriptor))
       return
     }
     if (method === 'start') {
@@ -412,8 +429,12 @@ async function dispatch(ctx, presetId, limits, shield, identity, projection, req
 }
 
 /** Host plugin body: the subagent provider plus one fenced JSON route. */
-export async function apply(ctx, config = {}) {
-  const foldDescriptor = await loadFoldDescriptor()
+export async function apply(ctx, config = {}, sourceProof) {
+  const proof = sourceProof ?? await loadHostContracts({ client: true })
+  const foldDescriptor = proof.foldDescriptor ?? await loadFoldDescriptor()
+  let compatibilityContext = ctx
+  const compatibility = () => panelCompatibility(compatibilityContext, proof)
+  ctx.provide('guidePanelCompatibility', { getState: compatibility })
   const hideGuidance = config?.model?.hideGuidance !== false
   let projectionSource
   let projectionSourceError
@@ -474,7 +495,9 @@ export async function apply(ctx, config = {}) {
   }
   // The provider must exist before the route serves a start request; both are
   // owned by this plugin's effect scope, so an unload removes them together.
-  ctx.inject(['subagents'], (injected) => {
+  ctx.inject(['subagents', 'agents', 'sessions', 'sessionQuery', 'guideAdmission', 'workspaceRegistry', 'connection', 'webServer', 'sessionTitle'], (injected) => {
+    compatibilityContext = injected
+    if (!compatibility().writable) { injected.logger?.warn?.(`guide-panel preflight: ${JSON.stringify(compatibility())}`); return }
     const subagents = serviceOf(injected, 'subagents')
     if (typeof subagents?.registerProvider !== 'function') return
     injected.effect(() => {
@@ -497,14 +520,14 @@ export async function apply(ctx, config = {}) {
       injected.logger.info(`guide-panel: subagent provider "${GUIDE_PROVIDER}" registered (preset "${presetId}")`)
     }
   })
-  ctx.inject(['webServer'], (injected) => {
+  ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
-    if (typeof webServer?.register !== 'function') return
+    if (typeof webServer?.register !== 'function' || typeof serviceOf(injected, 'connection')?.requestRejection !== 'function') return
     injected.effect(() => webServer.register({
       kind: 'prefix',
       path: ROUTE_PREFIX,
       handler: (req, res) => {
-        void dispatch(injected, presetId, limits, shield, identity, projection, req, res)
+        void dispatch(injected, presetId, limits, shield, identity, projection, foldDescriptor, compatibility, req, res)
       },
     }), 'guide-panel: /guide/api routes')
     if (typeof injected.logger?.info === 'function') {

@@ -7,6 +7,7 @@ export const inject = ['llm', 'agents', 'sessions', 'sessionQuery', 'goals', 'su
 
 export function apply(ctx) {
   let state = { status: 'starting', assertions: [] }
+  let restoreCompatibility
   const gates = new Map()
   const entered = new Set()
   const controller = new AbortController()
@@ -124,6 +125,16 @@ export function apply(ctx) {
     kind: 'prefix', path: '/li-runtime', handler(req, res) {
       const rejection = ctx.connection.requestRejection(req)
       const command = new URL(req.url, 'http://li.test').pathname.split('/').at(-1)
+      if (!rejection && req.method === 'POST' && ['compat-disable','compat-restore'].includes(command)) {
+        req.resume()
+        if(command==='compat-disable') {
+          const target=ctx.subagents[Symbol.for('cordis.original')]??ctx.subagents
+          const descriptor=Object.getOwnPropertyDescriptor(target,'startActivation')
+          restoreCompatibility=()=>{if(descriptor)Object.defineProperty(target,'startActivation',descriptor);else delete target.startActivation}
+          target.startActivation=undefined
+        } else {restoreCompatibility?.();restoreCompatibility=undefined}
+        res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({ok:true}));return
+      }
       if (!rejection && req.method === 'POST' && ['add-guide', 'auto-guide', 'auto-work'].includes(command)) {
         req.resume()
         const parent = ctx.agents.get(command === 'add-guide' ? state.parent : state.autoParent)

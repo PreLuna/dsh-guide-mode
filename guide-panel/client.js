@@ -27,6 +27,10 @@ window.__ModuleLoader__.load({
 
     const zh = {
       title: '指导',
+      legacyLayout: '检测到旧版指导页签，可清理后继续使用新版面板。',
+      cleanLegacy: '清理旧指导页签',
+      legacyCleanFailed: '部分旧页签暂时无法关闭，请稍后重试。',
+      compatibilityUnavailable: '指导面板暂不可用，请重启宿主或恢复支持的版本。',
       description: '在侧栏开一个继承当前上下文的指导对话，判断下一步该用什么技能',
       intro: '指导对话是当前会话的子会话，用「指导模式」preset 运行：它继承已完成轮次的历史，可以提供建议，也可以按你的要求执行修改。开在右侧栏，和主对话并排看。',
       goalNative: 'goal 兼容层当前使用原等待行为，运行中的指导仍可能推迟 goal 续轮。',
@@ -50,14 +54,10 @@ window.__ModuleLoader__.load({
       archiving: '归档中…',
       unarchiving: '恢复中…',
       unarchive: '取消归档',
-      archivedTag: '已归档',
       sleepTag: '休眠中',
       runningTag: '生成中',
       copyId: '复制 ID',
       copied: '已复制',
-      showArchived: '显示已归档',
-      hideArchived: '隐藏已归档',
-      noArchived: '没有已归档的指导对话',
       archivedDone: '已休眠',
       closeHint: '关闭对话页签只会暂时收起页面；会话仍在，点「打开」即可回来。闲置的指导对话会在子代理名额紧张时自动休眠，「重新打开」即唤醒（首条消息要冷启动几秒）。',
       unavailable: '工作区服务不可用',
@@ -76,6 +76,10 @@ window.__ModuleLoader__.load({
 
     const en = {
       title: 'Guidance',
+      legacyLayout: 'Old guidance tabs were detected. You can remove them and use this panel.',
+      cleanLegacy: 'Remove old guidance tabs',
+      legacyCleanFailed: 'Some old tabs could not be closed. Please retry later.',
+      compatibilityUnavailable: 'Guidance is unavailable. Restart the Host or restore a supported version.',
       description: 'Open a guidance conversation beside this one, inheriting its context',
       intro: 'A guidance conversation inherits completed turns and uses the Guidance preset. It can advise or make changes when you request them. It opens beside the main conversation.',
       goalNative: 'Goal compatibility is using the original wait behavior. Running guidance may delay goal continuation.',
@@ -99,14 +103,10 @@ window.__ModuleLoader__.load({
       archiving: 'Archiving…',
       unarchiving: 'Restoring…',
       unarchive: 'Unarchive',
-      archivedTag: 'Archived',
       sleepTag: 'Sleeping',
       runningTag: 'Running',
       copyId: 'Copy ID',
       copied: 'Copied',
-      showArchived: 'Show archived',
-      hideArchived: 'Hide archived',
-      noArchived: 'No archived guidance conversation',
       archivedDone: 'Sleeping',
       closeHint: 'Closing the chat tab only hides the page; the session stays and “Reopen” brings it back. Idle guidance threads fall asleep when subagent slots get tight; reopening wakes one (the first message cold-starts in a few seconds).',
       unavailable: 'Workspace service unavailable',
@@ -283,6 +283,36 @@ window.__ModuleLoader__.load({
     }
     const taskMeta = { flex: 'none', fontSize: 10, color: 'var(--dsw-alias-label-tertiary)' }
 
+    // Historical guidance reused the built-in guide page with a persisted Chinese title.
+    // Never identify old tabs from kind alone: the native Start page has that kind too.
+    function isLegacyGuideTab(tab) {
+      return tab?.kind === 'guide' && tab.title === '指导'
+        && tab.contentId === 'sidebar://guide' && typeof tab.id === 'string' && tab.id !== ''
+    }
+    function legacyTabs(right, sessionId) {
+      try {
+        const tabs = right?.tabsIn?.(sessionId)
+        return Array.isArray(tabs) ? tabs.filter(isLegacyGuideTab) : []
+      } catch { return [] }
+    }
+    async function cleanLegacyTabs(right, sessionId) {
+      const candidates = legacyTabs(right, sessionId)
+      let closed = 0, failed = 0
+      for (const tab of candidates) {
+        // Recheck identity at the moment of removal; operate on this exact seat.
+        if (!legacyTabs(right, sessionId).some(current => current.id === tab.id)) continue
+        try {
+          if (typeof right.closeIn === 'function') right.closeIn(sessionId, tab.id)
+          else if (right.mounted?.getSnapshot?.() === sessionId && typeof right.close === 'function') right.close(tab.id)
+          else throw Error('scoped close unavailable')
+          await Promise.resolve()
+          if (legacyTabs(right, sessionId).some(current => current.id === tab.id)) failed++
+          else closed++
+        } catch { failed++ }
+      }
+      return { closed, failed }
+    }
+
     // ── durable local records ────────────────────────────────────────────
     // The child session is the source of truth; this map only remembers the
     // threads this panel minted, so an archived (or catalog-dropped) thread
@@ -292,7 +322,8 @@ window.__ModuleLoader__.load({
         const raw = window.localStorage.getItem(STORE_KEY)
         if (!raw) return {}
         const parsed = JSON.parse(raw)
-        return parsed !== null && typeof parsed === 'object' ? parsed : {}
+        return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? Object.fromEntries(Object.entries(parsed).filter(([id, item]) => id.length > 0 && id.length <= 256 && typeof item?.parentSessionId === 'string' && item.parentSessionId.length > 0 && item.parentSessionId.length <= 256)) : {}
       } catch {
         return {}
       }
@@ -390,7 +421,7 @@ window.__ModuleLoader__.load({
     /** One-line settlement-shield status for the panel; `active` is silent. */
     function shieldNoteFor(shield, t) {
       if (shield?.mode === 'partial') return t('shieldPartial')
-      if (shield?.mode === 'off') return t('shieldOff')
+      if (shield?.mode === 'off' || shield?.mode === 'unsupported') return t('shieldOff')
       return ''
     }
 
@@ -408,18 +439,43 @@ window.__ModuleLoader__.load({
       return delayForBand(bandOf(running, capacity), archive)
     }
 
-    /** Whether one thread currently has a chat tab open in its seat. */
-    function threadOpen(right, seatSessionId, childSessionId) {
+    function resourceChild(address) {
       try {
-        const tabs = typeof right?.tabsIn === 'function' ? right.tabsIn(seatSessionId) : []
-        if (!Array.isArray(tabs)) return false
-        return tabs.some((tab) => {
-          const address = typeof tab?.contentId === 'string' ? tab.contentId : ''
-          return address.includes(childSessionId) || address.includes(encodeURIComponent(childSessionId))
-        })
-      } catch {
-        return false
+        const url = new URL(address)
+        if (url.protocol !== 'dsh-resource:' || url.hostname !== 'subagentchat' || !url.pathname.startsWith('/session/')) return undefined
+        return decodeURIComponent(url.pathname.slice('/session/'.length))
+      } catch { return undefined }
+    }
+    /** Include saved right-pane inventory and main-view fallback, across seats. */
+    function threadOpen(right, seatSessionId, childSessionId, workspace) {
+      try {
+        const inventory = right?.openTabs?.getSnapshot?.()
+        if (Array.isArray(inventory) && inventory.some(tab => resourceChild(tab.contentId) === childSessionId)) return true
+        const tabs = right?.tabsIn?.(seatSessionId)
+        if (Array.isArray(tabs) && tabs.some(tab => resourceChild(tab.contentId) === childSessionId)) return true
+        const selected = workspace?.selection?.getSnapshot?.()
+        return workspace?.mainReference?.sessionId === childSessionId || selected?.sessionId === childSessionId
+          || selected?.subagentAddress?.childSessionId === childSessionId
+      } catch { return true }
+    }
+    function archiveCandidates(records, list) {
+      const result = new Map()
+      for (const [id, record] of Object.entries(records ?? {})) {
+        if (typeof record?.parentSessionId === 'string' && typeof id === 'string' && id.length && record.parentSessionId.length)
+          result.set(id, { id, parentSessionId: record.parentSessionId })
       }
+      for (const [parentSessionId, projection] of Object.entries(list?.projectionsBySession ?? {})) {
+        const catalog = projection?.values?.subagentCatalog
+        for (const entry of Array.isArray(catalog) ? catalog : []) {
+          if (typeof entry?.id === 'string' && entry.id && entry.label?.startsWith?.(LABEL_PREFIX))
+            result.set(entry.id, { id: entry.id, parentSessionId })
+        }
+      }
+      for (const row of Object.values(list?.byId ?? {})) {
+        if (row?.origin === 'subagent' && typeof row.parentId === 'string' && row.displayTitle?.startsWith?.(LABEL_PREFIX) && !result.has(row.id))
+          result.set(row.id, { id: row.id, parentSessionId: row.parentId })
+      }
+      return [...result.values()]
     }
 
     function apiUrl(ctx, method) {
@@ -475,6 +531,8 @@ window.__ModuleLoader__.load({
         const archived = serviceOf(ctx, 'workspaces')?.list?.getSnapshot?.()?.archivedSessionIds
         if (Array.isArray(archived) && archived.includes(childSessionId)
           && typeof workspaceService?.unarchiveSession === 'function') {
+          const state = await callHost(ctx, 'state', { sessionId: parentSessionId }, ctx.locale.bind(NS))
+          if (state.panelCompat?.writable !== true) throw Error('Guidance is read-only on this Host')
           await workspaceService.unarchiveSession(childSessionId)
         }
       } catch {
@@ -645,11 +703,25 @@ window.__ModuleLoader__.load({
       const [note, setNote] = React.useState('')
       const [hostReady, setHostReady] = React.useState(null)
       const [capNote, setCapNote] = React.useState('')
+      const [panelSupported, setPanelSupported] = React.useState(null)
       const [goalNote, setGoalNote] = React.useState('')
       const [shieldNote, setShieldNote] = React.useState('')
       const [modelNote, setModelNote] = React.useState('')
       const [sidebarNote, setSidebarNote] = React.useState('')
       const [records, setRecords] = React.useState(loadRecords)
+      const [, setLegacyRevision] = React.useState(0)
+      const [legacyNote, setLegacyNote] = React.useState('')
+      const oldTabs = legacyTabs(serviceOf(ctx, 'sidebarRight'), sessionId)
+      React.useEffect(() => {
+        const right = serviceOf(ctx, 'sidebarRight')
+        return right?.openTabs?.subscribe?.(() => setLegacyRevision(value => value + 1))
+      }, [sessionId])
+      const cleanOldTabs = async () => {
+        const result = await cleanLegacyTabs(serviceOf(ctx, 'sidebarRight'), sessionId)
+        setLegacyNote(result.failed ? t('legacyCleanFailed') : '')
+        setLegacyRevision(value => value + 1)
+      }
+
 
       // Probe the host half once per mount. A stale bundle answers the SPA
       // fallback (405 for any non-GET), so the banner names the real fix
@@ -689,6 +761,7 @@ window.__ModuleLoader__.load({
               : value.goalAdapter?.mode === 'absent' ? t('goalAbsent') : '')
             setShieldNote(shieldNoteFor(value.settlementShield, t))
             setModelNote(modelNoteFor(value.modelProjection, t))
+            setPanelSupported(value.panelCompat?.writable === true)
             const admission = value.admission
             setCapNote(!admission || ['unsupported', 'off', 'reconciling'].includes(admission.mode)
               ? t('capNote') : '')
@@ -764,6 +837,7 @@ window.__ModuleLoader__.load({
       }
 
       const start = async () => {
+        if (panelSupported !== true) { setNote(t('compatibilityUnavailable')); return }
         const text = inputRef.current !== null ? inputRef.current.value.trim() : draftRef.current.trim()
         if (busy !== null) return
         if (text === '') {
@@ -802,6 +876,7 @@ window.__ModuleLoader__.load({
       }
 
       const archive = async (thread) => {
+        if (panelSupported !== true) { setNote(t('compatibilityUnavailable')); return }
         if (busy !== null) return
         const workspace = serviceOf(ctx, 'uiWorkspace')
         if (typeof workspace?.archiveSession !== 'function') {
@@ -822,6 +897,7 @@ window.__ModuleLoader__.load({
       }
 
       const unarchive = async (thread) => {
+        if (panelSupported !== true) { setNote(t('compatibilityUnavailable')); return }
         if (busy !== null) return
         const workspace = serviceOf(ctx, 'uiWorkspace')
         if (typeof workspace?.unarchiveSession !== 'function') {
@@ -907,12 +983,12 @@ window.__ModuleLoader__.load({
             isArchived
               ? h(
                 'button',
-                { type: 'button', style: secondary, onClick: () => void unarchive(thread), disabled: busy !== null },
+                { type: 'button', style: secondary, onClick: () => void unarchive(thread), disabled: busy !== null || panelSupported !== true },
                 archiving ? t('unarchiving') : t('unarchive'),
               )
               : h(
                 'button',
-                { type: 'button', style: secondary, onClick: () => void archive(thread), disabled: busy !== null },
+                { type: 'button', style: secondary, onClick: () => void archive(thread), disabled: busy !== null || panelSupported !== true },
                 archiving ? t('archiving') : t('archive'),
               ),
             h('button', { type: 'button', style: secondary, onClick: () => copy(thread) }, t('copyId')),
@@ -926,6 +1002,11 @@ window.__ModuleLoader__.load({
         h('div', { style: heading }, t('title')),
         h('p', { style: intro }, t('intro')),
         hostReady === false ? h('p', { style: warn }, t('hostStaleBanner')) : null,
+        oldTabs.length ? h('div', { role: 'status', style: warn, 'data-guide-legacy-layout': true },
+          h('p', null, t('legacyLayout')),
+          h('button', { type: 'button', style: secondary, onClick: () => void cleanOldTabs() }, t('cleanLegacy'))) : null,
+        legacyNote ? h('p', { role: 'status', style: warn }, legacyNote) : null,
+        panelSupported === false ? h('p', { role: 'status', style: warn }, t('compatibilityUnavailable')) : null,
         capNote !== '' ? h('p', { style: warn }, capNote) : null,
         h('p', { style: fieldLabel }, t('questionLabel')),
         h('textarea', {
@@ -961,7 +1042,7 @@ window.__ModuleLoader__.load({
             type: 'button',
             style: busy === 'start' ? { ...primary, opacity: 0.6, cursor: 'default' } : primary,
             onClick: () => void start(),
-            disabled: busy !== null,
+            disabled: busy !== null || panelSupported !== true,
           },
           busy === 'start' ? t('starting') : t('start'),
         ),
@@ -1071,9 +1152,29 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function clientCompatibility(ctx) {
+      const missing = []
+      for (const [key, methods] of Object.entries({ sidebarRightTabs: ['register', 'get'], slots: ['inject', 'register'],
+        sidebarRight: ['tabsIn', 'openResource'], uiWorkspace: ['openSession'] })) {
+        for (const method of methods) if (typeof serviceOf(ctx, key)?.[method] !== 'function') missing.push(`${key}.${method}`)
+      }
+      const list = serviceOf(ctx, 'sessions')?.list
+      if (typeof list?.getSnapshot !== 'function' || typeof list?.subscribe !== 'function') missing.push('sessions.list')
+      if (typeof serviceOf(ctx, 'uiWorkspace')?.selection?.getSnapshot !== 'function') missing.push('uiWorkspace.selection')
+      const inventory = serviceOf(ctx, 'sidebarRight')?.openTabs
+      if (typeof inventory?.getSnapshot !== 'function' || typeof inventory?.subscribe !== 'function') missing.push('sidebarRight.openTabs')
+      return { mode: missing.length ? 'unsupported' : 'ready', missing }
+    }
+
     return {
       inject: ['uiWorkspace', 'sessions', 'sidebarRight', 'locale'],
       apply(ctx) {
+        const compatibility = clientCompatibility(ctx)
+        ctx.provide?.('guidePanelClientCompatibility', { getState: () => compatibility })
+        if (compatibility.mode !== 'ready') {
+          console.warn('[guide-panel] unsupported client contract', compatibility.missing)
+          return
+        }
         const offZh = ctx.locale.register(NS, 'zh', zh)
         const offEn = ctx.locale.register(NS, 'en', en)
         // Native right-sidebar registration: the panel is its OWN tab type
@@ -1187,7 +1288,7 @@ window.__ModuleLoader__.load({
           // Peak-hold state (C3): the band last in force and the deadline of
           // its hold. Reset when pressure returns to that band or drops to none.
           const holds = new Map()
-          let scanning = false
+          let scanning = false, candidateOffset = 0
           const scan = async () => {
             if (stopped || scanning) return
             scanning = true
@@ -1196,22 +1297,18 @@ window.__ModuleLoader__.load({
             const list = sessions.list.getSnapshot() ?? EMPTY_LIST
             const archiveIds = workspaces?.list?.getSnapshot?.()?.archivedSessionIds
             const archived = new Set(Array.isArray(archiveIds) ? archiveIds : EMPTY_IDS)
-            const threads = new Map()
-            for (const [seatId, projection] of Object.entries(list.projectionsBySession ?? {})) {
-              const catalog = projection && projection.values && projection.values.subagentCatalog
-              if (!Array.isArray(catalog)) continue
-              for (const entry of catalog) {
-                const label = entry && entry.label
-                if (typeof label !== 'string' || !label.startsWith(LABEL_PREFIX)) continue
-                if (typeof entry.id !== 'string' || entry.id === '') continue
-                threads.set(entry.id, { seatId })
-              }
-            }
+            const allCandidates = archiveCandidates(loadRecords(), list)
+            const allCandidateIds = new Set(allCandidates.map(item => item.id))
+            const count = allCandidates.length
+            const offset = count ? candidateOffset % count : 0
+            const candidates = [...allCandidates.slice(offset), ...allCandidates.slice(0,offset)].slice(0,128)
+            candidateOffset = count ? (offset + candidates.length) % count : 0
+            const threads = new Map(candidates.map(item => [item.id, {seatId:item.parentSessionId}]))
             if (!threads.size) { holds.clear(); return }
-            const state = await callHost(ctx, 'state', { sessionIds: [...new Set([...threads.values()].map(thread => thread.seatId))] }, ctx.locale.bind(NS))
+            const state = await callHost(ctx, 'state', { sessionIds: [...new Set(candidates.map(item => item.parentSessionId))], candidates }, ctx.locale.bind(NS))
             if (stopped) return
             const snapshot = state?.admission
-            if (!snapshot || snapshot.enforcement !== 'native-materialize' || snapshot.unknown !== 0
+            if (state?.panelCompat?.writable !== true || !snapshot || snapshot.enforcement !== 'native-materialize' || snapshot.unknown !== 0
               || !Number.isFinite(snapshot.sampledAt) || Date.now() - snapshot.sampledAt > 10_000) { holds.clear(); return }
             limitsRef.current = { ...DEFAULT_LIMITS, archive: { ...DEFAULT_LIMITS.archive, ...state.archive } }
             const busy = new Set(snapshot.busyIds ?? [])
@@ -1227,14 +1324,16 @@ window.__ModuleLoader__.load({
             }
             for (const key of holds.keys()) if (!seenPools.has(key)) holds.delete(key)
             for (const [childId, thread] of threads) {
+              const verified = state.archiveCandidates?.[childId]
+              if (verified?.status !== 'idle' || verified.parentSessionId !== thread.seatId) { idleSince.delete(childId); continue }
               const pool = snapshot.poolsBySession?.[thread.seatId]
               if (!pool || !delays.has(pool.poolId) || busy.has(childId)) { idleSince.delete(childId); continue }
               const delay = delays.get(pool.poolId)
               const summary = sessions.list.getSnapshot()?.byId?.[childId]
               // Unknown state (no summary) is never archived: a background
               // run whose row is not loaded must not be stopped by a guess.
-              if (!summary || archived.has(childId) || summary.running === true
-                || threadOpen(right, thread.seatId, childId) || inflight.has(childId)) {
+              if (archived.has(childId) || summary?.running === true
+                || threadOpen(right, thread.seatId, childId, workspace) || inflight.has(childId)) {
                 idleSince.delete(childId)
                 continue
               }
@@ -1246,7 +1345,7 @@ window.__ModuleLoader__.load({
               idleSince.set(childId, since)
               if (archiveVerdict(now, since, delay) !== 'archive') continue
               inflight.add(childId)
-              workspace.archiveSession(childId, { stopActivity: true })
+              callHost(ctx, 'auto-archive', { id: childId, parentSessionId: thread.seatId }, ctx.locale.bind(NS))
                 .catch(() => {})
                 .finally(() => {
                   idleSince.delete(childId)
@@ -1254,7 +1353,7 @@ window.__ModuleLoader__.load({
                 })
             }
             for (const childId of [...idleSince.keys()]) {
-              if (!threads.has(childId)) idleSince.delete(childId)
+              if (!allCandidateIds.has(childId)) idleSince.delete(childId)
             }
             } catch { holds.clear() } finally { scanning = false }
           }
@@ -1281,7 +1380,7 @@ window.__ModuleLoader__.load({
         }, 'guide-panel: idle archive')
       },
       // Pure scheduling policy, exposed for tests only (no host access).
-      __internals: { bandOf, delayForBand, nextHold, archiveVerdict, archiveDelay, shieldNoteFor, modelNoteFor },
+      __internals: { clientCompatibility, resourceChild, threadOpen, archiveCandidates, isLegacyGuideTab, legacyTabs, cleanLegacyTabs, bandOf, delayForBand, nextHold, archiveVerdict, archiveDelay, shieldNoteFor, modelNoteFor },
     }
   },
 })

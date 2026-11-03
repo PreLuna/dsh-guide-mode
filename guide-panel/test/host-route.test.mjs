@@ -98,9 +98,13 @@ function capacityService(capacity = 8, reserve = 2, maxGuides = 4, used = 0, gui
     SubagentError, methodHash, reserve, maxGuides })
   services.guideAdmission.bind(manager)
 }
+services.sessions = { get() {} }
+services.sessionQuery = { async observeSession() { return undefined } }
+services.workspaceRegistry = { async archiveSession() {} }
+services.sessionTitle = { rename() {} }
 capacityService()
 applyShield(ctx, {}, events => events.find(event => event.type === 'subagent/descriptor')?.data)
-await apply(ctx)
+await apply(ctx, {}, {supported:true})
 assert.ok(services.route, 'the route must be registered')
 assert.equal(registeredProvider?.name, GUIDE_PROVIDER, 'apply must register the guidance provider')
 
@@ -109,9 +113,9 @@ assert.equal(registeredProvider?.name, GUIDE_PROVIDER, 'apply must register the 
 const shape = hostCompatibility(ctx)
 assert.deepEqual(shape, {
   tools: false,
-  sessions: false,
+  sessions: true,
   agents: true,
-  sessionQuery: false,
+  sessionQuery: true,
   subagents: true,
 })
 const completeShape = hostCompatibility({
@@ -286,7 +290,7 @@ for (const [capacity, reserve, maxGuides] of [[2,2,4],[1,2,4],[8,2,0]]) {
 }
 services.guideAdmission.dispose(); delete services.guideAdmission
 const absent = await post({sessionId:'session-a',question:'missing'})
-assert.equal(absent.status,400)
-assert.match(absent.body.error.message,/名额服务不可用/)
+assert.equal(absent.status,503)
+assert.match(absent.body.error.message,/面板暂不可用/)
 server.close()
 console.log('guide-panel host route: all checks passed')

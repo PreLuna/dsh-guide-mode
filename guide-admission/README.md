@@ -17,3 +17,5 @@ S 来自 `slots.size`，包括 creating、closing、external、带 inbox 的 idl
 安装与回退必须与 panel 配套：profile 依赖和 bundles 中登记本服务，放在 panel 前，创建本地 junction；移除 panel 的 capacity/reserve/maxGuides 配置。旧覆盖值先迁移到此服务，旧 capacity 与 Host 不一致时应先核对。完整部署脚本和证据见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
 
 验证入口：`node guide-admission/test/core.test.mjs`；真实 Host：`node evidence/O19-production-2026-11-03/run.mjs`。生产包不导入研究原型。
+
+1.1.0 及后续本机维护使用 [统一维护流程](../docs/LOCAL-MAINTENANCE.md)。本目录原 O19 prepare/apply/rollback 脚本只保留该轮精确恢复关系；源码变化后会拒绝覆盖历史计划，不用于新版本升级。

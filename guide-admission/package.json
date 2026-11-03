@@ -1,14 +1,26 @@
 {
   "name": "@local/dsh-guide-admission",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./index.js" },
-  "files": ["index.js", "core.js", "cordis.patch.yml", "README.md"],
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "core.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "peerDependencies": {
-    "@local/dsh-guide-shield": "1.0.0",
-    "@deepseek-ai/cordis": "~4.0.5",
+    "@local/dsh-guide-shield": "1.1.0",
+    "@deepseek-ai/cordis": "4.0.5",
     "@deepseek-ai/dsh-subagent": "0.2.1-rc.3"
   },
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "UNLICENSED"
 }

@@ -1,13 +1,26 @@
 {
   "name": "@local/dsh-guide-goal-adapter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./index.js", "./core": "./core.js" },
-  "files": ["index.js", "core.js", "cordis.patch.yml", "README.md"],
-  "peerDependencies": {
-    "@deepseek-ai/dsh-goal-round-driver": ">=0.2.1-rc.3",
-    "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.3"
+  "exports": {
+    ".": "./index.js",
+    "./core": "./core.js"
   },
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+  "files": [
+    "index.js",
+    "core.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-goal-round-driver": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-subagent": "0.2.1-rc.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "license": "UNLICENSED"
 }

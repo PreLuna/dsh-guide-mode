@@ -9,8 +9,12 @@ const service = (ctx, key) => {
   try { return ctx.get(key) } catch { return undefined }
 }
 
-export function apply(ctx, config = {}, foldDescriptor) {
-  if (typeof foldDescriptor !== 'function') throw new TypeError('guide-shield requires the Host descriptor fold')
+export function apply(ctx, config = {}, foldDescriptor, proof = {supported:true}) {
+  const missing=['agents','sessions'].filter(key=>typeof service(ctx,key)?.get!=='function')
+  if (proof.supported!==true || typeof foldDescriptor !== 'function' || missing.length) {
+    ctx.provide('guideSettlementShield',{shieldParent(){},rememberChild(){},getState:()=>({mode:'unsupported',reason:proof.reason??'missing-shield-contract',missing,inject:false,coreUpdate:'cold-restart'})})
+    return
+  }
   const identity = createIdentity({
     sessions: { get: id => service(ctx, 'sessions')?.get?.(id) },
     agents: { get: id => service(ctx, 'agents')?.get?.(id) },
@@ -67,6 +71,6 @@ export function apply(ctx, config = {}, foldDescriptor) {
       identity.remember(id, parent?.id)
       shield.shieldParent(parent)
     },
-    getState: shield.getState,
+    getState: () => ({...shield.getState(),identityRead:proof.identityRead??'snapshotEvents(inheritedEventCount); deprecated',coreUpdate:'cold-restart'}),
   })
 }

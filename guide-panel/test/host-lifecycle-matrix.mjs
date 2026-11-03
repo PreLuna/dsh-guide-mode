@@ -171,8 +171,8 @@ export async function runLifecycleMatrix(ctx, h) {
     const originalSource = readFileSync(filename, 'utf8')
     const marker = join(process.env.DSH_O2_PANEL_COPY, `hmr-gap-${Date.now()}.txt`)
     const releaseMarker = `${marker}.release`
-    const pausedSource = originalSource.replace('export async function apply(ctx, config = {}) {',
-      `export async function apply(ctx, config = {}) {\n  const o2Fs = await import('node:fs');\n  o2Fs.writeFileSync(${JSON.stringify(marker)}, 'new-apply');\n  const o2Deadline = Date.now() + 15000;\n  while (!o2Fs.existsSync(${JSON.stringify(releaseMarker)})) {\n    if (Date.now() > o2Deadline) throw new Error('O2 HMR gate timeout');\n    await new Promise(resolve => setTimeout(resolve, 10));\n  }`)
+    const pausedSource = originalSource.replace('export async function apply(ctx, config = {}, sourceProof) {',
+      `export async function apply(ctx, config = {}, sourceProof) {\n  const o2Fs = await import('node:fs');\n  o2Fs.writeFileSync(${JSON.stringify(marker)}, 'new-apply');\n  const o2Deadline = Date.now() + 15000;\n  while (!o2Fs.existsSync(${JSON.stringify(releaseMarker)})) {\n    if (Date.now() > o2Deadline) throw new Error('O2 HMR gate timeout');\n    await new Promise(resolve => setTimeout(resolve, 10));\n  }`)
     let reloadError
     let removeReloadListener
     try {

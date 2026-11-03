@@ -14,9 +14,9 @@ provider 的 prepareContinuable 负责 seed，独立 preset 提供人格与工�
 
 ## API 与界面
 
-guide-panel 提供 `/guide/api` 下的 POST ping、state 和 start。start body 为 `{ sessionId, question }`，父 agent 必须精确在线；请求经 connection 围栏和 64 KiB body 限制。state 返回容量、归档策略与可选 goal adapter 状态。
+guide-panel 提供 `/guide/api` 下的 POST ping、state、start 和 auto-archive。start body 为 `{ sessionId, question }`，父 agent 必须精确在线；请求经 connection 围栏和 64 KiB body 限制。state 返回容量、归档策略、候选核实结果与兼容状态。
 
-面板 tab kind 为 guide-panel，不能复用内置 guide kind，避免覆盖原生开始页。指导对话使用原生 subagentchat resource，优先在右栏新分栏打开；关页签只释放视图引用，归档才停止并隐藏。
+面板 tab kind 为 guide-panel，不能复用内置 guide kind，避免覆盖原生开始页。指导对话使用原生 subagentchat resource，优先在右栏新分栏打开；关页签只释放视图引用。用户手动归档可停止执行；自动归档只处理核实为空闲的候选，不强制停止活动。
 
 面板列表合并父 subagentCatalog 中“指导: ”条目与 localStorage 记录；后者帮助找回归档项。问题草稿按 sessionId 保存。专区仍按当前 scope.sessionId 展示，改为根会话范围尚未决定。
 
@@ -48,9 +48,13 @@ pending、external、普通工作与身份不明对象继续原等待。driver �
 
 C 跟随 Host volatile getter，R 按池，M 按 profile 全局。G 对自身 continuable/guide-fork descriptor 与接纳记录按 activation 对象去重。检查、登记、调用原生占槽期间无 await；普通工作直接委托。已有 creating 无法恢复 provider 时暂禁指导，待发布/回滚重新核对；manager 赋值同步接管，旧世代 G 在释放前继续计入。
 
-panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 和 pendingStarts 名额门已删除。client 从该快照按池计算压力和峰值保持，不再使用跨根 running summaries。候选仍沿用已加载 projection，打开视图/候选补全归 O20；native busy 或当前池/身份未知时不自动归档。
+panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 和 pendingStarts 名额门已删除。client 从该快照按池计算压力和峰值保持，不再使用跨根 running summaries。候选合并已加载 projection、用户记录和 summary，并轮转处理超过 128 条的历史。Host 以自身 descriptor/父关系核实候选；客户端覆盖右栏保存页签与主视图打开状态，Host 自动归档不传 stopActivity，活动竞争交给原生拒绝；native busy 或当前池/身份未知时不自动归档。
 
 核心服务采用冷更新，panel HMR 不卸载它；服务自身卸载/重载不承诺连续执法。未知源码/函数/形状或方法所有权变化报告 unsupported，不能声称所有原生入口仍受策略保护。生产隔离验收与实际 desktop 冷部署通过，见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
+
+## O21 契约与维护边界
+
+1.1.0 先核对官方 subagent/Cordis 及右栏/workspace 客户端产物，Host 检查必需服务/方法，客户端检查原生注册、保存 tab inventory 和主视图 selection。`/guide/api/state` 暴露 panelCompat，未知或缺失时只读/不可用并拒绝创建和自动归档；不挂半套 provider/tab。shield 独立预检，不支持时不声称 inject 防护 active。官方同步身份读取已 deprecated，当前按固定产物受控使用并公开诊断；升级与核心重载遵循冷更新，见 [维护流程](LOCAL-MAINTENANCE.md)。
 
 ## 结算 shield：与 goal 适配独立
 

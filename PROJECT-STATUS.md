@@ -16,9 +16,11 @@
 | O6/O8 实现设计 | B′ 审计整改及基线验收完成 | BP-1～3 已修复；34 组真实 Runtime、86 项 Host、11 项浏览器通过；O8 后续生命周期已由 O2/R6 独立验收；[修复报告](evidence/B-prime-fixes-2026-11-02/report.md) |
 | O2/R6 生命周期 | 已关闭：支持基线内实现、矩阵和本机部署均完成 | [收尾结论](docs/O2-R6-CLOSEOUT.md)；真实 closing/HMR 门控/父重建/两进程恢复与 desktop 迁移证据已闭环 |
 | O19/O7/R1 生产实现 | 支持基线及核心冷更新边界内关闭；生产部署和正常 desktop 运行确认完成 | [生产实施](evidence/O19-production-2026-11-03/report.md)：43 项生产 Host 断言、44 项核心检查及 O2/R6 回归通过；实际 profile/API/UI 核对 C/R/M=8/2/4 |
+| O12 / O20 / O21 | 1.1.0 实现与实际 desktop 冷部署完成 | 旧页签精准清理、Host 核实身份的自动归档、完整必需契约与只读/unsupported 状态；[证据](evidence/O12-O21-engineering-2026-11-03/report.md) |
+| R4 / R7 / R8 / R9 / O10 | 本机工程基线完成 | 本地 Git、最小 CI、生成物检查/加载、guide skill 降级、locale 清理、六包统一安装/卸载/恢复；无远端发布 |
 | 文档收口 | 本轮完成 | 当前事实、待办、工程约束与历史材料分开；[整理记录](docs/WORKSPACE-CLEANUP.md) |
 
-支持基线：DSH `0.2.1-rc.3`，构建 `be72761ee1a6736ebcdf4f3739363b083ae53c98`，Cordis `4.0.5`，官方 better-sidebar `0.28.2`。关键产物与函数指纹见阶段报告；未知 adapter 构建回退原行为，不承诺任意版本均免维护；`guide-panel` 的 O6 工具来源已有 5 个源码哈希预检，其他私有 API 仍见 O21。
+支持基线：DSH `0.2.1-rc.3`，构建 `be72761ee1a6736ebcdf4f3739363b083ae53c98`，Cordis `4.0.5`，官方 better-sidebar `0.28.2`。关键产物与函数指纹见阶段报告；未知 adapter 构建回退原行为，不承诺任意版本均免维护；O6 工具来源有 5 个源码哈希预检，1.1.0 新增 panel/shield 的来源及必需服务契约预检，升级重验流程见 [本机维护](docs/LOCAL-MAINTENANCE.md)。
 
 ## 已定决定
 
@@ -38,7 +40,7 @@
 | D10 | 压力按池原生 used / Host capacity，activation 释放后不计 | 生产 client 已改同源按池快照与峰值保持；idle parked 在 native release 前计入；实际 desktop 已切换 |
 | D11 | C3 峰值保持 holdMs，none 时保留闲置累计 | 已实现，默认 120 秒 |
 | D12 | 首次 delivery:caller，后续结算通过 shield 防污染 | T1 已包 inject/补 unwrap；真实 Host 生命周期见 T4.1/O2/R6 |
-| D13 | 不自动迁移旧 kind:guide 缓存 | 后续已选择“提示条 + 用户点击清理”；O12 待实现 |
+| D13 | 不自动迁移旧 kind:guide 缓存 | 1.1.0 已实现提示条与用户点击精准清理；保留原生开始页及其他 tab |
 | D14 | 归档停止执行，显示休眠中，可重新打开 | 已实现，接受其他 UI 仍可能可见/可输入 |
 | D15 | v1 不专门支持嵌套指导 | 已定，保留默认 depth 限制 |
 | D16 | 任务页计数与树/图使用同一过滤结果 | 已实现 |
@@ -62,7 +64,8 @@
 | 原 driver/join + Cordis | 12/12 | [日志](evidence/LI-stage1-2026-11-02/final-tests.log) |
 | sidebar 核心 + 实际官方 count/auto-open 消费函数 | 5/5 | [日志](evidence/LI-stage2-2026-11-02/final-tests.log) |
 | 真实隔离 Host goal 循环 | 11 项断言通过 | [runtime-result](evidence/LI-stage2-2026-11-02/runtime-result.json) |
-| 官方 sidebar 浏览器 | 11 项断言通过，最新 consoleErrors=0 | [browser-result](evidence/LI-stage2-2026-11-02/browser-result.json) / [截图](evidence/LI-stage2-2026-11-02/tasks.png) |
+| 官方 sidebar 浏览器（阶段二） | 当时 11 项断言通过、consoleErrors=0；1.1.0 的新回归见下行 | [browser-result](evidence/LI-stage2-2026-11-02/browser-result.json) / [截图](evidence/LI-stage2-2026-11-02/tasks.png) |
+| 1.1.0 本机交付 | 16 个 Node 检查进程、90 项真实 Host、11+2 项浏览器及 O2/R6 两进程回归通过；含预期 503 和 reload WebSocket 诊断 | [实施记录](evidence/O12-O21-engineering-2026-11-03/report.md) / [最终复核](evidence/O12-O21-engineering-2026-11-03/verification.json) |
 | panel 路由/渲染/调度 | 通过 | [测试目录](guide-panel/test/)；阶段报告记录 |
 | O8 真实隔离 Host（T4.1a） | 通过：async apply、真实 inject、普通消息、unwrap、重启用 | [T4.1 O8 报告](evidence/O6-O8-2026-11-02/report.md) / [runtime-result](evidence/LI-stage1-2026-11-02/runtime-result.json) |
 | O6 B′ + T4.1 真实 Host | **44 项断言通过，errors=[]；`modelProjection=active`；native tool-call + 实际 PTC `run_code`** | [runtime-result](evidence/LI-stage1-2026-11-02/runtime-result.json) / [T4.1 报告](evidence/O6-O8-2026-11-02/report.md) |
@@ -92,11 +95,11 @@
 
 ## 下一步范围
 
-O6 的 B′ 审计整改和 T4.1/T4.3 已在支持基线内闭合。O2/R6 与 O19/O7/R1 均已完成支持基线内实现、验收和实际 desktop 部署；准入核心采用冷更新。下一轮为 O12，以及 O11 的真实模型长时平台回归；本轮 desktop 准入 active，C/R/M=8/2/4，shield active/inject=true，O6 idle/no-target-tools 且持有 12 条包装记录。R4/R7/R8/R9/O10、O20/O21 按优先级跟进。产品取舍、可选回归和发布工作独立列在 [OPEN-ITEMS.md](OPEN-ITEMS.md)。
+O6 的 B′ 审计整改和 T4.1/T4.3 已在支持基线内闭合。O2/R6 与 O19/O7/R1 均已完成支持基线内实现、验收和实际 desktop 部署；准入核心采用冷更新。O12/O20/O21 与本机工程基线已随 1.1.0 完成；后续为 O11 的真实模型长时平台回归；本轮 desktop 准入 active，C/R/M=8/2/4，shield active/inject=true，O6 idle/no-target-tools 且持有 12 条包装记录。R5 本轮当前插件组合未复现，重现时再推进；本机工程基线不等于完成公开发布。产品取舍、可选回归和发布工作独立列在 [OPEN-ITEMS.md](OPEN-ITEMS.md)。
 
 ## B′ 最新审计结论
 
-原 [审计](evidence/B-prime-audit-2026-11-02/report.md) 的 BP-1～3 均已修复，扩展回归通过，见 [整改验收](evidence/B-prime-fixes-2026-11-02/report.md)。生命周期按精确注册层管理，caller 取消优先于卸载委托，有事件的未知 execute 替换明确 partial。实际 desktop 进程加载状态已于 2026-11-03 核对；O11/O21 的独立事项仍保留。原审计的 18 项回收回执继续有效，本轮没有继续删除文件。
+原 [审计](evidence/B-prime-audit-2026-11-02/report.md) 的 BP-1～3 均已修复，扩展回归通过，见 [整改验收](evidence/B-prime-fixes-2026-11-02/report.md)。生命周期按精确注册层管理，caller 取消优先于卸载委托，有事件的未知 execute 替换明确 partial。实际 desktop 进程加载状态已于 2026-11-03 核对；O21 已在 1.1.0 落实，O11 扩展事项仍保留。原审计的 18 项回收回执继续有效，本轮没有继续删除文件。
 
 ## 2026-11-03 desktop 迁移确认
 
@@ -104,4 +107,4 @@ O6 的 B′ 审计整改和 T4.1/T4.3 已在支持基线内闭合。O2/R6 与 O1
 
 ## O2/R6 关闭判定（2026-11-03）
 
-已逐项核对原完成标准、原始矩阵结果、源码/测试入口哈希及实际 profile 安装状态，结论为**支持基线内已关闭，无 O2/R6 剩余待办**。当前源码和证据一致，实际部署与备份存在。服务自身核心 HMR、整图 graceful shutdown 顺序、真实模型长时及未知版本仍按 O11/O21 跟踪；它们不与已通过的 panel HMR/scoped closing 混写。详细映射与复核口径以 [O2/R6 收尾结论](docs/O2-R6-CLOSEOUT.md) 为唯一入口，本次只整理 Markdown 与生成只读审计记录，没有修改生产代码、profile 或会话。
+该次逐项核对原完成标准、原始矩阵结果、源码/测试入口哈希及实际 profile 安装状态，结论为**支持基线内已关闭，无 O2/R6 剩余待办**。当时源码与备份哈希保留为历史证据；后续 1.1.0 已修改生产代码和 profile，并重新通过 O2/R6 两进程回归，最新哈希与部署见 [本轮复核](evidence/O12-O21-engineering-2026-11-03/verification.json)。服务自身核心 HMR、整图 graceful shutdown 顺序、真实模型长时仍按 O11 跟踪；未知版本按已落实的契约拒绝/降级并在升级时重验。原完成标准映射以 [O2/R6 收尾结论](docs/O2-R6-CLOSEOUT.md) 为准。

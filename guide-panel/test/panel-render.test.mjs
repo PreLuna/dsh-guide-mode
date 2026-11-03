@@ -67,7 +67,7 @@ const services = {
   workspaces: {
     list: { getSnapshot: () => ({ archivedSessionIds: [] }), subscribe: () => () => {} },
   },
-  sidebarRight: { openResource: () => {}, tabsIn: () => [], close: () => {} },
+  sidebarRight: { openTabs: { getSnapshot: () => [], subscribe: () => () => {} }, openResource: () => {}, tabsIn: () => [], close: () => {} },
   sidebarRightTabs: {
     register: (value) => { descriptor = value; return () => {} },
     get: () => ({}),
@@ -76,7 +76,7 @@ const services = {
     inject: (_key, callback) => callback(),
     register: (options, component) => { body = { options, component }; return () => {} },
   },
-  uiWorkspace: { archiveSession: async () => {}, unarchiveSession: async () => {} },
+  uiWorkspace: { openSession() {}, selection: { getSnapshot: () => ({}) }, archiveSession: async () => {}, unarchiveSession: async () => {} },
 }
 const ctx = {
   locale: { register: () => () => {}, bind: () => (key) => key },

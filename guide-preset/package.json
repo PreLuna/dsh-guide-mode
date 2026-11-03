@@ -1,11 +1,22 @@
 {
   "name": "@local/dsh-guide-preset",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
-  }
+  },
+  "license": "UNLICENSED",
+  "dshGuide": {
+    "externalSkills": [
+      "guide"
+    ],
+    "missingSkillBehavior": "general-advice-with-explicit-unavailable-note"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "README.md"
+  ]
 }
