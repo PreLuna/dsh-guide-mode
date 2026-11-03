@@ -1,0 +1,11 @@
+{
+  "name": "@local/dsh-guide-browser-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.js", "./client": "./client.js" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "inject": ["@local/dsh-guide-sidebar-adapter"] }
+  }
+}

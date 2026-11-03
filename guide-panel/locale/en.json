@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Guidance",
+    "description": "Open a guidance conversation beside this chat, inheriting its context, to judge the next skill or step."
+  }
+}

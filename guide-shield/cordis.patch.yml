@@ -1,0 +1,6 @@
+- insert:
+    - id: guide-settlement-shield
+      name: '@local/dsh-guide-shield'
+      config:
+        enabled: true
+        inject: true

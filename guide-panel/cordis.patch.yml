@@ -1,0 +1,19 @@
+- insert:
+    - id: guide-panel
+      name: '@local/dsh-guide-panel'
+      config:
+        # Capacity comes from Host; reserve/maxGuides live in guide-admission.
+        # O6: hide guidance from the model's list_agents result. hideGuidance is
+        # the master switch; blockControl applies only while it is on.
+        model:
+          hideGuidance: true
+          blockControl: true
+        # O8 is owned by the independent @local/dsh-guide-shield Host bundle.
+        # Idle-sleep delays per pressure band (25% / 50% / 75% of capacity).
+        archive:
+          lowDelayMs: 600000
+          midDelayMs: 180000
+          highDelayMs: 30000
+          # Peak hold: a dropped band stays in force this long. Must be greater
+          # than highDelayMs, otherwise the high band cannot fire after a drop.
+          holdMs: 120000

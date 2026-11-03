@@ -1,0 +1,6 @@
+- insert:
+    - id: guide-admission
+      name: '@local/dsh-guide-admission'
+      config:
+        reserve: 2
+        maxGuides: 4

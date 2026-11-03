@@ -1,0 +1,42 @@
+{
+  "name": "@local/dsh-guide-panel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./identity": "./identity.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "identity.js",
+    "shield.js",
+    "model-projection.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "peerDependencies": {
+    "@local/dsh-guide-shield": "1.0.0",
+    "@deepseek-ai/cordis": "~4.0.5",
+    "@deepseek-ai/dsh-scope": ">=0.2.1-rc.3",
+    "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.3",
+    "@deepseek-ai/dsh-tool-subagent-control": ">=0.2.1-rc.3",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.3",
+    "@local/dsh-guide-admission": "1.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@local/dsh-guide-sidebar-adapter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.js", "./client": "./client.js", "./core": "./core.js" },
+  "files": ["index.js", "client.js", "core.js", "cordis.patch.yml", "README.md"],
+  "peerDependencies": { "dsh-better-sidebar": ">=0.28.2" },
+  "scripts": { "build": "node scripts/build.mjs", "test": "node --test test/core.test.mjs" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "inject": ["@deepseek-ai/dsh-client-modules", "dsh-better-sidebar"] }
+  }
+}

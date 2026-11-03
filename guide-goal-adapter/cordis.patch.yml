@@ -1,0 +1,7 @@
+# Install/remove this bundle with its paired profile configuration. See README.
+- id: goal-round-driver
+  name: '@deepseek-ai/dsh-goal-round-driver'
+  disabled: true
+- insert:
+    - id: guide-goal-adapter
+      name: '@local/dsh-guide-goal-adapter'

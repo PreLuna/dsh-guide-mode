@@ -1,0 +1,10 @@
+{
+  "name": "@local/dsh-guide-shield",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.js", "./identity": "./identity.js", "./shield": "./shield.js" },
+  "files": ["index.js", "core.js", "identity.js", "shield.js", "cordis.patch.yml", "README.md"],
+  "peerDependencies": { "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.3" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

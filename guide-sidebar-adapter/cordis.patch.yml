@@ -1,0 +1,3 @@
+- insert:
+    - id: guide-sidebar-adapter
+      name: '@local/dsh-guide-sidebar-adapter'

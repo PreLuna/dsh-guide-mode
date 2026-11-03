@@ -1,0 +1,3 @@
+- insert:
+    - id: li-browser-fixture
+      name: '@local/dsh-guide-browser-fixture'
