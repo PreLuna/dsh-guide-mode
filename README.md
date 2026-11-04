@@ -35,7 +35,7 @@
 
 生产代码不包含上游 driver、join 或任务组件副本；旧 fork 已提炼为 [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除。UI 的 label 前缀过滤和 goal 的可信 provider 身份是不同判据，不能互相替代。
 
-仓库不包含本机 `evidence/`：原始报告、恢复备份、官方包缓存留在维护者机器。引用这些记录的链接用于追溯，不表示 clone 后已附带专项环境。新机器准备与本地快照见 [仓库与打包说明](docs/REPOSITORY-PREPARATION.md)，当前已接受边界见 [范围决定](docs/SCOPE-AND-ACCEPTED-LIMITS.md)。
+仓库不包含本机 `evidence/`：原始报告、恢复备份、官方包缓存留在维护者机器。引用这些记录的链接用于追溯，不表示 clone 后已附带专项环境。新机器准备与本地快照见 [维护手册](docs/MAINTENANCE.md)，当前已接受边界见 [已定边界](docs/DECISIONS.md)。
 
 ## 能力与边界
 
@@ -79,7 +79,7 @@ archive:
 
 私有仓库：[PreLuna/dsh-guide-mode](https://github.com/PreLuna/dsh-guide-mode)。有权限的账号可 clone 后运行 `npm run repo:check`、`npm test` 和 `npm run doctor`。六包运行仍依赖上述固定 DSH／官方 sidebar 基线；本仓库不会安装或替换整个宿主。
 
-统一安装、升级、完整卸载与回退见 [本机维护流程](docs/LOCAL-MAINTENANCE.md)。入口是 [scripts/workspace.mjs](scripts/workspace.mjs) 的 `prepare` 与 [scripts/apply-profile.ps1](scripts/apply-profile.ps1)，原则是先在隔离副本验证、停 Host、生成计划、审阅后应用，并保存文件级恢复记录。准入核心与 shield 核心采用冷更新；panel 客户端变更需要硬刷新。
+统一安装、升级、完整卸载与回退见 [维护手册](docs/MAINTENANCE.md)。入口是 [scripts/workspace.mjs](scripts/workspace.mjs) 的 `prepare` 与 [scripts/apply-profile.ps1](scripts/apply-profile.ps1)，原则是先在隔离副本验证、停 Host、生成计划、审阅后应用，并保存文件级恢复记录。准入核心与 shield 核心采用冷更新；panel 客户端变更需要硬刷新。
 
 两个 adapter 的本机切换（关闭 DSH Host 后）：
 
@@ -130,17 +130,16 @@ node guide-panel/scripts/lifecycle-smoke.mjs   # 隔离真实 Host、HMR 与跨�
 
 ## 文档地图
 
+全仓库 7 篇文档，每类事实只有一个出处：
+
 | 文档 | 唯一职责 |
 |---|---|
 | 本文 | 使用、当前安装、配置和诊断 |
-| [PROJECT-STATUS.md](PROJECT-STATUS.md) | 当前交付、已定决定、验证索引 |
-| [OPEN-ITEMS.md](OPEN-ITEMS.md) | 真正尚未实现、待决策或待验证的事项 |
-| [任务边界与维持现状的设计](docs/SCOPE-AND-ACCEPTED-LIMITS.md) | 原生组件职责、已接受边界、暂缓及按复现触发的后续 |
-| [架构说明](docs/ARCHITECTURE.md) | provider、身份、局部作用域、shield 和生命周期 |
-| [本机维护](docs/LOCAL-MAINTENANCE.md) | 版本、测试、安装/升级/卸载/回退 |
-| [私有仓库与打包](docs/REPOSITORY-PREPARATION.md) | 仓库收录边界、清理记录、本地快照及后续公开前事项 |
-| [O11 验证计划](docs/O11-VALIDATION-PLAN.md) | 兼容门禁与多 pane/Git/PTY/真实模型的补测缺口和脚本计划 |
+| [PROJECT-STATUS.md](PROJECT-STATUS.md) | 当前交付、已定决定 D1–D31、未完成事项、验证索引、结果分级 |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 已接受边界与暂缓事项（PT-6、RM-3/5/7、Q4、O5 等**已定稿**，不再反复修改） |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | provider、身份、局部作用域、shield 和生命周期 |
+| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | 目录地图、安装/升级/卸载/回退、升级门禁、仓库与打包 |
+| [docs/HISTORY-AND-MAINTENANCE-NOTES.md](docs/HISTORY-AND-MAINTENANCE-NOTES.md) | 已删旧方案／fork／部署脚本中保留的维护经验 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本历史 |
-| [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) | 已删旧方案／fork／部署脚本中保留的维护经验 |
-| [证据索引](evidence/README.md) | 报告、日志、JSON、截图与保留规则 |
-| [工作区地图](docs/WORKSPACE-MAP.md) | 每个目录的职责、体积构成与可回收边界（`dist`／`docs`／`evidence`／`scripts`） |
+
+本地不入库的还有 [证据索引](evidence/README.md)（报告、日志、JSON、截图与保留规则）。

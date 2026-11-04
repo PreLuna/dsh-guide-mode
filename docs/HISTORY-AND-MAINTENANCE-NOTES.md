@@ -1,6 +1,6 @@
 # 历史设计与维护经验摘要
 
-整理：2026-11-04（Asia/Shanghai）。本文件提炼已完成或已放弃方案中的参考价值，替代旧 fork、重复台账、旧任务全文及一次性部署脚本。当前行为以 [架构](ARCHITECTURE.md)、[范围决定](SCOPE-AND-ACCEPTED-LIMITS.md) 和 [状态台账](../PROJECT-STATUS.md) 为准。
+整理：2026-11-04（Asia/Shanghai）。本文件提炼已完成或已放弃方案中的参考价值，替代旧 fork、重复台账、旧任务全文及一次性部署脚本。当前行为以 [架构](ARCHITECTURE.md)、[已定边界](DECISIONS.md) 和 [项目状态](../PROJECT-STATUS.md) 为准。
 
 ## 1. 去 fork 与 goal 等待根因
 
@@ -63,7 +63,7 @@ PT-6 原错误包括检查旧工具名、用父身份调用、将对话 ID 当�
 
 如以后恢复：继续用指导 owner 和返回的 terminal ID；不要把主界面新建进程冒充原进程。模型终端 backend 与用户 xterm attach 不是自动等价。`terminal_read` 的 newest-relative offset/count 是有界快照，不是追加游标；只读查看不可悄悄创建 agent 或关闭终端。
 
-RM 当前接受宿主默认机制，详见 [验收决定](RM-ACCEPTANCE-DECISIONS.md)。旧扩展研究仅保留如下复测经验，不构成必须实施的新任务：
+RM 当前接受宿主默认机制，详见 [已定边界 §3](DECISIONS.md)。旧扩展研究仅保留如下复测经验，不构成必须实施的新任务：
 
 - 压缩 fixture 必须提供有效 contextWindow／输出上限并匹配 headroom；工具结果裁剪不等于摘要压缩。摘要也会调用模型，离线测试须连摘要一起用本地 fixture。
 - 普通模型回合重试与直接摘要 stream 入口不同。normal 的额外重试次数、always 的持续重试、provider 有效策略和 caller 取消需分别考虑，不靠错误文本判断。
@@ -73,7 +73,7 @@ RM 当前接受宿主默认机制，详见 [验收决定](RM-ACCEPTANCE-DECISION
 
 ## 6. 安装、恢复与删除边界
 
-当前入口为 [统一维护流程](LOCAL-MAINTENANCE.md) 和 `scripts/workspace.mjs`／`scripts/apply-profile.ps1`。过时的 O19／O2 一次性 prepare／apply／verify／rollback 脚本按固定日期、固定哈希和旧计划结构工作，不适合作为新版本升级入口，现已退役删除。
+当前入口为 [维护手册](MAINTENANCE.md) 和 `scripts/workspace.mjs`／`scripts/apply-profile.ps1`。过时的 O19／O2 一次性 prepare／apply／verify／rollback 脚本按固定日期、固定哈希和旧计划结构工作，不适合作为新版本升级入口，现已退役删除。
 
 仍保留两阶段的 adapter 安装／恢复脚本：它们负责官方 sidebar 文件恢复、driver 配对选择及原路径回执，与纯增加六包依赖的统一入口不完全等价。相关 `evidence/LI-stage*/desktop-before`、`official/package` 和 tarball 仍被回退或集成测试引用，不能按“历史缓存”整体删除。
 

@@ -2,7 +2,7 @@
 
 > B′ 注册生命周期、取消与卸载交错、来源变更三项整改已通过扩展验收。当前保证以 [修复报告](../evidence/B-prime-fixes-2026-11-02/report.md) 为准。
 
-更新：2026-11-03。本文描述当前代码；已定决定在 [台账](../PROJECT-STATUS.md)，未完成事项在 [待办](../OPEN-ITEMS.md)，安装和使用见 [README](../README.md)。
+更新：2026-11-04。本文描述当前代码；交付与决定在 [项目状态](../PROJECT-STATUS.md)，已接受边界在 [已定边界](DECISIONS.md)，安装和使用见 [README](../README.md)。
 
 ## 会话、preset 与上下文
 
@@ -54,7 +54,7 @@ panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 
 
 ## O21 契约与维护边界
 
-1.1.0 先核对官方 subagent/Cordis 及右栏/workspace 客户端产物，Host 检查必需服务/方法，客户端检查原生注册、保存 tab inventory 和主视图 selection。`/guide/api/state` 暴露 panelCompat，未知或缺失时只读/不可用并拒绝创建和自动归档；不挂半套 provider/tab。shield 独立预检，不支持时不声称 inject 防护 active。官方同步身份读取已 deprecated，当前按固定产物受控使用并公开诊断；升级与核心重载遵循冷更新，见 [维护流程](LOCAL-MAINTENANCE.md)。
+1.1.0 先核对官方 subagent/Cordis 及右栏/workspace 客户端产物，Host 检查必需服务/方法，客户端检查原生注册、保存 tab inventory 和主视图 selection。`/guide/api/state` 暴露 panelCompat，未知或缺失时只读/不可用并拒绝创建和自动归档；不挂半套 provider/tab。shield 独立预检，不支持时不声称 inject 防护 active。官方同步身份读取已 deprecated，当前按固定产物受控使用并公开诊断；升级与核心重载遵循冷更新，见 [维护手册](MAINTENANCE.md)。
 
 ## 结算 shield：与 goal 适配独立
 

@@ -247,7 +247,7 @@ GUARD_JS = """({ parent, child }) => {
 
 
 async def run_multi_pane(page, config, output, errors):
-    """A1: the multi-pane browser matrix from docs/O11-VALIDATION-PLAN.md §3.2."""
+    """A1: the multi-pane browser matrix; scenario list and results live in PROJECT-STATUS.md."""
     parent = config['parent']
     result = {
         'status': 'failed', 'scenario': 'multi-pane', 'sourceVersions': {}, 'startedAt': now(),

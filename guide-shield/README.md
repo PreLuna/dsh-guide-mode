@@ -8,7 +8,7 @@
 
 ## 当前维护
 
-1.1.0 的统一安装、升级、完整卸载与恢复使用 [本机维护流程](../docs/LOCAL-MAINTENANCE.md)。官方同步 snapshotEvents(inheritedEventCount) 已 deprecated，目前在固定产物下受控使用并在 state 暴露依赖；升级必须复核，核心更新使用冷重启。旧独立服务迁移经验见历史摘要，不能作为新版本升级计划重复执行。
+1.1.0 的统一安装、升级、完整卸载与恢复使用 [维护手册](../docs/MAINTENANCE.md)。官方同步 snapshotEvents(inheritedEventCount) 已 deprecated，目前在固定产物下受控使用并在 state 暴露依赖；升级必须复核，核心更新使用冷重启。旧独立服务迁移经验见历史摘要，不能作为新版本升级计划重复执行。
 
 ## 安装与恢复
 

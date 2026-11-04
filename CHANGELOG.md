@@ -12,7 +12,7 @@
 - PT-6: exercise current persistent-terminal tools through real guidance native calls, verify original result cards and process cleanup, and propagate PTY scenario failure/blocking to smoke results. Keep the Windows sandbox startup failure separate from the explicitly enabled unsandboxed diagnostic.
 - O5: automatic archiving is now opt-in (`archive.auto`, default false); the scheduler and manual archive are unchanged when enabled.
 - Q7: the Tasks-page guidance section keeps this chat's threads and adds the remaining threads under the same root session, grouped and deduplicated.
-- Docs: add `docs/WORKSPACE-MAP.md` describing every directory's role, size composition and reclaimable boundaries; refresh the local evidence index with the four 2026-11-04 directories and `B-prime-decisions`.
+- Docs: consolidate 12 documents into 7 with one source of truth per fact. `OPEN-ITEMS` merged into `PROJECT-STATUS`; `SCOPE-AND-ACCEPTED-LIMITS` and `RM-ACCEPTANCE-DECISIONS` merged into `docs/DECISIONS.md` and frozen (PT-6, RM-3/5/7, Q4, O5 keep the status quo); `LOCAL-MAINTENANCE`, `REPOSITORY-PREPARATION` and `WORKSPACE-MAP` merged into `docs/MAINTENANCE.md`; the executed O11 plan retired after its result grading moved to `PROJECT-STATUS` and its upgrade gate to `MAINTENANCE`. Local `evidence/` index refreshed with the 2026-11-04 directories.
 
 ## 1.1.0 — 2026-11-03
 

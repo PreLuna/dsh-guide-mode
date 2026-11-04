@@ -20,7 +20,7 @@
 
 ## 生成物与维护
 
-`node guide-sidebar-adapter/scripts/build.mjs --check` 检查 client.js 与自有源码一致，检查模式不改文件。修改 core/entry 后先 build，再检查；安装脚本会检查。生成后的 client 有独立加载测试，工作区 `npm test` 及 CI 均覆盖。统一安装/卸载参考 [本机维护流程](../docs/LOCAL-MAINTENANCE.md)。
+`node guide-sidebar-adapter/scripts/build.mjs --check` 检查 client.js 与自有源码一致，检查模式不改文件。修改 core/entry 后先 build，再检查；安装脚本会检查。生成后的 client 有独立加载测试，工作区 `npm test` 及 CI 均覆盖。统一安装/卸载参考 [维护手册](../docs/MAINTENANCE.md)。
 
 ## 验证
 
