@@ -18,7 +18,7 @@ guide-panel 提供 `/guide/api` 下的 POST ping、state、start 和 auto-archiv
 
 面板 tab kind 为 guide-panel，不能复用内置 guide kind，避免覆盖原生开始页。指导对话使用原生 subagentchat resource，优先在右栏新分栏打开；关页签只释放视图引用。用户手动归档可停止执行；自动归档只处理核实为空闲的候选，不强制停止活动。
 
-面板列表合并父 subagentCatalog 中“指导: ”条目与 localStorage 记录；后者帮助找回归档项。问题草稿按 sessionId 保存。专区仍按当前 scope.sessionId 展示，改为根会话范围尚未决定。
+面板列表合并父 subagentCatalog 中“指导: ”条目与 localStorage 记录；后者帮助找回归档项。问题草稿按 sessionId 保存。专区显示当前会话的指导，并分组补充同一根会话下的其他指导；面板本身仍按当前 seat 打开。
 
 ## goal adapter
 
@@ -48,7 +48,7 @@ pending、external、普通工作与身份不明对象继续原等待。driver �
 
 C 跟随 Host volatile getter，R 按池，M 按 profile 全局。G 对自身 continuable/guide-fork descriptor 与接纳记录按 activation 对象去重。检查、登记、调用原生占槽期间无 await；普通工作直接委托。已有 creating 无法恢复 provider 时暂禁指导，待发布/回滚重新核对；manager 赋值同步接管，旧世代 G 在释放前继续计入。
 
-panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 和 pendingStarts 名额门已删除。client 从该快照按池计算压力和峰值保持，不再使用跨根 running summaries。候选合并已加载 projection、用户记录和 summary，并轮转处理超过 128 条的历史。Host 以自身 descriptor/父关系核实候选；客户端覆盖右栏保存页签与主视图打开状态，Host 自动归档不传 stopActivity，活动竞争交给原生拒绝；native busy 或当前池/身份未知时不自动归档。
+panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 和 pendingStarts 名额门已删除。client 从该快照按池计算压力和峰值保持，不再使用跨根 running summaries。候选合并已加载 projection、用户记录和 summary，并轮转处理超过 128 条的历史。Host 以自身 descriptor/父关系核实候选；客户端覆盖右栏保存页签与主视图打开状态，Host 自动归档不传 stopActivity，活动竞争交给原生拒绝；native busy 或当前池/身份未知时不自动归档。自动归档默认关闭（`archive.auto`），显式开启后才启动客户端调度；手动归档仍可停止执行。
 
 核心服务采用冷更新，panel HMR 不卸载它；服务自身卸载/重载不承诺连续执法。未知源码/函数/形状或方法所有权变化报告 unsupported，不能声称所有原生入口仍受策略保护。生产隔离验收与实际 desktop 冷部署通过，见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
 
@@ -64,6 +64,6 @@ panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 
 
 panel 不再持有 shield 的卸载权。真实 HMR 门控证明旧 panel 已卸载、新 apply 未完成时结算仍被拦；真实 closing、父重建、两进程恢复与 observation 见 [O2/R6 验收](../evidence/O2-R6-2026-11-02/report.md)。独立服务自身卸载会释放自己的包装；其核心 HMR、整个服务图关闭顺序不属于 panel HMR 的连续保护承诺。
 
-O6 采用 B′：在 `tools.register` 进入 registry 前装饰原 `list_agents` / `send_message` / `interrupt_agent` 定义（[model-projection.js](../guide-panel/model-projection.js)），保留原 schema/render/notification 和原 disposer。list 执行原 body 后过滤，控制在原 body 前判定；所有 await 后 caller 取消优先于卸载委托。来源按原模块 runtime 身份、首次接受的 execute 指针和 5 个源码哈希核验。已有定义从原模块 live fiber 的精确注册层 bootstrap；覆盖统计用 global/live-agent 可见视图，包装生命周期按精确注册存活管理，暂不可见不还原。事件中的未知 execute 替换失活旧包装并报告 partial，不覆盖第三方。状态仍为 off/pending/idle/active/partial/unsupported，含覆盖计数及注册/包装记录诊断。最新 34 组 Runtime、86 项 Host、11 项浏览器通过。实现和边界见 [设计](O6-O8-DESIGN.md) / [整改报告](../evidence/B-prime-fixes-2026-11-02/report.md)。
+O6 采用 B′：在 `tools.register` 进入 registry 前装饰原 `list_agents` / `send_message` / `interrupt_agent` 定义（[model-projection.js](../guide-panel/model-projection.js)），保留原 schema/render/notification 和原 disposer。list 执行原 body 后过滤，控制在原 body 前判定；所有 await 后 caller 取消优先于卸载委托。来源按原模块 runtime 身份、首次接受的 execute 指针和 5 个源码哈希核验。已有定义从原模块 live fiber 的精确注册层 bootstrap；覆盖统计用 global/live-agent 可见视图，包装生命周期按精确注册存活管理，暂不可见不还原。事件中的未知 execute 替换失活旧包装并报告 partial，不覆盖第三方。状态仍为 off/pending/idle/active/partial/unsupported，含覆盖计数及注册/包装记录诊断。最新 34 组 Runtime、86 项 Host、11 项浏览器通过。实现和边界见 [归档设计](HISTORY-AND-MAINTENANCE-NOTES.md) / [整改报告](../evidence/B-prime-fixes-2026-11-02/report.md)。
 
-原产物指纹见两阶段报告；最新 B′ 测试范围见整改报告。未验证路径不能套用主路径结论。O8 已通过 T4.1a；O6 完成 T4.1/T4.3 及 BP-1～3 整改；O2/R6 已完成基线矩阵及实际 desktop 部署并关闭，证据范围以 [收尾结论](O2-R6-CLOSEOUT.md) 为准。
+原产物指纹见两阶段报告；最新 B′ 测试范围见整改报告。未验证路径不能套用主路径结论。O8 已通过 T4.1a；O6 完成 T4.1/T4.3 及 BP-1～3 整改；O2/R6 已完成基线矩阵及实际 desktop 部署并关闭，证据范围以 [归档收尾结论](HISTORY-AND-MAINTENANCE-NOTES.md) 为准。

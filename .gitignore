@@ -3,6 +3,12 @@ node_modules/
 evidence/
 better-sidebar-fork/
 docs/archive/
+dist/
+**/__pycache__/
+*.pyc
+*.zip
+.env
+.env.*
 *.log
 *.tmp
 *.tgz

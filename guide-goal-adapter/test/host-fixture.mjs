@@ -1,7 +1,10 @@
 // Installed only in the isolated smoke profile. No external model or user data.
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createPtyFixture } from './pty-fixture.mjs'
+import { createResidualFixture } from './residual-fixture.mjs'
 export const name = 'guide-goal-real-runtime-fixture'
 export const inject = ['llm', 'agents', 'sessions', 'sessionQuery', 'goals', 'subagents', 'agentPresets', 'webServer', 'connection', 'workspaceRegistry', 'tools']
 
@@ -18,6 +21,8 @@ export function apply(ctx) {
   const errors = []
   const handles = new Set()
   const toolNotifications = new Map()
+  const ptyFixture = createPtyFixture(ctx, { child, rootAgent, nativeTurn, until, controller })
+  const residualFixture = createResidualFixture(ctx, { child, rootAgent, until, controller })
   ctx.on('tools/result', (exec, result) => {
     const previous = toolNotifications.get(exec.callId) ?? []
     previous.push({ name: exec.name, agentId: exec.agent?.id, result })
@@ -43,6 +48,10 @@ export function apply(ctx) {
     resolveModel: async (provider, id) => ({ provider, id, name: id }),
     async prepareCall(provider, id) { return { model: await this.resolveModel(provider, id), stream: options => this.stream(options) } },
     async *stream(options) {
+      const residualStream = residualFixture.stream(options)
+      if (residualStream) { yield* residualStream; return }
+      const ptyStream = ptyFixture.stream(options)
+      if (ptyStream) { yield* ptyStream; return }
       const text = options.messages.flatMap(message => message.content).filter(block => block.type === 'text').map(block => block.text).join('\n')
       const nativePattern = /LI_O6_NATIVE_(LIST|SEND|INTERRUPT)(?: ([0-9a-f-]{36}))?/
       const nativeUser = [...options.messages].reverse().find(message => {
@@ -108,7 +117,7 @@ export function apply(ctx) {
         yield { type: 'finish', reason: { kind: 'stop' } }
         return
       }
-      const tag = text.includes('LI_PARENT_HOLD') ? 'parent' : text.includes('LI_WORK_HOLD') ? 'worker' : text.includes('LI_GUIDE_HOLD') ? 'guide' : text.includes('LI_O8_HOLD') ? 'o8' : text.includes('LI_O6WORK_HOLD') ? 'o6work' : text.includes('LI_O6GUIDEWORK_HOLD') ? 'o6guidework' : text.includes('LI_O6_HOLD') ? 'o6' : text.includes('LI_PTCGUIDE_HOLD') ? 'ptcguide' : text.includes('LI_PTCWORK_HOLD') ? 'ptcwork' : undefined
+      const tag = text.includes('LI_PARENT_HOLD') ? 'parent' : text.includes('LI_WORK_HOLD') ? 'worker' : text.includes('LI_GUIDE_HOLD') ? 'guide' : text.includes('LI_GF_HOLD') ? 'gf' : text.includes('LI_O8_HOLD') ? 'o8' : text.includes('LI_O6WORK_HOLD') ? 'o6work' : text.includes('LI_O6GUIDEWORK_HOLD') ? 'o6guidework' : text.includes('LI_O6_HOLD') ? 'o6' : text.includes('LI_PTCGUIDE_HOLD') ? 'ptcguide' : text.includes('LI_PTCWORK_HOLD') ? 'ptcwork' : undefined
       if (tag && gates.has(tag)) {
         entered.add(tag)
         await Promise.race([gates.get(tag).promise, new Promise((_, reject) => {
@@ -125,6 +134,24 @@ export function apply(ctx) {
     kind: 'prefix', path: '/li-runtime', handler(req, res) {
       const rejection = ctx.connection.requestRejection(req)
       const command = new URL(req.url, 'http://li.test').pathname.split('/').at(-1)
+      if (!rejection && command === 'residual-resources' && req.method === 'GET') {
+        const resources = {}
+        for (const kind of process.getActiveResourcesInfo()) resources[kind] = (resources[kind] ?? 0) + 1
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ at: Date.now(), memory: process.memoryUsage(), resources }))
+        return
+      }
+      if (!rejection && ['residual-setup', 'residual-state', 'residual-pressure', 'residual-cleanup'].includes(command)
+        && req.method === (command === 'residual-state' ? 'GET' : 'POST')) {
+        req.resume()
+        const count = Number(new URL(req.url, 'http://li.test').searchParams.get('count') ?? '0')
+        const action = command === 'residual-setup' ? residualFixture.setup()
+          : command === 'residual-pressure' ? ([0, 2, 4, 6].includes(count) ? residualFixture.pressure(count) : Promise.reject(Error('invalid test pressure')))
+          : command === 'residual-cleanup' ? residualFixture.cleanup() : Promise.resolve(residualFixture.snapshot())
+        action.then(value => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(value)) },
+          error => { res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ status: 'failed', error: String(error) })) })
+        return
+      }
       if (!rejection && req.method === 'POST' && ['compat-disable','compat-restore'].includes(command)) {
         req.resume()
         if(command==='compat-disable') {
@@ -134,6 +161,65 @@ export function apply(ctx) {
           target.startActivation=undefined
         } else {restoreCompatibility?.();restoreCompatibility=undefined}
         res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({ok:true}));return
+      }
+      if (!rejection && req.method === 'GET' && command === 'tools') {
+        const agent = state.parent ? ctx.agents.get(state.parent) : undefined
+        const names = ['read', 'read_image', 'write', 'edit', 'str_replace_editor', 'bash', 'pwsh', 'grep', 'glob',
+          'terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list']
+        const defs = names.map(name => {
+          let def
+          try { def = ctx.tools.get(name, agent) } catch {}
+          return { name, found: def !== undefined, keys: def ? Object.keys(def) : null,
+            schema: def?.inputSchema ?? def?.schema ?? def?.parameters ?? def?.parametersSchema ?? null,
+            execute: typeof def?.execute }
+        })
+        const agentTools = agent?.tools
+        let agentNames
+        try { agentNames = agentTools?.names ?? (agentTools instanceof Map ? [...agentTools.keys()] : null) } catch {}
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ defs, toolKeys: Object.keys(ctx.tools ?? {}), agentToolKeys: agentTools ? Object.keys(agentTools) : null,
+          agentNames }))
+        return
+      }
+      if (!rejection && req.method === 'GET' && command === 'soak') {
+        const url = new URL(req.url, 'http://li.test')
+        if (url.searchParams.get('start') === '1' && soakState.status !== 'running') {
+          soakState = { status: 'running', startedAt: Date.now() }
+          realSoak().then(result => { soakState = result }, error => {
+            soakState = { status: 'failed', error: String(error), stack: error?.stack }
+          })
+        }
+        res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(soakState))
+        return
+      }
+      if (!rejection && req.method === 'GET' && command === 'soak-probe') {
+        soakProbe().then(result => {
+          res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(result))
+        }, error => {
+          res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ status: 'failed', error: String(error) }))
+        })
+        return
+      }
+      if (!rejection && ['pty-start', 'pty-state', 'pty-cleanup'].includes(command)
+        && req.method === (command === 'pty-state' ? 'GET' : 'POST')) {
+        req.resume()
+        const action = command === 'pty-start' ? ptyFixture.start()
+          : command === 'pty-cleanup' ? ptyFixture.cleanup() : Promise.resolve(ptyFixture.snapshot())
+        action.then(result => {
+          res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(result))
+        }, error => {
+          res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ status: 'failed', error: String(error) }))
+        })
+        return
+      }
+      if (!rejection && req.method === 'POST' && command === 'gf') {
+        req.resume()
+        gitFileEdit().then(result => {
+          res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(result))
+        }, error => {
+          res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ status: 'failed', error: String(error) }))
+        })
+        return
       }
       if (!rejection && req.method === 'POST' && ['add-guide', 'auto-guide', 'auto-work'].includes(command)) {
         req.resume()
@@ -162,10 +248,11 @@ export function apply(ctx) {
     state.assertions.push(label)
     if (process.env.DSH_O2_STATE && label.startsWith('O2:')) console.error(`[O2 fixture] ${label}`)
   }
-  async function rootAgent({ ptc = false, workspaceCwd = process.cwd() } = {}) {
+  async function rootAgent({ ptc = false, workspaceCwd = process.cwd(),
+    agentOptions = { provider: 'li-deterministic', model: 'mock' } } = {}) {
     const handle = await ctx.agents.create({
       sessionId: `li-runtime-parent-${Date.now()}`,
-      agentOptions: { provider: 'li-deterministic', model: 'mock' },
+      agentOptions,
       meta: { cwd: workspaceCwd },
       setup: async child => {
         await ctx.agentPresets.mount(child, 'guide')
@@ -218,10 +305,11 @@ export function apply(ctx) {
       return { status: 'passed', presets, observations }
     } finally { unlisten(); unregister() }
   }
-  async function child(parent, provider, tag, { maxDepth = 1 } = {}) {
+  async function child(parent, provider, tag, { maxDepth = 1, cwd = process.cwd(), prompt,
+    agentOptions = { provider: 'li-deterministic', model: 'mock' } } = {}) {
     return ctx.subagents.startActivation({ provider, delivery: 'caller', label: provider === 'guide-fork' ? `指导: LI ${tag}` : `LI ${tag}`, signal: controller.signal,
-      request: { parent, prompt: [{ type: 'text', text: `LI_${tag.toUpperCase()}_HOLD` }], cwd: process.cwd(),
-        maxDepth, agentOptions: { provider: 'li-deterministic', model: 'mock' },
+      request: { parent, prompt: [{ type: 'text', text: prompt ?? `LI_${tag.toUpperCase()}_HOLD` }], cwd,
+        maxDepth, agentOptions,
         ...(provider === 'guide-fork' ? { agentPreset: 'guide' } : {}) },
     })
   }
@@ -472,6 +560,274 @@ export function apply(ctx) {
     return { status: 'passed', parent: parent.id, native, ptc, configuration: 'passed' }
   }
 
+  async function gitFileEdit() {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-gf-'))
+    const checks = []
+    const record = (id, status, detail = {}) => checks.push({ id, status, detail })
+    const run = (args, options = {}) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', ...options }).trim()
+    const execute = (agent, name, args) => ctx.tools.execute({
+      name, arguments: args, agent, signal: controller.signal,
+      callId: `gf-${name}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    })
+    const textOf = result => {
+      const content = Array.isArray(result?.content) ? result.content : []
+      return content.map(block => block?.text ?? '').join('\n') || JSON.stringify(result?.value ?? result ?? null)
+    }
+    let handle
+    try {
+      run(['init'])
+      run(['config', 'user.email', 'o11@example.invalid'])
+      run(['config', 'user.name', 'O11'])
+      writeFileSync(join(dir, 'notes.txt'), 'alpha\nbeta\n')
+      writeFileSync(join(dir, 'notes-crlf.txt'), 'one\r\ntwo\r\n')
+      run(['add', '.'])
+      run(['commit', '-m', 'initial'])
+
+      handle = await rootAgent({ workspaceCwd: dir })
+      const parent = handle.agent
+      gates.set('gf', Promise.withResolvers())
+      const guide = await child(parent, 'guide-fork', 'gf', { cwd: dir, prompt: 'LI_GF_HOLD' })
+      await until(() => entered.has('gf'), 'GF guidance entered mock model', 7000)
+      const guideAgent = ctx.agents.get(guide.childId)
+      if (guideAgent === undefined) throw new Error('GF guide agent missing')
+
+      await execute(guideAgent, 'read', { file_path: join(dir, 'notes.txt') })
+      const first = await execute(guideAgent, 'write', { file_path: join(dir, 'notes.txt'), content: 'alpha\nbeta\nguide-line\n' })
+      const firstDisk = readFileSync(join(dir, 'notes.txt'), 'utf8')
+      const parentRead = await execute(parent, 'read', { file_path: join(dir, 'notes.txt') })
+      record('GF-1',
+        first.isError === true || parentRead.isError === true || !firstDisk.includes('guide-line') || !textOf(parentRead).includes('guide-line')
+          ? 'failed' : 'passed',
+        { writeError: first.isError === true, readError: parentRead.isError === true, disk: firstDisk,
+          writeResult: JSON.stringify(first).slice(0, 2500), parentRead: textOf(parentRead).slice(0, 2000) })
+
+      await execute(guideAgent, 'read', { file_path: join(dir, 'notes.txt') })
+      const edited = await execute(guideAgent, 'edit', { file_path: join(dir, 'notes.txt'), old_string: 'alpha', new_string: 'alpha\n中文 🚀' })
+      const editedDisk = readFileSync(join(dir, 'notes.txt'), 'utf8')
+      record('GF-4-tool',
+        edited.isError === true || !editedDisk.includes('中文') || !editedDisk.includes('🚀') ? 'failed' : 'passed',
+        { editError: edited.isError === true, disk: editedDisk, editResult: JSON.stringify(edited).slice(0, 2500) })
+
+      await execute(guideAgent, 'read', { file_path: join(dir, 'notes-crlf.txt') })
+      const crlf = await execute(guideAgent, 'write', { file_path: join(dir, 'notes-crlf.txt'), content: 'one\r\ntwo\r\nthree\r\n' })
+      const crlfText = readFileSync(join(dir, 'notes-crlf.txt'), 'utf8')
+      record('GF-4-eol',
+        crlf.isError === true || !crlfText.includes('\r\nthree\r\n') ? 'failed' : 'passed',
+        { writeError: crlf.isError === true, text: JSON.stringify(crlfText), writeResult: JSON.stringify(crlf).slice(0, 2500) })
+
+      run(['add', 'notes.txt', 'notes-crlf.txt'])
+      const diff = run(['diff', '--cached', '--', 'notes.txt'])
+      run(['commit', '-m', 'guide edit'])
+      const status = run(['status', '--porcelain'])
+      const branch = run(['branch', '--show-current'])
+      record('GF-3',
+        diff.includes('guide-line') && status === '' && branch !== '' ? 'passed' : 'failed',
+        { diff, status, branch })
+
+      await Promise.all([
+        execute(guideAgent, 'read', { file_path: join(dir, 'notes.txt') }),
+        execute(parent, 'read', { file_path: join(dir, 'notes.txt') }),
+      ])
+      const [guideParallel, parentParallel] = await Promise.all([
+        execute(guideAgent, 'write', { file_path: join(dir, 'notes.txt'), content: 'guide-concurrent\n' }),
+        execute(parent, 'write', { file_path: join(dir, 'notes.txt'), content: 'parent-concurrent\n' }),
+      ])
+      const final = readFileSync(join(dir, 'notes.txt'), 'utf8')
+      record('GF-2',
+        final === 'guide-concurrent\n' || final === 'parent-concurrent\n' ? 'passed' : 'failed',
+        { final, guideError: guideParallel.isError === true, parentError: parentParallel.isError === true,
+          guideResult: JSON.stringify(guideParallel).slice(0, 2500),
+          parentResult: JSON.stringify(parentParallel).slice(0, 2500),
+          note: 'no lock; the last completed write is what landed; a failed concurrent write is a refusal, not a silent overwrite' })
+
+      record('GF-4', 'deferred', { reason: 'editor save/EOL/draft is exercised by the browser UI scene' })
+      record('GF-5', 'deferred', { reason: 'same file in two panes is exercised by the browser UI scene' })
+      record('GF-6', 'deferred', { reason: 'Git tab refresh is exercised by the browser UI scene' })
+
+      gates.get('gf').resolve()
+      await guide.result.catch(() => {})
+      return { status: checks.some(item => item.status === 'failed') ? 'failed' : 'passed', dir, checks }
+    } catch (error) {
+      record('fatal', 'failed', { error: String(error), stack: error?.stack })
+      return { status: 'failed', dir, checks }
+    } finally {
+      gates.get('gf')?.resolve()
+      if (handle !== undefined) {
+        await handle.dispose().catch(() => {})
+        handles.delete(handle)
+      }
+    }
+  }
+
+  async function soakProbe() {
+    const provider = process.env.DSH_GUIDE_SOAK_PROVIDER ?? 'deepseek-official'
+    const model = process.env.DSH_GUIDE_SOAK_MODEL ?? 'deepseek-chat'
+    const started = Date.now()
+    const handle = await ctx.agents.create({
+      sessionId: `soak-probe-${Date.now()}`,
+      agentOptions: { provider, model },
+      meta: { cwd: mkdtempSync(join(tmpdir(), 'dsh-soak-')) },
+    })
+    const agent = handle.agent
+    try {
+      const before = agent.session.seq
+      const id = `soak-user-${Date.now()}`
+      agent.followup({ id, role: 'user', source: { kind: 'user' },
+        content: [{ type: 'text', text: 'Reply with exactly SOAK_OK and nothing else.' }] })
+      await until(() => agent.status === 'idle'
+        && agent.session.snapshotEvents().slice(before).some(event => event.type === 'turn/end'),
+      'real model turn', 120_000)
+      const events = agent.session.snapshotEvents().slice(before)
+      const text = events.map(event => JSON.stringify(event.data ?? {})).join('\n').slice(0, 8000)
+      return { status: text.includes('SOAK_OK') ? 'passed' : 'failed', provider, model, ms: Date.now() - started,
+        eventTypes: [...new Set(events.map(event => event.type))], text }
+    } finally {
+      await handle.dispose().catch(() => {})
+    }
+  }
+
+  async function realTurn(agent, text, timeout = 120_000) {
+    const before = agent.session.seq
+    const id = `soak-user-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    agent.followup({ id, role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text }] })
+    await until(() => agent.status === 'idle'
+      && agent.session.snapshotEvents().slice(before).some(event => event.type === 'turn/end'),
+    `real turn: ${text.slice(0, 40)}`, timeout)
+    return agent.session.snapshotEvents().slice(before)
+  }
+
+  async function realSoak() {
+    const provider = process.env.DSH_GUIDE_SOAK_PROVIDER ?? 'deepseek-official'
+    const model = process.env.DSH_GUIDE_SOAK_MODEL ?? 'deepseek-chat'
+    const minutes = Number(process.env.DSH_GUIDE_SOAK_MINUTES ?? 30)
+    const maxTokens = Number(process.env.DSH_GUIDE_SOAK_MAX_TOKENS ?? 200000)
+    const started = Date.now()
+    const deadline = started + minutes * 60_000
+    const metrics = { provider, model, minutes, maxTokens, turns: 0, goalRounds: 0, guides: [],
+      pauseResume: false, resident: null, slots: null, eventCount: 0, elapsedMs: 0,
+      tokenAccounting: 'not exposed by session events; the time/round cap is the applied bound' }
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-soak-real-'))
+    let handle
+    try {
+      handle = await rootAgent({ workspaceCwd: dir, agentOptions: { provider, model } })
+      const parent = handle.agent
+      await realTurn(parent, 'Reply in one short sentence: SOAK_READY', 120_000)
+      metrics.turns++
+      ctx.goals.create(parent, {
+        objective: 'Do not mark the goal complete. In each round, append one short line to soak-log.txt and report it. '
+          + 'Keep going until the host stops the goal or the round limit is reached.',
+        maxGoalRounds: 6,
+      })
+      metrics.goalRounds = rounds.get(parent.id) ?? 0
+
+      const prompts = [
+        'In one short sentence, say guide one is ready.',
+        'In one short sentence, say guide two is ready.',
+        'In one short sentence, say guide three is ready.',
+      ]
+      const guides = []
+      for (const [index, prompt] of prompts.entries()) {
+        if (Date.now() > deadline) break
+        guides.push({ index, receipt: await child(parent, 'guide-fork', `soak-${index + 1}`, {
+          cwd: dir, prompt, agentOptions: { provider, model },
+        }) })
+      }
+      for (const { index, receipt } of guides) {
+        const settled = await Promise.race([
+          receipt.result.then(() => ({ ok: true })),
+          new Promise(resolve => setTimeout(() => resolve({ ok: false, error: 'timeout' }),
+            Math.max(1000, Math.min(180_000, deadline - Date.now())))),
+        ])
+        metrics.guides.push({ index, ...settled, status: ctx.agents.get(receipt.childId)?.status ?? 'unknown' })
+      }
+
+      try {
+        await until(() => {
+          const state = ctx.goals.get(parent)
+          return (rounds.get(parent.id) ?? 0) >= 2
+            || ['complete', 'blocked', 'paused', 'failed'].includes(state?.phase)
+        }, 'real goal after guides', 120_000)
+      } catch (error) {
+        metrics.goalWaitError = String(error)
+      }
+      const current = ctx.goals.get(parent)
+      metrics.goalPhase = current?.phase ?? null
+      metrics.longGoal = (rounds.get(parent.id) ?? 0) >= 2
+      if (current !== undefined && !['complete', 'blocked'].includes(current.phase)) {
+        try {
+          let pauseError
+          for (let attempt = 0; attempt < 8; attempt++) {
+            try {
+              const latest = ctx.goals.get(parent)
+              if (latest === undefined) throw new Error('goal disappeared before pause')
+              ctx.goals.pause(parent, latest)
+              pauseError = undefined
+              break
+            } catch (error) {
+              pauseError = error
+              await new Promise(resolve => setTimeout(resolve, 60))
+            }
+          }
+          if (pauseError !== undefined) throw pauseError
+          await until(() => parent.status === 'idle' && ctx.goals.get(parent)?.phase === 'paused', 'goal paused', 60_000)
+          let resumeError
+          for (let attempt = 0; attempt < 8; attempt++) {
+            try {
+              const paused = ctx.goals.get(parent)
+              if (paused === undefined) throw new Error('paused goal disappeared')
+              ctx.goals.resume(parent, paused)
+              resumeError = undefined
+              break
+            } catch (error) {
+              resumeError = error
+              await new Promise(resolve => setTimeout(resolve, 60))
+            }
+          }
+          if (resumeError !== undefined) throw resumeError
+          await until(() => (rounds.get(parent.id) ?? 0) >= Math.max(3, metrics.goalRounds + 1), 'goal resumed', 120_000)
+          try {
+            await until(() => {
+              const state = ctx.goals.get(parent)
+              return (rounds.get(parent.id) ?? 0) >= 6 || ['complete', 'blocked'].includes(state?.phase)
+            }, 'goal round limit after resume', 120_000)
+          } catch (error) {
+            metrics.roundLimitWaitError = String(error)
+          }
+          metrics.pauseResume = true
+        } catch (error) {
+          metrics.pauseResume = `failed: ${String(error)}`
+        }
+      } else {
+        metrics.pauseResume = `skipped: ${current?.phase ?? 'no goal'}`
+      }
+      metrics.goalRounds = rounds.get(parent.id) ?? metrics.goalRounds
+      metrics.eventCount = parent.session.snapshotEvents().length
+      metrics.resident = ctx.subagents.manager?.resident?.size ?? null
+      metrics.slots = ctx.subagents.manager?.slots?.size ?? null
+      metrics.guideChildren = guides.map(({ receipt }) => receipt.childId)
+      metrics.elapsedMs = Date.now() - started
+      const guideOk = metrics.guides.filter(guide => guide.ok === true).length
+      const passed = metrics.turns >= 1 && guideOk >= 2
+      return { status: passed ? 'passed' : 'failed', ...metrics, guideOk }
+    } catch (error) {
+      metrics.elapsedMs = Date.now() - started
+      metrics.parentStatus = handle?.agent?.status
+      metrics.goalPhase = handle?.agent ? (ctx.goals.get(handle.agent)?.phase ?? null) : null
+      try {
+        metrics.lastEvents = handle?.agent?.session?.snapshotEvents?.().slice(-8).map(event =>
+          ({ type: event.type, data: JSON.stringify(event.data ?? {}).slice(0, 300) }))
+      } catch {}
+      return { status: 'failed', ...metrics, error: String(error), stack: error?.stack }
+    } finally {
+      try { ctx.goals.pause(handle?.agent, ctx.goals.get(handle?.agent)) } catch {}
+      if (handle !== undefined) {
+        await handle.dispose().catch(() => {})
+        handles.delete(handle)
+      }
+    }
+  }
+
+  let soakState = { status: 'idle' }
   let task
   ctx.effect(() => {
     task = (async () => {

@@ -19,9 +19,10 @@ window.__ModuleLoader__.load({
     const EMPTY_ENTRIES = []
 
     // Mirrors the host defaults; the host's /guide/api/state replaces this
-    // document once it answers.
+    // document once it answers. O5 keeps automatic archiving opt-in: the
+    // scheduler starts only after the host reports `archive.auto === true`.
     const DEFAULT_LIMITS = {
-      archive: { lowDelayMs: 600_000, midDelayMs: 180_000, highDelayMs: 30_000, holdMs: 120_000 },
+      archive: { auto: false, lowDelayMs: 600_000, midDelayMs: 180_000, highDelayMs: 30_000, holdMs: 120_000 },
     }
     const ARCHIVE_TICK_MS = 15_000
 
@@ -59,7 +60,7 @@ window.__ModuleLoader__.load({
       copyId: '复制 ID',
       copied: '已复制',
       archivedDone: '已休眠',
-      closeHint: '关闭对话页签只会暂时收起页面；会话仍在，点「打开」即可回来。闲置的指导对话会在子代理名额紧张时自动休眠，「重新打开」即唤醒（首条消息要冷启动几秒）。',
+      closeHint: '关闭对话页签只会暂时收起页面；会话仍在，点「打开」即可回来。开启自动归档后，闲置的指导对话会在子代理名额紧张时休眠，「重新打开」即唤醒（首条消息要冷启动几秒）。',
       unavailable: '工作区服务不可用',
       noThreadsSurface: '当前部署打不开侧栏对话页，已改为在主界面打开',
       legacy: '改用独立会话（不继承上下文）',
@@ -70,6 +71,10 @@ window.__ModuleLoader__.load({
       capNote: '名额服务暂不可用，请稍后重试或重启宿主。',
       taskSectionTitle: '指导对话',
       taskSectionEmpty: '本会话还没有指导对话。',
+      taskSectionEmptyTree: '本会话与根会话都没有指导对话。',
+      taskGroupCurrent: '本会话',
+      taskGroupRoot: '根会话其他指导',
+      taskGroupRootOnly: '根会话指导',
       taskSectionOpenPanel: '打开指导面板',
       taskSectionOpening: '打开中…',
     }
@@ -108,7 +113,7 @@ window.__ModuleLoader__.load({
       copyId: 'Copy ID',
       copied: 'Copied',
       archivedDone: 'Sleeping',
-      closeHint: 'Closing the chat tab only hides the page; the session stays and “Reopen” brings it back. Idle guidance threads fall asleep when subagent slots get tight; reopening wakes one (the first message cold-starts in a few seconds).',
+      closeHint: 'Closing the chat tab only hides the page; the session stays and “Reopen” brings it back. When automatic archiving is enabled, idle guidance threads fall asleep while subagent slots are tight; reopening wakes one (the first message cold-starts in a few seconds).',
       unavailable: 'Workspace service unavailable',
       noThreadsSurface: 'This deployment cannot host the sidebar chat; opened in the main view instead',
       legacy: 'Use a standalone session (no inherited context)',
@@ -119,6 +124,10 @@ window.__ModuleLoader__.load({
       capNote: 'Capacity admission is unavailable. Retry later or restart the Host.',
       taskSectionTitle: 'Guidance threads',
       taskSectionEmpty: 'No guidance conversation in this chat yet.',
+      taskSectionEmptyTree: 'No guidance conversation in this chat or its root session.',
+      taskGroupCurrent: 'This chat',
+      taskGroupRoot: 'Other guidance under the root session',
+      taskGroupRootOnly: 'Guidance under the root session',
       taskSectionOpenPanel: 'Open the guidance panel',
       taskSectionOpening: 'Opening…',
     }
@@ -201,6 +210,7 @@ window.__ModuleLoader__.load({
       marginTop: 4,
     }
     const sectionTitle = { fontSize: 12, fontWeight: 600, lineHeight: 1.4 }
+    const groupHeading = { ...sectionTitle, paddingTop: 2, color: 'var(--dsw-alias-label-secondary)' }
     const count = { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)' }
     const empty = {
       margin: 0,
@@ -395,6 +405,11 @@ window.__ModuleLoader__.load({
       if (band === 'mid') return limits.midDelayMs ?? DEFAULT_LIMITS.archive.midDelayMs
       if (band === 'high') return limits.highDelayMs ?? DEFAULT_LIMITS.archive.highDelayMs
       return null
+    }
+
+    /** O5 is opt-in: only an explicit host `archive.auto === true` schedules. */
+    function autoArchiveEnabled(archive) {
+      return archive?.auto === true
     }
 
     /**
@@ -686,6 +701,44 @@ window.__ModuleLoader__.load({
         byId.set(summary.id, { id: summary.id, label: summary.displayTitle, createdAt: 0 })
       }
       return [...byId.values()].sort((left, right) => right.createdAt - left.createdAt)
+    }
+
+    /**
+     * The main session of one parent chain. Mirrors the official sidebar's
+     * rootAncestor(): an unknown/hydrating start degrades to itself, and a
+     * broken chain also falls back to the current session rather than guessing.
+     */
+    function rootAncestor(byId, sessionId) {
+      if (sessionId === undefined) return undefined
+      const start = byId?.[sessionId]
+      if (start === undefined) return sessionId
+      const seen = new Set()
+      let current = start
+      while (current?.origin === 'subagent' && current.parentId !== undefined && !seen.has(current.id)) {
+        seen.add(current.id)
+        const parent = byId?.[current.parentId]
+        if (parent === undefined) return sessionId
+        current = parent
+      }
+      return current?.id ?? sessionId
+    }
+
+    /**
+     * Q7 C: the task-page section keeps this chat's guides and adds the
+     * remaining guides under the same root session. The current session is
+     * excluded from the root group (a guide's own page must not list itself),
+     * and the same row never appears twice.
+     */
+    function sectionThreadGroups(records, list, sessionId) {
+      const current = threadsOf(records, list, sessionId).map(thread => ({ ...thread, seat: sessionId }))
+      const rootId = rootAncestor(list?.byId, sessionId)
+      if (rootId === undefined || rootId === sessionId) return { rootId, current, root: [] }
+      const seen = new Set(current.map(thread => thread.id))
+      seen.add(sessionId)
+      const root = threadsOf(records, list, rootId)
+        .filter(thread => !seen.has(thread.id))
+        .map(thread => ({ ...thread, seat: rootId }))
+      return { rootId, current, root }
     }
 
     // ── panel ────────────────────────────────────────────────────────────
@@ -1077,7 +1130,7 @@ window.__ModuleLoader__.load({
       const archivedIds = useArchivedSessionIds(ctx)
       const records = React.useMemo(loadRecords, [])
       const archived = React.useMemo(() => new Set(archivedIds), [archivedIds])
-      const threads = React.useMemo(() => threadsOf(records, list, sessionId), [records, list, sessionId])
+      const groups = React.useMemo(() => sectionThreadGroups(records, list, sessionId), [records, list, sessionId])
       const [busy, setBusy] = React.useState(null)
       const [note, setNote] = React.useState('')
 
@@ -1086,7 +1139,9 @@ window.__ModuleLoader__.load({
         setBusy(thread.id)
         setNote('')
         try {
-          await openThread(ctx, sessionId, thread.id)
+          // Root-group rows carry their own parent; current-group rows use the
+          // seat session. The address is what the native chat page consumes.
+          await openThread(ctx, thread.seat ?? sessionId, thread.id)
         } catch (error) {
           setNote(String(error && error.message ? error.message : error))
         } finally {
@@ -1104,7 +1159,7 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const rows = threads.map((thread) => {
+      const rowOf = (thread) => {
         const summary = list?.byId?.[thread.id]
         const running = summary?.running === true
         const sleeping = archived.has(thread.id)
@@ -1128,12 +1183,24 @@ window.__ModuleLoader__.load({
               : sleeping ? t('reopen') : t('open'),
           ),
         )
-      })
+      }
+
+      const currentRows = groups.current.map(rowOf)
+      const rootRows = groups.root.map(rowOf)
+      const hasCurrent = currentRows.length > 0
+      const hasRoot = rootRows.length > 0
+      const emptyKey = groups.rootId !== undefined && groups.rootId !== sessionId
+        ? 'taskSectionEmptyTree'
+        : 'taskSectionEmpty'
 
       return h(
         'div',
         { style: taskBox },
-        threads.length === 0 ? h('p', { style: hint }, t('taskSectionEmpty')) : h('div', { style: taskList }, rows),
+        !hasCurrent && !hasRoot ? h('p', { style: hint }, t(emptyKey)) : null,
+        hasCurrent && hasRoot ? h('p', { style: groupHeading }, t('taskGroupCurrent')) : null,
+        hasCurrent ? h('div', { style: taskList }, currentRows) : null,
+        hasRoot ? h('p', { style: groupHeading }, t(hasCurrent ? 'taskGroupRoot' : 'taskGroupRootOnly')) : null,
+        hasRoot ? h('div', { style: taskList }, rootRows) : null,
         h(
           'button',
           { type: 'button', style: linkButton, onClick: openPanel },
@@ -1283,6 +1350,7 @@ window.__ModuleLoader__.load({
           if (typeof sessions?.list?.getSnapshot !== 'function'
             || typeof workspace?.archiveSession !== 'function') return
           let stopped = false
+          let detach = () => {}
           const idleSince = new Map()
           const inflight = new Set()
           // Peak-hold state (C3): the band last in force and the deadline of
@@ -1311,6 +1379,7 @@ window.__ModuleLoader__.load({
             if (state?.panelCompat?.writable !== true || !snapshot || snapshot.enforcement !== 'native-materialize' || snapshot.unknown !== 0
               || !Number.isFinite(snapshot.sampledAt) || Date.now() - snapshot.sampledAt > 10_000) { holds.clear(); return }
             limitsRef.current = { ...DEFAULT_LIMITS, archive: { ...DEFAULT_LIMITS.archive, ...state.archive } }
+            if (!autoArchiveEnabled(limitsRef.current.archive)) { holds.clear(); return }
             const busy = new Set(snapshot.busyIds ?? [])
             const seenPools = new Set(), delays = new Map()
             for (const pool of Object.values(snapshot.poolsBySession ?? {})) {
@@ -1357,30 +1426,46 @@ window.__ModuleLoader__.load({
             }
             } catch { holds.clear() } finally { scanning = false }
           }
-          let offSessions = () => {}
-          let offWorkspaces = () => {}
-          try {
-            offSessions = sessions.list.subscribe?.(scan) ?? (() => {})
-          } catch {}
-          try {
-            offWorkspaces = workspaces?.list?.subscribe?.(scan) ?? (() => {})
-          } catch {}
-          const interval = typeof window !== 'undefined' && typeof window.setInterval === 'function'
-            ? window.setInterval(scan, ARCHIVE_TICK_MS)
-            : 0
-          scan()
+          const attach = () => {
+            let offSessions = () => {}
+            let offWorkspaces = () => {}
+            try {
+              offSessions = sessions.list.subscribe?.(scan) ?? (() => {})
+            } catch {}
+            try {
+              offWorkspaces = workspaces?.list?.subscribe?.(scan) ?? (() => {})
+            } catch {}
+            const interval = typeof window !== 'undefined' && typeof window.setInterval === 'function'
+              ? window.setInterval(scan, ARCHIVE_TICK_MS)
+              : 0
+            detach = () => {
+              try { offSessions() } catch {}
+              try { offWorkspaces() } catch {}
+              if (interval !== 0 && typeof window.clearInterval === 'function') {
+                try { window.clearInterval(interval) } catch {}
+              }
+            }
+            scan()
+          }
+          void (async () => {
+            // O5: automatic archiving is opt-in. Read the Host policy once;
+            // without an explicit `archive.auto === true` no timer, scan or
+            // state polling starts. Manual archive is unaffected.
+            let policy
+            try { policy = await callHost(ctx, 'state', {}, ctx.locale.bind(NS)) } catch { return }
+            if (stopped) return
+            limitsRef.current = { ...DEFAULT_LIMITS, archive: { ...DEFAULT_LIMITS.archive, ...policy?.archive } }
+            if (!autoArchiveEnabled(limitsRef.current.archive)) return
+            attach()
+          })()
           return () => {
             stopped = true
-            try { offSessions() } catch {}
-            try { offWorkspaces() } catch {}
-            if (interval !== 0 && typeof window.clearInterval === 'function') {
-              try { window.clearInterval(interval) } catch {}
-            }
+            detach()
           }
         }, 'guide-panel: idle archive')
       },
       // Pure scheduling policy, exposed for tests only (no host access).
-      __internals: { clientCompatibility, resourceChild, threadOpen, archiveCandidates, isLegacyGuideTab, legacyTabs, cleanLegacyTabs, bandOf, delayForBand, nextHold, archiveVerdict, archiveDelay, shieldNoteFor, modelNoteFor },
+      __internals: { clientCompatibility, resourceChild, threadOpen, archiveCandidates, isLegacyGuideTab, legacyTabs, cleanLegacyTabs, bandOf, delayForBand, nextHold, archiveVerdict, archiveDelay, autoArchiveEnabled, DEFAULT_LIMITS, rootAncestor, sectionThreadGroups, shieldNoteFor, modelNoteFor },
     }
   },
 })

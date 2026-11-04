@@ -40,8 +40,15 @@ await import('../client.js')
 assert.ok(plugin, 'the client bundle must register a module')
 assert.ok(plugin.__internals, 'the client bundle must expose the scheduler policy')
 
-const { bandOf, delayForBand, nextHold, archiveVerdict, archiveDelay } = plugin.__internals
+const { bandOf, delayForBand, nextHold, archiveVerdict, archiveDelay, autoArchiveEnabled, DEFAULT_LIMITS } = plugin.__internals
 const ARCHIVE = { lowDelayMs: 600_000, midDelayMs: 180_000, highDelayMs: 30_000, holdMs: 120_000 }
+
+// O5: automatic archiving is opt-in; only an explicit host `auto: true` starts it.
+assert.equal(DEFAULT_LIMITS.archive.auto, false)
+assert.equal(autoArchiveEnabled(undefined), false)
+assert.equal(autoArchiveEnabled({}), false)
+assert.equal(autoArchiveEnabled({ auto: false }), false)
+assert.equal(autoArchiveEnabled({ auto: true }), true)
 
 // ── B1: running children / capacity, half-open band boundaries ────────────
 assert.equal(bandOf(0, 8), 'none')

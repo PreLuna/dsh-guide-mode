@@ -9,8 +9,10 @@
           hideGuidance: true
           blockControl: true
         # O8 is owned by the independent @local/dsh-guide-shield Host bundle.
+        # O5: automatic archiving is opt-in; set auto: true to enable it.
         # Idle-sleep delays per pressure band (25% / 50% / 75% of capacity).
         archive:
+          auto: false
           lowDelayMs: 600000
           midDelayMs: 180000
           highDelayMs: 30000

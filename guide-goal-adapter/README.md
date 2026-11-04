@@ -18,6 +18,16 @@ node guide-goal-adapter/scripts/smoke.mjs --integration
 
 smoke 使用工作区下独立 DSH_HOME 和 profile；integration 使用进程内确定性模型，不读取真实用户凭据或调用外部模型。当前结果见 `evidence/LI-stage1-2026-11-02/`。
 
+PTY 扩展回归（包括真实指导 native tool-call、双终端状态隔离、原生工具结果卡及清理）：
+
+```powershell
+$env:DSH_SMOKE_OUTPUT = 'evidence/O11-validation-2026-11-04/pt6/recheck'
+$env:DSH_SMOKE_SCENARIO = 'pty' # 只测第六项可用 pt6
+node guide-goal-adapter/scripts/smoke.mjs --sidebar --integration --combination
+```
+
+`pty-result.json`／`pt6-result.json` 的 failed 或 blocked 会传递给顶层结果和非零退出码。`DSH_PT6_UNSANDBOXED=1` 仅用于明确授权的隔离无沙箱诊断：只改变专用临时父子会话，并记录 `danger-full-access`／`isolated-unsandboxed-diagnostic`；此模式的通过不能替代 workspace-write 验收。可用 `DSH_SMOKE_TERMINAL_SHELL` 显式指定隔离组合的官方终端 backend shell 路径作对照，不修改真实 profile。详情见 [本轮报告](../evidence/O11-validation-2026-11-04/pt6/report.md)。
+
 ## 安装与撤销
 
 首次切换前关闭 DSH Host，执行 `scripts/install-desktop.ps1`；它保存恢复信息、登记 link 包及 bundle，然后冷启动 DSH。`-Restore` 移除 adapter 的 bundle 和依赖选择，原 driver 的禁用 patch 随之消失，再次冷启动恢复。

@@ -1,12 +1,12 @@
 # 本机工程基线与维护
 
-适用范围：本机自用六包，不对外发布。版本统一为 1.1.0，`private:true`、`UNLICENSED`；维护者为本机工作区用户。本轮不建立公开仓库、不上传代码，也不宣称具备公开分发许可。公共作者/远端仓库/开源许可留到明确对外分发时决定。
+适用范围：六包先以私有 GitHub 仓库维护，版本保留 1.1.0、`private:true`、`UNLICENSED`。本轮不公开仓库、不发布市场；公共作者／包命名空间／开源许可在后续公开前决定。仓库收录和本地打包见 [仓库说明](REPOSITORY-PREPARATION.md)。
 
 ## 版本管理与 CI
 
 一个工作区 Git 仓库管理六个自有包、当前文档和测试。依赖、历史 fork、历史文档、evidence、隔离 profile、会话/恢复数据均不纳入 Git；运行与回退依赖的证据目录必须在本机保留，不能据 .gitignore 删除它们。
 
-`npm test` 运行无需安装 DSH 的 Node 回归和生成物一致性检查；`.github/workflows/test.yml` 为 Windows/Node 24 的最小 CI。已在本机执行相同命令；未连接远端，不能称 GitHub 托管 CI 已跑过。真实 Runtime/Host/浏览器验收另行使用已安装 DSH、Electron 与 Python Playwright，不能以 Node CI 替代。
+`npm test` 运行无需安装 DSH 的 Node 回归和生成物一致性检查；`.github/workflows/test.yml` 为 Windows/Node 24 的最小 CI。已在本机执行相同命令；私有仓库的托管 CI 以 [Actions 实际记录](https://github.com/PreLuna/dsh-guide-mode/actions) 为准。真实 Runtime/Host/浏览器验收另行使用已安装 DSH、Electron 与 Python Playwright，不能以 Node CI 替代。
 
 `client.js` 从 sidebar adapter 自有 `core.js` 和 `client.entry.js` 生成。修改后运行 `npm run build --prefix guide-sidebar-adapter`，检查运行 `npm run build:check`；安装脚本也会检查。生成后客户端有独立加载测试，原生任务组件仍由官方包提供。
 
@@ -39,4 +39,11 @@ panel HMR 的既有保护回归保留；准入和 shield 核心更新采用冷�
 
 ## R5 复现口径
 
-复用当前 desktop 的依赖与 bundle 组合，在隔离 DSH_HOME 和无用户凭据的 Edge 测试一页、两页及刷新；记录 SSE/HTTP 时间线。此次 9 次 API 请求成功，未复现排队，因此不擅自更换连接协议。该结论不覆盖长期插件 HMR、多窗口或人为撑满 HTTP/1.1 连接；真实使用再出现时保留网络瀑布继续定位。
+复用当前 desktop 的依赖与 bundle 组合，在隔离 DSH_HOME 和无用户凭据的 Edge 记录 SSE/HTTP 时间线。初次一页／两页及刷新 9 次请求成功；2026-11-04 扩展至五页、六次刷新和六次 adapter 重挂，约 124 秒、660 次 API 请求全部成功，关闭其他页面后 Host TCP 资源回落，仍未复现排队，见 [补测报告](../evidence/O11-residual-check-2026-11-04/report.md)。不据此更换连接协议或声称长期泄漏修复；浏览器页面／独立上下文不是原生多窗口，adapter 重挂不是任意源码 HMR，测试没有人为撑满 HTTP/1.1 连接。真实使用再出现时保留网络瀑布继续定位。
+
+## 文档维护
+
+- 当前文档只写当前事实：README 负责使用/安装/配置/诊断，PROJECT-STATUS 负责交付与决定，OPEN-ITEMS 只留真正剩余事项，ARCHITECTURE 描述当前机制，本文描述版本与维护流程。
+- 已完成或已放弃的方案先提炼有效结论至 [历史设计摘要](HISTORY-AND-MAINTENANCE-NOTES.md)，再删除确认无运行／测试／恢复依赖的重复原文；删除前记录路径与哈希。
+- 当前文档不把历史记录当安装步骤。原始实验 evidence 和必要恢复资料留在本机，不上传 GitHub，不因未入 Git 就删除；过时文档链接迁移到摘要，原始结果不改写。
+- 修改文档后核对相对链接和测试事实；`npm test`、`npm run build:check`、`npm run doctor` 的结果必须与 README 的验证说明一致。

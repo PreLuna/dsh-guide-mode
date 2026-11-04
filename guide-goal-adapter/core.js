@@ -77,11 +77,17 @@ export function createIdentityReader(ctx, signal, foldDescriptor) {
 export function assertSingleDriver(ctx) {
   const loader = ctx.get('loader')
   if (loader === undefined) return // Bare Contexts used in keyless integration tests.
-  const schedulers = [...loader.entries()].filter(entry => !entry.disabled && (
+  const entries = [...loader.entries()]
+  const originals = entries.filter(entry => entry.options?.name === '@deepseek-ai/dsh-goal-round-driver')
+  const schedulers = entries.filter(entry => !entry.disabled && (
     entry.options?.name === '@deepseek-ai/dsh-goal-round-driver'
     || entry.options?.name === '@local/dsh-guide-goal-adapter'
   ))
-  if (schedulers.length !== 1 || schedulers[0].options.name !== '@local/dsh-guide-goal-adapter') {
+  // The paired profile must keep the original driver present but disabled. A
+  // local-only loader is not an acceptable recovery shape: it silently drops
+  // the upstream schedule contract and cannot prove the original was replaced.
+  if (originals.length !== 1 || originals[0].disabled !== true
+    || schedulers.length !== 1 || schedulers[0].options.name !== '@local/dsh-guide-goal-adapter') {
     throw new Error('guide-goal-adapter: expected exactly one enabled adapter and a disabled original goal-round-driver; restore the paired profile configuration')
   }
 }

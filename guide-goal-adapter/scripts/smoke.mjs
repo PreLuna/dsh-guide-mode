@@ -1,5 +1,5 @@
 /** Isolated real-profile mount. Never uses or changes the desktop profile. */
-import { mkdirSync, writeFileSync, existsSync, realpathSync, symlinkSync, readFileSync } from 'node:fs'
+import { cpSync, mkdirSync, writeFileSync, existsSync, realpathSync, symlinkSync, readFileSync } from 'node:fs'
 import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
@@ -53,9 +53,38 @@ writeFileSync(join(profile, 'package.json'), JSON.stringify({
   dsh: { profile: { bundles: combinationBundles ?? ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', ...Object.keys(dependencies)] } },
 }, null, 2) + '\n')
 writeFileSync(join(profile, 'cordis.yml'), '[]\n')
-writeFileSync(join(profile, 'cordis.patch.yml'), integration ? JSON.stringify([{ insert: [{
+const testPatches = integration ? [{ insert: [{
   id: 'li-runtime-fixture', name: join(workspace, 'guide-goal-adapter/test/host-fixture.mjs').replaceAll('\\', '/'),
-}] }], null, 2) : '[]\n')
+}] }] : []
+if (process.env.DSH_SMOKE_SCENARIO === 'residual') testPatches.push({ id: 'guide-panel', name: '@local/dsh-guide-panel', config: {
+  model: { hideGuidance: true, blockControl: true },
+  archive: { auto: true, lowDelayMs: 3000, midDelayMs: 2000, highDelayMs: 1000, holdMs: 4000 },
+} })
+if (process.env.DSH_SMOKE_TERMINAL_SHELL) testPatches.push({ id: 'optional-persistent-terminals', config: [
+  { id: 'optional-terminal-registry', name: '@deepseek-ai/dsh-terminal' },
+  { id: 'optional-terminal-pwsh', name: '@deepseek-ai/dsh-terminal-bash', config: {
+    shellDialect: 'pwsh', shellPath: process.env.DSH_SMOKE_TERMINAL_SHELL,
+  } },
+  { id: 'optional-tool-terminal', name: '@deepseek-ai/dsh-tool-terminal' },
+] })
+writeFileSync(join(profile, 'cordis.patch.yml'), JSON.stringify(testPatches, null, 2) + '\n')
+}
+
+if (process.env.DSH_SMOKE_REAL_MODEL === '1') {
+  const sourceHome = join(process.env.USERPROFILE ?? process.env.HOME, '.dsh')
+  mkdirSync(home, { recursive: true })
+  const authFiles = [
+    ['.credentials.yaml', '.credentials.yaml'],
+    ['settings.yaml.imported', 'settings.yaml'],
+    ['settings.yaml.imported', 'settings.yaml.imported'],
+  ]
+  for (const [sourceName, targetName] of authFiles) {
+    const source = join(sourceHome, sourceName)
+    if (existsSync(source)) cpSync(source, join(home, targetName), { force: true })
+  }
+  const modelCache = join(sourceHome, 'llm-deepseek')
+  if (existsSync(modelCache)) cpSync(modelCache, join(home, 'llm-deepseek'), { recursive: true, force: true })
+  console.log(JSON.stringify({ realModelAuth: 'copied to isolated DSH_HOME (values not logged)' }))
 }
 
 const executable = process.env.DSH_ELECTRON ?? 'C:/Users/wang/AppData/Local/Programs/DeepSeek Harness/DeepSeek Harness.exe'
@@ -70,6 +99,7 @@ let entryUrl
 let cookie
 let passed = false
 let lastProbeError
+let scenarioResult
 const redact = text => text.replace(/([?&]token=)[^\s"'<>]+/g, '$1[redacted]')
 const args = desktop ? ['--expose-internals', desktopHost, runtimeDir, profile, join(dirname(executable), 'resources/runtime/primary-runtime')]
   : ['--expose-internals', cli, '--profile', 'goal-smoke', '--no-open', '--host', '127.0.0.1', '--port', '0']
@@ -156,15 +186,25 @@ try {
           }
           if (sidebar && integration) {
             const browser = spawn('python', [join(workspace, 'guide-sidebar-adapter/test/browser_test.py')], { cwd: workspace, env: { ...process.env, PYTHONUTF8: '1' }, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
-            browser.stdin.end(JSON.stringify({ entryUrl, parent: runtime.parent, autoParent: runtime.autoParent, output: smokeRoot }))
+            browser.stdin.end(JSON.stringify({ entryUrl, parent: runtime.parent, autoParent: runtime.autoParent, output: smokeRoot,
+              scenario: process.env.DSH_SMOKE_SCENARIO, residualTimers: process.env.DSH_RESIDUAL_TIMERS !== '0' }))
             let browserOutput = ''
             browser.stdout.on('data', text => { browserOutput += text })
             browser.stderr.on('data', text => { browserOutput += text })
             const code = await new Promise(resolve => browser.on('exit', resolve))
             if (code !== 0) throw new Error(`Runtime fixture browser check failed: ${redact(browserOutput).slice(-2500)}`)
             console.log(browserOutput.trim())
+            const scenario = process.env.DSH_SMOKE_SCENARIO
+            if (['pty', 'pt6', 'residual', 'r5-extended'].includes(scenario)) {
+              scenarioResult = JSON.parse(readFileSync(join(smokeRoot, `${scenario}-result.json`), 'utf8'))
+              const status = scenarioResult.status
+              if (!['passed', 'known-diagnostic'].includes(status)) {
+                writeFileSync(join(smokeRoot, 'runtime-result.json'), JSON.stringify({ status, scenario, scenarioResult, home, baseUrl, runtime }, null, 2) + '\n')
+                throw Error(`Runtime fixture ${scenario} scenario ${status}; see ${scenario}-result.json`)
+              }
+            }
           }
-          if(combination){
+          if(combination && !process.env.DSH_SMOKE_SCENARIO){
             const browser=spawn('python',[join(workspace,'scripts/r5-browser.py')],{cwd:workspace,env:{...process.env,PYTHONUTF8:'1'},windowsHide:true,stdio:['pipe','pipe','pipe']})
             browser.stdin.end(JSON.stringify({entryUrl,output:smokeRoot}))
             let output='';browser.stdout.on('data',chunk=>output+=chunk);browser.stderr.on('data',chunk=>output+=chunk)
@@ -172,8 +212,8 @@ try {
             if(code!==0)throw Error(`Combination browser probe failed: ${redact(output).slice(-2500)}`)
             console.log(output.trim())
           }
-          writeFileSync(join(smokeRoot, desktop ? expectOriginal ? 'desktop-restore-result.json' : 'desktop-mount-result.json' : integration ? 'runtime-result.json' : 'smoke-result.json'), JSON.stringify({ status: 'passed', home, baseUrl, state, runtime, panelStart, sidebarState, scope: desktop ? 'actual desktop profile cold Host startup and fenced guidance API; no test agents or model requests' : integration ? 'real isolated Host, agent loop, goal, subagent runtime, native tool-call and actual PTC run_code; deterministic in-process model; no external model request' : 'real isolated keyless Host startup and fenced guidance API; no model request' }, null, 2) + '\n')
-          console.log(JSON.stringify({ status: 'passed', baseUrl, goalAdapter: data.goalAdapter }))
+          writeFileSync(join(smokeRoot, desktop ? expectOriginal ? 'desktop-restore-result.json' : 'desktop-mount-result.json' : integration ? 'runtime-result.json' : 'smoke-result.json'), JSON.stringify({ status: scenarioResult?.status ?? 'passed', qualification: scenarioResult?.scope, mode: scenarioResult?.mode, scenarioResult, home, baseUrl, state, runtime, panelStart, sidebarState, scope: desktop ? 'actual desktop profile cold Host startup and fenced guidance API; no test agents or model requests' : integration ? 'real isolated Host, agent loop, goal, subagent runtime, native tool-call and actual PTC run_code; deterministic in-process model; no external model request' : 'real isolated keyless Host startup and fenced guidance API; no model request' }, null, 2) + '\n')
+          console.log(JSON.stringify({ status: scenarioResult?.status ?? 'passed', qualification: scenarioResult?.scope, mode: scenarioResult?.mode, baseUrl, goalAdapter: data.goalAdapter }))
           passed = true
           break
         }

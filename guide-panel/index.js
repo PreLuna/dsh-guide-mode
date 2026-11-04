@@ -70,6 +70,8 @@ export function resolveLimits(config) {
     : {}
   return {
     archive: {
+      // O5: keep the scheduler available but require an explicit opt-in.
+      auto: archive.auto === true,
       lowDelayMs: countOf(archive.lowDelayMs, DEFAULT_ARCHIVE.lowDelayMs),
       midDelayMs: countOf(archive.midDelayMs, DEFAULT_ARCHIVE.midDelayMs),
       highDelayMs: countOf(archive.highDelayMs, DEFAULT_ARCHIVE.highDelayMs),

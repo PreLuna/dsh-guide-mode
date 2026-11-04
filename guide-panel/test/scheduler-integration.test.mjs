@@ -14,7 +14,7 @@ globalThis.fetch = async (_url, options) => {
     archives.push(body.id); archived.add(body.id)
     return {status:200,ok:true,text:async()=>JSON.stringify({ok:true,value:{archived:true}})}
   }
-  return { status: 200, ok: true, text: async () => JSON.stringify({ok:true,value:{ panelCompat:{writable:true},archiveCandidates:Object.fromEntries((body.candidates??[]).map(item=>[item.id,{status:'idle',parentSessionId:item.parentSessionId}])), archive:{lowDelayMs:600,midDelayMs:180,highDelayMs:30,holdMs:120},admission:{
+  return { status: 200, ok: true, text: async () => JSON.stringify({ok:true,value:{ panelCompat:{writable:true},archiveCandidates:Object.fromEntries((body.candidates??[]).map(item=>[item.id,{status:'idle',parentSessionId:item.parentSessionId}])), archive:{auto:true,lowDelayMs:600,midDelayMs:180,highDelayMs:30,holdMs:120},admission:{
     ...state, sampledAt:clock, enforcement:'native-materialize',unknown:0,busyIds:state.busyIds??[],
   }}}) }
 }

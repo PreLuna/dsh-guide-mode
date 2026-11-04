@@ -56,6 +56,7 @@ window.__ModuleLoader__ = {
 // ── fake host ────────────────────────────────────────────────────────────
 let descriptor = null
 let body = null
+let taskSection = null
 let listSnapshot = { byId: {}, projectionsBySession: {} }
 const services = {
   sessions: {
@@ -68,6 +69,10 @@ const services = {
     list: { getSnapshot: () => ({ archivedSessionIds: [] }), subscribe: () => () => {} },
   },
   sidebarRight: { openTabs: { getSnapshot: () => [], subscribe: () => () => {} }, openResource: () => {}, tabsIn: () => [], close: () => {} },
+  betterSidebar: {
+    registerTaskFilter: () => () => {},
+    registerTaskSection: (value) => { taskSection = value; return () => {} },
+  },
   sidebarRightTabs: {
     register: (value) => { descriptor = value; return () => {} },
     get: () => ({}),
@@ -141,6 +146,63 @@ const archivedText = textOf(render())
 assert.match(archivedText, /sleepTag/, 'an archived thread must show the sleeping tag')
 assert.match(archivedText, /reopen/, 'a sleeping thread must still be openable')
 assert.match(archivedText, /unarchive/, 'a sleeping thread must offer the wake action')
+
+// Q7 C: the task section keeps this chat's guides and adds the remaining
+// guides under the root session, without duplicating rows or listing itself.
+const { rootAncestor, sectionThreadGroups } = plugin.__internals
+const chain = {
+  root: { id: 'root', origin: 'user' },
+  child: { id: 'child', origin: 'subagent', parentId: 'root' },
+  grand: { id: 'grand', origin: 'subagent', parentId: 'child' },
+}
+assert.equal(rootAncestor(chain, 'grand'), 'root')
+assert.equal(rootAncestor(chain, 'root'), 'root')
+assert.equal(rootAncestor(chain, 'missing'), 'missing')
+assert.equal(rootAncestor({ child: { id: 'child', origin: 'subagent', parentId: 'gone' } }, 'child'), 'child')
+const cycle = { a: { id: 'a', origin: 'subagent', parentId: 'b' }, b: { id: 'b', origin: 'subagent', parentId: 'a' } }
+assert.ok(['a', 'b'].includes(rootAncestor(cycle, 'a')), 'a cycle must terminate and return a chain member')
+
+storage.clear()
+const hybridList = {
+  byId: {
+    root: { id: 'root', origin: 'user' },
+    child: { id: 'child', origin: 'subagent', parentId: 'root' },
+    sib: { id: 'sib', origin: 'subagent', parentId: 'root' },
+    gr: { id: 'gr', origin: 'subagent', parentId: 'root', displayTitle: '指导: root' },
+    gc: { id: 'gc', origin: 'subagent', parentId: 'child', displayTitle: '指导: child' },
+  },
+  projectionsBySession: {
+    root: { values: { subagentCatalog: [{ id: 'gr', label: '指导: root' }, { id: 'gc', label: '指导: child' }] } },
+    child: { values: { subagentCatalog: [{ id: 'gc', label: '指导: child' }] } },
+  },
+}
+const groups = sectionThreadGroups({}, hybridList, 'child')
+assert.equal(groups.rootId, 'root')
+assert.deepEqual(groups.current.map(thread => thread.id), ['gc'])
+assert.deepEqual(groups.root.map(thread => thread.id), ['gr'], 'root group dedupes the current chat row')
+assert.equal(groups.root[0].seat, 'root', 'root rows carry the root parent address')
+
+const selfList = {
+  byId: {
+    root: { id: 'root', origin: 'user' },
+    guide: { id: 'guide', origin: 'subagent', parentId: 'root' },
+  },
+  projectionsBySession: {
+    root: { values: { subagentCatalog: [{ id: 'guide', label: '指导: self' }] } },
+  },
+}
+const selfGroups = sectionThreadGroups({}, selfList, 'guide')
+assert.equal(selfGroups.current.length, 0)
+assert.equal(selfGroups.root.length, 0, 'a guide page must not list itself')
+
+listSnapshot = hybridList
+services.workspaces.list.getSnapshot = () => ({ archivedSessionIds: [] })
+assert.ok(taskSection, 'apply must register the task-page section')
+const sectionText = textOf(taskSection.component({ ctx, scope: { sessionId: 'child' } }))
+assert.match(sectionText, /taskGroupCurrent/)
+assert.match(sectionText, /taskGroupRoot/)
+assert.match(sectionText, /child/)
+assert.match(sectionText, /root/)
 
 // The shield status is a pure translation; `active` stays silent.
 const t = (key) => key

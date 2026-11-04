@@ -18,4 +18,4 @@ S 来自 `slots.size`，包括 creating、closing、external、带 inbox 的 idl
 
 验证入口：`node guide-admission/test/core.test.mjs`；真实 Host：`node evidence/O19-production-2026-11-03/run.mjs`。生产包不导入研究原型。
 
-1.1.0 及后续本机维护使用 [统一维护流程](../docs/LOCAL-MAINTENANCE.md)。本目录原 O19 prepare/apply/rollback 脚本只保留该轮精确恢复关系；源码变化后会拒绝覆盖历史计划，不用于新版本升级。
+1.1.0 及后续维护使用 [统一维护流程](../docs/LOCAL-MAINTENANCE.md)。原 O19 固定日期的 prepare/apply/rollback/verify 脚本已提炼为 [恢复经验](../docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除；原始备份保留本机，不重用旧计划升级。

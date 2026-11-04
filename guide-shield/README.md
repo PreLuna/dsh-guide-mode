@@ -1,6 +1,6 @@
 # Guide settlement shield
 
-独立 Host bundle `@local/dsh-guide-shield`，支持 DSH 0.2.1-rc.3 / Cordis 4.0.5。O2/R6 实现、验收与实际 desktop 部署已关闭，最终判定见 [收尾结论](../docs/O2-R6-CLOSEOUT.md)。panel 的 provider/API/O6 生命周期与结算防护分开：重载或禁用 panel 不卸载此服务，已有指导结算仍受保护。服务自身卸载会失活并释放它持有的包装；第三方保留的旧 wrapper 直通原方法。
+独立 Host bundle `@local/dsh-guide-shield`，支持 DSH 0.2.1-rc.3 / Cordis 4.0.5。O2/R6 实现、验收与实际 desktop 部署已关闭，最终判定见 [收尾结论](../docs/HISTORY-AND-MAINTENANCE-NOTES.md)。panel 的 provider/API/O6 生命周期与结算防护分开：重载或禁用 panel 不卸载此服务，已有指导结算仍受保护。服务自身卸载会失活并释放它持有的包装；第三方保留的旧 wrapper 直通原方法。
 
 `index.js` 先核验宿主源码与官方 descriptor fold 契约，不通过时报告 unsupported 并不安装半套保护；`core.js` 持有事件监听、父对象包装和释放；`identity.js` 只读子会话自身 first-wins descriptor。`guide-panel/identity.js` 与 `shield.js` 是兼容导出，goal adapter 继续保留独立 reader，但使用同一 first-wins 语义。
 
@@ -8,24 +8,13 @@
 
 ## 当前维护
 
-1.1.0 的统一安装、升级、完整卸载与恢复使用 [本机维护流程](../docs/LOCAL-MAINTENANCE.md)。官方同步 snapshotEvents(inheritedEventCount) 已 deprecated，目前在固定产物下受控使用并在 state 暴露依赖；升级必须复核，核心更新使用冷重启。以下保留 1.0.0 独立服务迁移记录，不能作为新版本升级计划重复执行。
+1.1.0 的统一安装、升级、完整卸载与恢复使用 [本机维护流程](../docs/LOCAL-MAINTENANCE.md)。官方同步 snapshotEvents(inheritedEventCount) 已 deprecated，目前在固定产物下受控使用并在 state 暴露依赖；升级必须复核，核心更新使用冷重启。旧独立服务迁移经验见历史摘要，不能作为新版本升级计划重复执行。
 
-## 安装与迁移
+## 安装与恢复
 
-2026-11-03 已按本说明完成实际 desktop 迁移并启动确认，见 [迁移报告](../evidence/O2-R6-desktop-migration-2026-11-03/report.md)。以下为迁移步骤：关闭 Host 后，在其 profile 的 dependencies 中登记本包，并在 bundles 中放到 panel 前；为 profile/node_modules/@local/dsh-guide-shield 建立指向本目录的 junction，方式与现有自有包一致。保留 panel、preset、goal/sidebar adapter 和其他依赖。
+六包通过统一 profile 计划成组安装，shield 放在 panel 前；配置位于 `guide-shield/cordis.patch.yml`，默认 `enabled:true`、`inject:true`。若旧 panel 有自定义 shield override，应先核对并迁移到独立服务，不能让两个配置所有者同时生效。
 
-```json
-{
-  "dependencies": {
-    "@local/dsh-guide-shield": "link:D:/files/Project/指导模式/guide-shield"
-  },
-  "dsh": { "profile": { "bundles": ["@local/dsh-guide-shield"] } }
-}
-```
-
-这是**合并片段，不是替换整个 manifest**。新服务的配置位于 `guide-shield/cordis.patch.yml`：`enabled:true`、`inject:true`。如旧 panel 有自定义 `shield.enabled` / `shield.inject`，把值迁到新服务 config；panel 不再拥有该配置。恢复前核对 profile 原有成对 goal driver/adapter 选择。
-
-启动后检查 `/guide/api/state` 的 `settlementShield.mode=active`、`inject=true`。缺服务时 panel 报 `off / host-service-unavailable`，不会声称受保护。完整回退应使用迁移前 profile 与迁移前 panel 版本；仅卸载新服务会有意解除防护。
+启动后检查 `/guide/api/state` 的 `settlementShield.mode=active`、`inject=true`。缺服务时 panel 报 off／host-service-unavailable。回退必须配套源码版本与 profile，单独卸载 shield 会有意解除防护。旧固定日期迁移脚本已提炼到 [恢复经验](../docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除，原始本机备份保留。
 
 ## 验证与边界
 

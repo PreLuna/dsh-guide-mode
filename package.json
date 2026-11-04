@@ -11,6 +11,8 @@
     "test": "node scripts/test.mjs",
     "build:check": "node guide-sidebar-adapter/scripts/build.mjs --check",
     "doctor": "node scripts/workspace.mjs doctor",
+    "repo:check": "node scripts/check-repository.mjs",
+    "pack:local": "node scripts/package-local.mjs",
     "profile:prepare": "node scripts/workspace.mjs prepare"
   }
 }

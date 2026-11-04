@@ -16,7 +16,7 @@
 
 `install-desktop.ps1 -Restore` 恢复阶段一的 sidebar 文件和配置选择，保留 goal adapter 与其他后续 profile 配置；不递归删除包或用户数据。恢复文件均核对 SHA-256，替换文件时不会写穿可能的硬链接。重新运行正常安装可回到官方包 + adapter。
 
-不再运行 better-sidebar-fork 的构建或覆盖脚本。原 fork 与实验源码仅冻结为历史证据。
+旧 better-sidebar-fork 已提炼为 [历史设计摘要](../docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除；不再构建或覆盖它。官方验证缓存和必要恢复资料仍留在本机，未随仓库分发。
 
 ## 生成物与维护
 

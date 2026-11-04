@@ -17,7 +17,7 @@ if(command==='doctor'){
   const skill=existsSync(join(skillRoot,'guide/SKILL.md'))
   const results=packages.map(directory=>{const manifest=JSON.parse(readFileSync(join(root,directory,'package.json'),'utf8'));return{directory,name:manifest.name,version:manifest.version,private:manifest.private,license:manifest.license}})
   if(results.some(item=>item.version!=='1.1.0'||item.private!==true||item.license!=='UNLICENSED'))throw Error('Inconsistent local release metadata')
-  console.log(JSON.stringify({status:'passed',distribution:'local-only',packages:results,guideSkill:{available:skill,fallback:'explicit unavailable note and general advice'},profile},null,2))
+  console.log(JSON.stringify({status:'passed',distribution:'private-github',packages:results,guideSkill:{available:skill,fallback:'explicit unavailable note and general advice'},profile},null,2))
 }else if(command==='prepare'){
   const outputArg=option('--output');if(!outputArg)throw Error('--output is required; use a new evidence directory for every operation')
   const output=resolve(outputArg),mode=option('--mode')??'install'

@@ -1,25 +1,10 @@
 # DSH 指导模式
 
-> O2/R6 已在支持基线内关闭，实际 desktop shield 已迁移并启动确认，见 [收尾结论](docs/O2-R6-CLOSEOUT.md)。O6 B′ 的独立验收见 [修复报告](evidence/B-prime-fixes-2026-11-02/report.md)。
-
 在主会话旁边打开继承上下文的指导对话，用独立 `guide` preset 提供建议或按要求执行修改。指导可使用写工具，并可与主会话 goal 并行。
 
-截至 2026-11-03，两阶段局部注入与独立 Host shield 均已完成并安装到本机 desktop profile：复用原 goal driver，恢复官方 better-sidebar 0.28.2，通过两个独立 adapter 添加兼容行为。支持基线为 DSH 0.2.1-rc.3 / Cordis 4.0.5；两个 adapter 的未知产物会回退原行为，1.1.0 已为 panel/shield 加入必需源码/形状契约预检，不支持时明确只读/不可用。
+截至 2026-11-04，两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。当前版本 `1.1.0`，先以私有 GitHub 仓库维护，市场／公开源码发布待稳定后另行决定。当前保留 `private:true`、`UNLICENSED`。
 
-## 从哪里开始看
-
-| 文档 | 唯一职责 |
-|---|---|
-| 本文 | 使用、当前安装、配置和常见问题 |
-| [PROJECT-STATUS.md](PROJECT-STATUS.md) | 当前交付、已定决定、验收证据 |
-| [OPEN-ITEMS.md](OPEN-ITEMS.md) | 真正尚未实现、待决策或待验证的事项 |
-| [架构说明](docs/ARCHITECTURE.md) | provider、身份、局部作用域、shield 和生命周期 |
-| [O6/O8 设计](docs/O6-O8-DESIGN.md) | 模型不可见投影与结算 shield；B′ 注册生命周期/取消/来源整改及扩展验收已完成 |
-| [O6/O8 任务](docs/O6-O8-TASKS.md) | 已确认取舍后的任务、验收、回滚与完成记录 |
-| [O2/R6 收尾](docs/O2-R6-CLOSEOUT.md) | 原完成标准、证据映射、正式关闭判定及 O11/O21 保留边界 |
-| [局部注入方案](LOCAL-INJECTION-PLAN.md) | 已确认的工程约束与两阶段交付对照，不是下一轮待办 |
-| [工作区整理记录](docs/WORKSPACE-CLEANUP.md) | 文件分类、归档和可回收产物清单 |
-| [历史资料索引](docs/archive/README.md) | 旧方案和整理前文档，不能作为当前安装说明 |
+支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。工作区在 1.1.0 基线上另有未发布的本地改动：自动归档默认关闭、专区改为混合分组，见 [CHANGELOG](CHANGELOG.md) 的 Unreleased。
 
 ## 使用
 
@@ -29,24 +14,30 @@
 4. 关闭页签会保留会话；在面板或任务页专区点「打开」可回到同一段对话。
 5. 归档会停止并隐藏该会话；已归档的指导在面板中以「休眠中」显示，可取消归档、重新打开。其他原生 UI 仍可能可见或可输入。
 
-官方 better-sidebar 的原任务树/图隐藏指导及其分支，计数不含指导；创建指导不会自动弹出普通任务页，普通工作子代理仍保持原行为。指导专区位于原任务页底部，使用已确认的独立滚动区。
+官方 better-sidebar 的原任务树/图隐藏指导及其分支，计数不含指导；创建指导不会自动弹出普通任务页，普通工作子代理保持原行为。指导专区位于原任务页底部，使用独立滚动区；它显示本会话的指导，并分组补充同一根会话下的其他指导。
 
 主会话模型调用 `list_agents` 时看不到指导及其分支；模型对指导分支的 `send_message` / `interrupt_agent` 会被拒绝，普通工作与指导向父级回报仍放行。需要停止或操作指导时，使用本面板或原生指导对话页，而不是让模型代做。默认开启；可用 `model.hideGuidance` / `model.blockControl` 关闭。
 
-指导和 goal 可以同时修改工作区；当前没有额外的跨会话文件锁或冲突协调器。各自沿用宿主原有权限规则。
+指导和 goal 可以同时修改工作区；当前没有跨会话文件锁或冲突协调器，各自沿用宿主原有权限规则。
 
-## 当前包与运行边界
+## 当前安装
 
-| 目录 | 职责 |
+| 包 | 职责 |
 |---|---|
-| [guide-panel](guide-panel/) | `guide-fork` provider、API、面板、专区和自动归档；连接独立准入与 shield 服务 |
-| [guide-admission](guide-admission/README.md) | 原生同步准入、权威容量/身份/按池快照；生产验收与 desktop 冷部署完成 |
-| [guide-shield](guide-shield/README.md) | 独立 Host 结算防护，panel HMR 时连续持有包装；实际 desktop 新 bundle 已于 2026-11-03 安装并启动确认 |
-| [guide-preset](guide-preset/README.md) | `guide` persona 与工具面；外部用户级 guide skill 缺失时明确降级为一般建议 |
+| [guide-panel](guide-panel/) | `guide-fork` provider、`/guide/api`、面板、专区与自动归档；连接独立准入与 shield 服务 |
+| [guide-admission](guide-admission/README.md) | 原生同步准入、权威容量/身份/按池快照 |
+| [guide-shield](guide-shield/README.md) | 独立 Host 结算防护；panel HMR 期间连续持有包装 |
+| [guide-preset](guide-preset/README.md) | `guide` persona 与工具面；外部用户级 guide skill 缺失时明确降级 |
 | [guide-goal-adapter](guide-goal-adapter/README.md) | 在私有 subagents 作用域复用原 driver/join |
 | [guide-sidebar-adapter](guide-sidebar-adapter/README.md) | 官方 sidebar 的局部数据视图与原任务组件装饰 |
 
-生产代码不包含上游 driver、join 或任务组件副本；[better-sidebar-fork](better-sidebar-fork/) 仅冻结历史。UI 的 label 前缀过滤和 goal 的可信 provider 身份是不同判据，不能互相替代。
+本机 desktop 已登记六个 `@local` link 与 bundle，官方 `dsh-better-sidebar` 保持 registry 版本 `0.28.2`。最近一次核对：准入 active、`C/R/M=8/2/4`，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。证据见 [O19 生产部署](evidence/O19-production-2026-11-03/report.md) / [O2/R6 迁移](evidence/O2-R6-desktop-migration-2026-11-03/report.md) / [1.1.0 实施](evidence/O12-O21-engineering-2026-11-03/report.md)。
+
+生产代码不包含上游 driver、join 或任务组件副本；旧 fork 已提炼为 [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除。UI 的 label 前缀过滤和 goal 的可信 provider 身份是不同判据，不能互相替代。
+
+仓库不包含本机 `evidence/`：原始报告、恢复备份、官方包缓存留在维护者机器。引用这些记录的链接用于追溯，不表示 clone 后已附带专项环境。新机器准备与本地快照见 [仓库与打包说明](docs/REPOSITORY-PREPARATION.md)，当前已接受边界见 [范围决定](docs/SCOPE-AND-ACCEPTED-LIMITS.md)。
+
+## 能力与边界
 
 | 能力或边界 | 当前行为 |
 |---|---|
@@ -54,9 +45,9 @@
 | 保守等待 | pending 创建、external、closing、身份未知、指导拥有工作后代时继续等待 |
 | 上下文 | 复制最后一个已完成轮次之前的 seed；未完成轮次不继承 |
 | 名额 | activation 在 native release 前占槽；creating、closing、external、idle parked 均可能占槽 |
-| 结算防污染 | O2/R6 支持基线内已关闭：真实 closing、panel HMR、父重建/两进程恢复通过，实际 desktop 部署完成；见 [收尾结论](docs/O2-R6-CLOSEOUT.md) |
+| 结算防污染 | 支持基线内已关闭：真实 closing、panel HMR、父重建/两进程恢复通过，实际 desktop 部署完成 |
 | 模型工具面 | `list_agents` 隐藏指导分支；模型 `send_message`/`interrupt_agent` 到指导分支被拒绝；普通工作不受影响 |
-| 归档 | 阻止模型执行；其他原生 UI 可能仍允许点开/输入，用户已接受 |
+| 归档 | 阻止模型执行；其他原生 UI 可能仍允许点开/输入，用户已接受；自动归档默认关闭 |
 | 嵌套指导 | v1 不专门支持，保留默认 depth 限制 |
 | 版本变化 | 未知 driver/join/sidebar/tool 来源回退明确状态；完整面板预检见 O21 |
 
@@ -75,29 +66,22 @@ maxGuides: 4
 
 ```yaml
 archive:
+  auto: false
   lowDelayMs: 600000
   midDelayMs: 180000
   highDelayMs: 30000
   holdMs: 120000
 ```
 
-B1 使用每池原生 `used / capacity`，阈值为 25% / 50% / 75%；C3 每池独立保持峰值 120 秒。已释放 activation 的归档不额外释放名额；native busy/未知/无当前池/状态查询失败时跳过自动归档。1.1.0 已补 records/summary 候选、主视图与保存页签识别；Host 验证自身身份和父关系后调用不强制停止的原生归档。每轮最多 128 条并轮转扫描，历史较多时不会固定遗漏后续候选。
+自动归档保留完整能力但默认关闭：只有显式 `auto: true` 才会启动 15 秒扫描；手动归档按钮不受影响。B1 使用每池原生 `used / capacity`，阈值为 25% / 50% / 75%；C3 每池独立保持峰值 120 秒。已释放 activation 的归档不额外释放名额；native busy/未知/无当前池/状态查询失败时跳过自动归档。1.1.0 已补 records/summary 候选、主视图与保存页签识别；Host 验证自身身份和父关系后调用不强制停止的原生归档。每轮最多 128 条并轮转扫描，历史较多时不会固定遗漏后续候选。
 
-生产隔离验证与实际 desktop 冷部署均已完成。设置页、Host getter/API 与配置来源核对为 C=8、R=2、全局 M=4，正常 desktop 准入组件运行中。部署状态与核对证据见 [实施记录](evidence/O19-production-2026-11-03/report.md)。
+## 安装、更新与恢复
 
-## 1.1.0 本机工程基线
+私有仓库：[PreLuna/dsh-guide-mode](https://github.com/PreLuna/dsh-guide-mode)。有权限的账号可 clone 后运行 `npm run repo:check`、`npm test` 和 `npm run doctor`。六包运行仍依赖上述固定 DSH／官方 sidebar 基线；本仓库不会安装或替换整个宿主。
 
-六包统一版本、最小 Node CI、生成物检查与加载测试已落实；本地 Git 管理当前源码和文档，依赖、历史 fork、evidence 和恢复数据不进入仓库。用户选择仅本机自用：不上传、不发布市场，维护者与许可按私有工作区处理。托管 CI 尚未运行，本机执行相同命令通过。
+统一安装、升级、完整卸载与回退见 [本机维护流程](docs/LOCAL-MAINTENANCE.md)。入口是 [scripts/workspace.mjs](scripts/workspace.mjs) 的 `prepare` 与 [scripts/apply-profile.ps1](scripts/apply-profile.ps1)，原则是先在隔离副本验证、停 Host、生成计划、审阅后应用，并保存文件级恢复记录。准入核心与 shield 核心采用冷更新；panel 客户端变更需要硬刷新。
 
-`npm test` 跑 Node 基线，`npm run build:check` 核对 sidebar 生成物，`npm run doctor` 核对版本及用户级 guide skill。统一安装/升级/完整卸载/回退见 [本机维护流程](docs/LOCAL-MAINTENANCE.md)，本轮实测见 [实施记录](evidence/O12-O21-engineering-2026-11-03/report.md)。旧 O19/shield 精确迁移脚本作为历史恢复入口保留，新升级必须用新的证据目录。
-
-## 本机安装、更新与恢复
-
-`@local/dsh-guide-admission` 已于 2026-11-03 完成成对安装与实际 profile 冷启动验证，正常 desktop 组件运行中。安装/回退入口位于 [guide-admission/scripts](guide-admission/scripts/)，原始 profile 与 panel 备份保存在 [本轮证据](evidence/O19-production-2026-11-03/report.md)。准备脚本会保留已经应用的原始迁移计划，后续升级须另建证据目录。
-
-原有自有包已通过 link/bundle 登记到 `C:\Users\wang\.dsh\profiles\desktop`，官方 `dsh-better-sidebar` 保持 registry 版本 0.28.2。当前提供本机统一安装、升级、完整卸载和恢复工具，不对外发布。新增 `@local/dsh-guide-shield` 已于 2026-11-03 登记到实际 desktop，并完成冷启动与正常桌面运行状态核对；本机无旧 shield override。证据与备份见 [迁移报告](evidence/O2-R6-desktop-migration-2026-11-03/report.md)，再次迁移参考 [新服务说明](guide-shield/README.md)。
-
-关闭 DSH Host 后，两个 adapter 的本机切换入口为：
+两个 adapter 的本机切换（关闭 DSH Host 后）：
 
 ```powershell
 ./guide-goal-adapter/scripts/install-desktop.ps1
@@ -109,34 +93,53 @@ node guide-sidebar-adapter/scripts/prepare-official.mjs
 ./guide-goal-adapter/scripts/install-desktop.ps1 -Restore
 ```
 
-脚本保存配置和文件级恢复记录，只同步两个自有 link 的 lockfile importer，保留其余 registry 依赖图。`evidence/LI-stage*/desktop-before` 以及阶段二 `official` 目录是当前恢复/本机重装路径的依赖，暂不移动或删除。
+`evidence/LI-stage*/desktop-before` 以及阶段二 `official` 目录是恢复与本机重装路径的依赖，暂不移动或删除。旧 O19/shield 精确迁移脚本只保留历史恢复入口；新升级必须使用新的证据目录。完整卸载后已有指导日志仍保留，但其 guide preset/provider 不再可用。
 
-原 goal driver 文件没有修改。sidebar adapter 的构建只运行 `node guide-sidebar-adapter/scripts/build.mjs`，不再构建或覆盖 fork。正常升级使用官方包管理流程，未知版本须重新核验私有边界与指纹。
+## 验证
 
-普通 panel 客户端变更需要硬刷新；准入核心代码和 R/M 配置必须停 Host 后冷更新，不承诺服务自身 HMR 空窗连续执法。其余 Host 模块按各自支持边界使用 HMR 或重启。涉及 adapter 首次切换、依赖更新和运行中 goal 时优先冷启动；卸载会沿用原 driver 的取消/disarm，不会自动 resume。
-
-## 验证与诊断
-
-最新结果：原 driver/join 12/12、sidebar 核心及实际官方消费 5/5、B′ 真实 Runtime 34 组、真实隔离 Host **86 项断言**、浏览器 11 项通过。模型使用本机确定性 fixture，没有调用用户外部模型。O6 的 native/PTC 三个工具、standard/guide/custom 首调、冷恢复、配置切换与取消/所有权均有回归；`modelProjection=active`、Host `errors=[]`。两阶段实际 desktop 冷启动/恢复证据仍有效；2026-11-03 已完成当前源码和独立 shield 的实际 desktop 启动确认，O6 为 idle/no-target-tools 且保留 12 条包装记录，见 [迁移报告](evidence/O2-R6-desktop-migration-2026-11-03/report.md)。
-
-证据和未覆盖项见 [阶段一报告](evidence/LI-stage1-2026-11-02/report.md) / [阶段二报告](evidence/LI-stage2-2026-11-02/report.md)。终端实际交互、多 pane 穷举、真实模型长时使用等仍在 [待验证清单](OPEN-ITEMS.md)。
+本机基线（无需安装 DSH）：
 
 ```powershell
-node guide-panel/test/identity.test.mjs
-node guide-panel/test/shield.test.mjs
-node guide-panel/test/lifecycle.test.mjs
-node guide-panel/test/model-projection.test.mjs
-node guide-panel/test/contract.test.mjs
-node guide-panel/test/host-route.test.mjs
-node guide-panel/test/panel-render.test.mjs
-node guide-panel/test/scheduler.test.mjs
-node guide-panel/scripts/lifecycle-smoke.mjs  # 隔离真实 Host、HMR 与跨进程恢复
-node --test guide-sidebar-adapter/test/core.test.mjs
-node guide-goal-adapter/scripts/smoke.mjs --integration
+npm test          # 16 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter
+npm run build:check
+npm run doctor    # 版本、私有许可、用户级 guide skill
+npm run repo:check # 仓库文件边界与当前文档链接
 ```
 
-原 driver 和官方消费函数测试使用安装包 Electron Node：设置 `ELECTRON_RUN_AS_NODE=1`，传 `--expose-internals guide-goal-adapter/test/run-host.mjs`；sidebar 加 `--sidebar-core`。详见两个 adapter README。
+需要已安装 DSH、Electron、官方 tarball 或隔离 Host 的用例单独运行：
 
-面板提示 Host 未加载或请求 405 时，检查 `/guide/api` 是否已注册；只刷新客户端不能替换旧 Host 模块。已确认的旧 `kind:guide` 指导页签在面板显示提示条，由用户点击清理；只处理历史标题与页面地址均匹配的项，原生开始页及无法确认的项保留。R5 已在当前插件组合的一页/两页/刷新中复核未重现，长期和 HMR 泄漏仍不作已修复承诺；O2/R6 的 closing、panel HMR 和父重建已完成支持基线内矩阵，并完成实际 desktop 新 bundle 部署。
+```powershell
+$env:ELECTRON_RUN_AS_NODE = '1'
+& '<DSH 安装目录>\DeepSeek Harness.exe' --expose-internals guide-goal-adapter/test/run-host.mjs
+& '<DSH 安装目录>\DeepSeek Harness.exe' --expose-internals guide-goal-adapter/test/run-host.mjs --sidebar-core
+node guide-goal-adapter/scripts/smoke.mjs --integration
+node guide-goal-adapter/scripts/smoke.mjs --integration --sidebar
+node guide-panel/scripts/lifecycle-smoke.mjs   # 隔离真实 Host、HMR 与跨进程恢复
+```
 
-输入问题的草稿按会话保存在 localStorage。输入框诊断可在 DevTools 设置 `window.__guideDebug = true`，观察面板底部事件与焦点信息。
+浏览器 UI 使用 `guide-sidebar-adapter/test/browser_test.py`（stdin 传配置、Edge/Playwright、隔离 profile，不读取真实用户凭据）。
+
+最近结果：原 driver/join 12/12、sidebar 核心及官方消费函数 5/5、B′ 真实 Runtime 34 组、真实隔离 Host 86 项断言、浏览器 11 项通过；1.1.0 为 16 个 Node 检查进程、90 项真实 Host、11+2 项浏览器及 O2/R6 两进程回归。模型使用本机确定性 fixture，没有调用用户外部模型。逐项证据与未覆盖项见 [PROJECT-STATUS](PROJECT-STATUS.md) 与 [证据索引](evidence/README.md)。
+
+## 诊断
+
+- 面板提示 Host 未加载或请求 405：检查 `/guide/api` 是否已注册；只刷新客户端不能替换旧 Host 模块。
+- 面板显示只读/不支持：查看 `/guide/api/state` 的 `panelCompat`、`guideAdmission`、`settlementShield`；未知契约不会挂半套 provider/tab。
+- 已确认的旧 `kind:guide` 指导页签会在面板显示提示条，由用户点击清理；只处理历史标题与页面地址均匹配的项，原生开始页及无法确认的项保留。
+- 输入草稿按会话保存在 localStorage；设置 `window.__guideDebug = true` 可观察面板底部事件与焦点信息。
+
+## 文档地图
+
+| 文档 | 唯一职责 |
+|---|---|
+| 本文 | 使用、当前安装、配置和诊断 |
+| [PROJECT-STATUS.md](PROJECT-STATUS.md) | 当前交付、已定决定、验证索引 |
+| [OPEN-ITEMS.md](OPEN-ITEMS.md) | 真正尚未实现、待决策或待验证的事项 |
+| [任务边界与维持现状的设计](docs/SCOPE-AND-ACCEPTED-LIMITS.md) | 原生组件职责、已接受边界、暂缓及按复现触发的后续 |
+| [架构说明](docs/ARCHITECTURE.md) | provider、身份、局部作用域、shield 和生命周期 |
+| [本机维护](docs/LOCAL-MAINTENANCE.md) | 版本、测试、安装/升级/卸载/回退 |
+| [私有仓库与打包](docs/REPOSITORY-PREPARATION.md) | 仓库收录边界、清理记录、本地快照及后续公开前事项 |
+| [O11 验证计划](docs/O11-VALIDATION-PLAN.md) | 兼容门禁与多 pane/Git/PTY/真实模型的补测缺口和脚本计划 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本历史 |
+| [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) | 已删旧方案／fork／部署脚本中保留的维护经验 |
+| [证据索引](evidence/README.md) | 报告、日志、JSON、截图与保留规则 |
