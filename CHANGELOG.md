@@ -12,6 +12,7 @@
 - PT-6: exercise current persistent-terminal tools through real guidance native calls, verify original result cards and process cleanup, and propagate PTY scenario failure/blocking to smoke results. Keep the Windows sandbox startup failure separate from the explicitly enabled unsandboxed diagnostic.
 - O5: automatic archiving is now opt-in (`archive.auto`, default false); the scheduler and manual archive are unchanged when enabled.
 - Q7: the Tasks-page guidance section keeps this chat's threads and adds the remaining threads under the same root session, grouped and deduplicated.
+- Docs: add `docs/WORKSPACE-MAP.md` describing every directory's role, size composition and reclaimable boundaries; refresh the local evidence index with the four 2026-11-04 directories and `B-prime-decisions`.
 
 ## 1.1.0 — 2026-11-03
 

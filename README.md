@@ -143,3 +143,4 @@ node guide-panel/scripts/lifecycle-smoke.mjs   # 隔离真实 Host、HMR 与跨�
 | [CHANGELOG.md](CHANGELOG.md) | 版本历史 |
 | [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) | 已删旧方案／fork／部署脚本中保留的维护经验 |
 | [证据索引](evidence/README.md) | 报告、日志、JSON、截图与保留规则 |
+| [工作区地图](docs/WORKSPACE-MAP.md) | 每个目录的职责、体积构成与可回收边界（`dist`／`docs`／`evidence`／`scripts`） |
