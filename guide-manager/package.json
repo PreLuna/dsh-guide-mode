@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Product manager for the DSH guidance mode components with phase-1A hot switches",
+  "description": "Product manager for the DSH guidance mode components with phase-1B pending cold intents",
   "exports": {
     ".": "./index.js",
     "./core": "./core.js",
@@ -14,7 +14,10 @@
     "core.js",
     "client.js",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "helper/apply-pending.mjs",
+    "helper/restart-guide-manager.ps1",
+    "helper/restart-guide-manager.cmd"
   ],
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
@@ -36,7 +39,7 @@
     "product": "dsh-guide-mode",
     "release": "1.1.0",
     "readOnly": false,
-    "actionScope": "phase-1a",
+    "actionScope": "phase-1b",
     "components": {
       "@local/dsh-guide-preset": {
         "component": "preset",

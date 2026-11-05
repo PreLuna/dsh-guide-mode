@@ -1,11 +1,12 @@
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   COMPONENTS,
   MANAGER_ACTION,
   actionForComponent,
   buildEdges,
+  coldIntent,
   componentStatus,
   hostStatus,
   normalizeActionResult,
@@ -23,6 +24,12 @@ import {
  */
 
 const ROUTE_PREFIX = '/guide-manager/api'
+const PACKAGE_DIR = dirname(fileURLToPath(import.meta.url))
+const WORKSPACE_ROOT = resolve(PACKAGE_DIR, '..')
+const HELPER_PATH = join(PACKAGE_DIR, 'helper', 'restart-guide-manager.cmd')
+const HELPER_PS1 = join(PACKAGE_DIR, 'helper', 'restart-guide-manager.ps1')
+const HELPER_APPLY = join(PACKAGE_DIR, 'helper', 'apply-pending.mjs')
+const PENDING_VERSION = 1
 
 function serviceOf(ctx, name) {
   try {
@@ -157,7 +164,7 @@ function readHostState(ctx, profileContext, expected) {
   return hostStatus(actual, expected ?? {})
 }
 
-function collectComponents(ctx, pluginData, guide, profileContext, host) {
+function collectComponents(ctx, pluginData, guide, profileContext, host, pendingByComponent = new Map()) {
   const definitions = guide.components ?? {}
   const components = [...COMPONENTS].sort((a, b) => a.order - b.order).map((component) => {
     const bundle = pluginData.bundles.find((item) => item.name === component.package) ?? null
@@ -211,7 +218,10 @@ function collectComponents(ctx, pluginData, guide, profileContext, host) {
       contractMatch: status.contractMatch,
     }
   })
-  for (const component of components) component.action = actionForComponent(component, components, host)
+  for (const component of components) {
+    component.action = actionForComponent(component, components, host)
+    component.pending = pendingByComponent.get(component.key) ?? null
+  }
   return components
 }
 
@@ -251,8 +261,70 @@ function buildWarnings(state) {
     }
   }
   if (state.skills.status !== 'ready') warnings.push(`skills:${state.skills.status}:${state.skills.reason ?? 'unknown'}`)
+  if (state.pending?.error) warnings.push(`pending:${state.pending.error}`)
   if (state.dataSource === 'profile-fallback') warnings.push('data:profile-fallback')
   return [...new Set(warnings)]
+}
+
+function pendingDirOf(profileContext) {
+  return profileContext?.dir === undefined ? null : join(profileContext.dir, '.guide-manager')
+}
+
+function readPending(profileContext) {
+  const dir = pendingDirOf(profileContext)
+  if (dir === null) return { present: false, path: null, createdAt: null, intents: [], error: 'profile-unavailable' }
+  const path = join(dir, 'pending.json')
+  if (!existsSync(path)) return { present: false, path, createdAt: null, intents: [], error: null }
+  try {
+    const data = JSON.parse(readFileSync(path, 'utf8'))
+    if (data?.version !== PENDING_VERSION || !Array.isArray(data.intents)) {
+      return { present: false, path, createdAt: null, intents: [], error: 'invalid-pending-file' }
+    }
+    const intents = data.intents.filter((intent) => intent !== null && typeof intent === 'object' && typeof intent.component === 'string' && typeof intent.enabled === 'boolean' && Array.isArray(intent.patches))
+    return { present: true, path, createdAt: data.createdAt ?? null, intents, error: null }
+  } catch (error) {
+    return { present: false, path, createdAt: null, intents: [], error: String(error.message ?? error) }
+  }
+}
+
+function writePending(profileContext, intents) {
+  const dir = pendingDirOf(profileContext)
+  if (dir === null) throw new Error('profile context is unavailable')
+  const path = join(dir, 'pending.json')
+  if (intents.length === 0) {
+    if (existsSync(path)) unlinkSync(path)
+    return null
+  }
+  const data = {
+    version: PENDING_VERSION,
+    createdAt: new Date().toISOString(),
+    profile: profileContext.dir,
+    installAnchor: profileContext.installAnchor ?? null,
+    workspace: WORKSPACE_ROOT,
+    intents,
+  }
+  mkdirSync(dir, { recursive: true })
+  const temporary = join(dir, `pending.json.${process.pid}.tmp`)
+  writeFileSync(temporary, JSON.stringify(data, null, 2) + '\n')
+  renameSync(temporary, path)
+  return data
+}
+
+function pendingView(profileContext) {
+  const read = readPending(profileContext)
+  const byComponent = new Map(read.intents.map((intent) => [intent.component, { enabled: intent.enabled, createdAt: read.createdAt }]))
+  return {
+    present: read.present,
+    path: read.path,
+    createdAt: read.createdAt,
+    intents: read.intents.map((intent) => ({ component: intent.component, enabled: intent.enabled })),
+    error: read.error,
+    helper: HELPER_PATH,
+    helperPs1: HELPER_PS1,
+    applyScript: HELPER_APPLY,
+    helperExists: existsSync(HELPER_PATH),
+    byComponent,
+  }
 }
 
 async function collectState(ctx) {
@@ -260,7 +332,8 @@ async function collectState(ctx) {
   const profileContext = serviceOf(ctx, 'profileContext')
   const host = readHostState(ctx, profileContext, bom.guide.host ?? {})
   const pluginData = await readPluginData(ctx, profileContext)
-  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host)
+  const pending = pendingView(profileContext)
+  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host, pending.byComponent)
   const edges = buildEdges(components, bom.guide.edges ?? [], pluginData.rows)
   const skills = readSkillsState(profileContext?.home)
   const manager = checkManager(ctx)
@@ -268,7 +341,7 @@ async function collectState(ctx) {
     product: bom.guide.product ?? 'dsh-guide-mode',
     release: bom.guide.release ?? bom.manifest.version ?? null,
     readOnly: false,
-    actionScope: 'phase-1a',
+    actionScope: 'phase-1b',
     manager: { ...manager, version: bom.manifest.version ?? null, action: MANAGER_ACTION },
     profile: {
       name: profileContext?.name ?? null,
@@ -279,6 +352,17 @@ async function collectState(ctx) {
     components,
     edges,
     skills,
+    pending: {
+      present: pending.present,
+      path: pending.path,
+      createdAt: pending.createdAt,
+      intents: pending.intents,
+      error: pending.error,
+      helper: pending.helper,
+      helperPs1: pending.helperPs1,
+      applyScript: pending.applyScript,
+      helperExists: pending.helperExists,
+    },
     dataSource: pluginData.mode,
     dataError: pluginData.error,
     generatedAt: new Date().toISOString(),
@@ -287,9 +371,39 @@ async function collectState(ctx) {
   return state
 }
 
+async function stageCold(ctx, key, enabled, component) {
+  const profileContext = serviceOf(ctx, 'profileContext')
+  if (profileContext?.dir === undefined) return { ok: false, code: 'profile-unavailable', message: 'profile context is unavailable' }
+  const intent = coldIntent(key, enabled)
+  if (intent === null) return { ok: false, code: 'no-cold-intent', message: `no cold intent for ${key}` }
+  const current = readPending(profileContext)
+  const intents = current.intents.filter((item) => item.component !== key)
+  const clearing = component.enabled === enabled
+  if (!clearing) intents.push(intent)
+  try {
+    const data = writePending(profileContext, intents)
+    return {
+      ok: true,
+      value: {
+        component: key,
+        enabled,
+        application: clearing ? 'pending-cleared' : 'pending-restart',
+        patches: clearing ? [] : intent.patches,
+        pendingPath: data === null ? null : join(profileContext.dir, '.guide-manager', 'pending.json'),
+        helperPath: HELPER_PATH,
+        createdAt: data?.createdAt ?? null,
+        error: null,
+      },
+    }
+  } catch (error) {
+    return { ok: false, code: 'pending-write-failed', message: String(error.message ?? error) }
+  }
+}
+
 /**
- * Phase 1A action: only hot-switchable components, only through the official
- * pluginManager. The manager never edits the profile itself.
+ * Phase 1A/1B action: hot components use the official pluginManager; cold
+ * components only stage a pending intent for the restart helper. The manager
+ * never edits the profile itself.
  */
 async function setComponentEnabled(ctx, key, enabled) {
   if (key === 'manager') return { ok: false, code: 'locked', message: 'the manager is protected and has no switch' }
@@ -303,9 +417,9 @@ async function setComponentEnabled(ctx, key, enabled) {
   }
   const component = state.components.find((item) => item.key === key)
   if (component === undefined) return { ok: false, code: 'unknown-component', message: `Unknown component: ${key}` }
-  const action = component.action ?? { policy: 'locked', reason: 'missing-action-policy', canToggle: false, blockers: [] }
-  if (action.policy !== 'hot') {
-    return { ok: false, code: action.policy, message: action.reason ?? 'component is not hot-switchable' }
+  const action = component.action ?? { policy: 'locked', reason: 'missing-action-policy', canToggle: false, kind: 'locked', blockers: [] }
+  if (action.kind !== 'hot' && action.kind !== 'cold') {
+    return { ok: false, code: action.policy, message: action.reason ?? 'component is not switchable' }
   }
   if (action.canToggle !== true) {
     return {
@@ -315,6 +429,7 @@ async function setComponentEnabled(ctx, key, enabled) {
       blockers: action.blockers ?? [],
     }
   }
+  if (action.kind === 'cold') return stageCold(ctx, key, enabled, component)
   if (component.enabled === enabled) {
     return { ok: true, value: { component: key, enabled, application: 'applied', changed: false, noop: true, error: null } }
   }
@@ -441,7 +556,7 @@ async function handle(injected, getState, setEnabled, req, res) {
     return
   }
   if (pathname === `${ROUTE_PREFIX}/ping`) {
-    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-1a' } })
+    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-1b' } })
     return
   }
   if (pathname !== `${ROUTE_PREFIX}/state`) {
@@ -460,7 +575,7 @@ export const name = 'guide-manager'
 export async function apply(ctx) {
   const getState = () => collectState(ctx)
   const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled)
-  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-1a' })
+  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-1b' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
     const connection = serviceOf(injected, 'connection')
@@ -471,6 +586,6 @@ export async function apply(ctx) {
       handler: (req, res) => {
         void handle(injected, getState, setEnabled, req, res)
       },
-    }), 'guide-manager: status and phase-1a action route')
+    }), 'guide-manager: status and phase-1b action route')
   })
 }

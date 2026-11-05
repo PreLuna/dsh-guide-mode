@@ -1,8 +1,11 @@
-# Guide manager（Phase 1A）
+# Guide manager（Phase 1B）
 
-独立的 Host + client 包，在官方 **插件** 页增加一个「指导」标签页，展示指导模式的六个组件、依赖关系、宿主版本和 `guide` skill 状态。Phase 1A 增加了两个**安全热开关**：`guide-panel` 和 `guide-sidebar-adapter`。
+独立的 Host + client 包，在官方 **插件** 页增加一个「指导」标签页，展示指导模式的六个组件、依赖关系、宿主版本和 `guide` skill 状态，并提供两档切换：
 
-它不 import 六个组件，也不直接编辑 profile；所有开关都调用官方 `pluginManager.setPluginEnabled`。
+- **热切换**：`guide-panel`、`guide-sidebar-adapter`，通过官方 `pluginManager.setPluginEnabled` 立即生效。
+- **冷切换**：`guide-admission`、`guide-shield`、`guide-goal-adapter`，只写 pending intent；由独立 helper 在 DSH 停止时应用 profile patch 并重启。
+
+manager 不 import 六个组件，也不直接写 profile；冷 patch 由 helper 调用官方 `writePluginEnabled` 完成。
 
 ## 显示内容
 
@@ -10,7 +13,7 @@
 - **六个组件**：版本、契约版本、实际启用状态、Loader fiber 阶段、组件自己的 state 服务。
 - **依赖与互斥**：panel → preset/admission/shield/sidebar，以及 goal adapter 与原 goal driver 的互斥关系。
 - **skills**：`guide` skill 是否存在、版本/哈希、`skills-guide` 路由数据是否完整、是否被 skills manager 禁用。
-- **警告**：以上检查的失败或未验证项。
+- **pending**：冷切换已准备的状态、helper 路径和 intent 数量。
 
 状态分级：
 
@@ -26,33 +29,46 @@
 
 版本不一致不等于不兼容：它显示为 `ready-unverified`。只有契约缺失、服务明确 unsupported 或 fiber 失败才降为失败。
 
-## 操作（Phase 1A）
+## 操作策略
 
-| 组件 | 动作策略 | 当前行为 |
+| 组件 | 策略 | 当前行为 |
 |---|---|---|
-| `guide-panel` | `hot` | 可停用/启用；停用后 manager tab 仍可用 |
-| `guide-sidebar-adapter` | `hot` | 可停用/启用；停用时恢复官方 sidebar |
-| `guide-admission` | `restart-required` | 只显示“需要重启后生效”，不写入 |
-| `guide-shield` | `restart-required` | 只显示“需要重启后生效”，不写入 |
-| `guide-goal-adapter` | `paired-restart` | 需要与原 driver 成对切换，Phase 1B 再开放 |
+| `guide-panel` | `hot` | 停用/启用立即生效；停用后 manager tab 仍可用 |
+| `guide-sidebar-adapter` | `hot` | 停用/启用立即生效；停用时恢复官方 sidebar |
+| `guide-admission` | `restart-required` | 准备启用/停用；写 pending intent，helper 应用后重启 |
+| `guide-shield` | `restart-required` | 同上 |
+| `guide-goal-adapter` | `paired-restart` | 写 pending intent，成对切换 adapter 与原 driver |
 | `guide-preset` | `locked` | 影响已有会话恢复，不提供开关 |
 | `guide-manager` | `locked` | 管理器自身受保护 |
 
 规则：
 
-- 只有 `hot` 且 `canToggle=true` 的组件显示开关；第一次点击进入确认，第二次才提交。
-- 请求必须带 `confirm: true`；Host 会重新检查策略和依赖，不信任客户端的旧状态。
-- 启用 panel 前检查 preset/admission/shield 是否存在且未禁用；硬失败会返回 `dependency-conflict` 和 blockers。
-- 启用 sidebar 前如果宿主 better-sidebar 版本不匹配，返回 `unsupported-sidebar-host`。
-- 开关结果保留官方语义：`applied`、`restart-required`、`overridden`、`failed`；失败不会显示成成功。
-- manager 只调用官方 `pluginManager`，不自己写 `cordis.patch.yml` 或 lockfile。
+- 热操作只调用官方 `pluginManager.setPluginEnabled`，不自己写 profile。
+- 冷操作只写 `profile/.guide-manager/pending.json`，不修改 `cordis.patch.yml`。
+- goal 的 pending 必须同时包含 adapter 和原 driver 两项，避免两个都启用或都停用。
+- 取消准备：再次触发“准备当前状态”即可清掉该组件的 intent；UI 提供“取消准备”按钮。
+- 冷切换不会自动执行；需要用户双击 `helper/restart-guide-manager.cmd`，该 helper 会关闭并重启 DSH。
+
+## Pending helper
+
+位置：`guide-manager/helper/restart-guide-manager.cmd`
+
+双击后：
+
+1. 停止 `DeepSeek Harness` 进程（只停这个名字，不动其他程序）。
+2. 用 Electron Node 运行 `apply-pending.mjs`，导入官方 `writePluginEnabled`。
+3. 备份 `cordis.patch.yml`，逐项写 patch；任何失败恢复备份并保留 pending。
+4. 删除 pending（成功时），重启 DSH。
+5. 写日志和回执到 `profile/.guide-manager/`。
+
+失败时 pending 保留，可修正后重试；回执见 `last-apply-result.json` / `helper-result.json`。
 
 ## API
 
 ```text
-GET  /guide-manager/api/state   # 完整状态，含每个组件的 action policy
+GET  /guide-manager/api/state   # 完整状态、action policy、pending
 GET  /guide-manager/api/ping    # Host 半边存活检查
-POST /guide-manager/api/action  # Phase 1A：set-component-enabled
+POST /guide-manager/api/action  # set-component-enabled
 ```
 
 `POST /action` body：
@@ -60,13 +76,20 @@ POST /guide-manager/api/action  # Phase 1A：set-component-enabled
 ```json
 {
   "action": "set-component-enabled",
-  "component": "panel",
+  "component": "admission",
   "enabled": false,
   "confirm": true
 }
 ```
 
-接口都经过宿主 `connection.requestRejection` 围栏。action 只接受 panel/sidebar 的 hot 切换；其他组件返回 `restart-required`、`paired-restart` 或 `locked`。
+返回的 `application`：
+
+- `applied`：热切换完成。
+- `pending-restart`：冷切换已写入 pending，等待 helper。
+- `pending-cleared`：取消了该组件的 pending。
+- `restart-required` / `overridden` / `failed`：保留官方语义。
+
+接口都经过宿主 `connection.requestRejection` 围栏。
 
 ## 数据来源
 
@@ -74,30 +97,37 @@ POST /guide-manager/api/action  # Phase 1A：set-component-enabled
 2. 六个组件自己的可选服务：`guidePanelCompatibility`、`guideAdmission`、`guideSettlementShield`、`guideSidebarHost`、`guideGoalAdapter`。
 3. `$DSH_HOME/skills/guide/SKILL.md`、`$DSH_HOME/skills-guide/`、`$DSH_HOME/skills-manager/state.json`。
 4. 包自己的 `dshGuide` BOM（`package.json`）。
+5. `profile/.guide-manager/pending.json`。
 
 它不 import 六个组件中的任何一个，因此 panel 被禁用或损坏时，管理页仍能显示状态。
 
 ## 安装与测试
 
-本机 desktop 已在 2026-11-05 安装并验证「指导」tab。隔离 Host 还实测了 panel 的停用 → 确认 → 启用流程；停用后 manager tab 仍在，`applied` 提示正确，再启用后 panel 恢复 `ready`。
+本机 desktop 已安装并验证「指导」tab。Phase 1B 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
 node guide-manager/test/core.test.mjs
 node guide-manager/test/host-state.test.mjs
 node guide-manager/test/client-registration.test.mjs
+node guide-manager/test/helper.test.mjs
 ```
 
 ### 隔离验证（2026-11-05）
 
 - 隔离 `DSH_HOME` + `manager-test` profile，七个包以 link 登记；`dsh --profile manager-test --dump-config` 组合出 `guide-manager` 与六个组件入口。
-- 隔离 Web Host 打开官方插件页，出现「指导」标签页；六个组件卡片、依赖边、宿主版本、`guide` skill 状态和警告都渲染，数据来源为 `plugin-manager`。
-- 点击 panel 的“停用 → 确认停用”：提示 `已应用`，panel 变为 `disabled/row-disabled`，依赖边变为 `inactive`，manager tab 仍可用。
-- 点击 panel 的“启用 → 确认启用”：提示 `已应用`，panel 恢复 `ready`，依赖边恢复。
-- 该隔离 profile 没有安装官方 `dsh-better-sidebar` 和 `guide` skill，因此 sidebar 显示 `unsupported/package-unavailable`、skills 显示 `missing`；这是预期的降级，不是本机 desktop 的结论。
+- 隔离 Web Host 打开官方插件页，出现「指导」标签页；六个组件卡片、依赖边、宿主版本、`guide` skill 状态和警告都渲染。
+- panel 热切换实测：停用 → 确认 → `已应用` → `disabled/row-disabled`；启用 → 确认 → `ready`。
+- admission 冷切换实测：准备停用 → 确认 → `已准备，重启后生效`，出现 pending banner 和 helper 路径；取消准备 → `已取消准备`，pending 文件删除。
+- 在临时 profile 上直接运行 `apply-pending.mjs`：
+  - admission 单项写入 `guide-admission disabled:true`；
+  - goal 成对写入 `guide-goal-adapter disabled:true` 和 `goal-round-driver disabled:false`；
+  - pending 成功删除，receipt 状态 `applied`。
+- 该隔离 profile 没有安装官方 `dsh-better-sidebar` 和 `guide` skill，因此 sidebar 显示 `unsupported/package-unavailable`、skills 显示 `missing`；这是预期的降级。
 
 ## 边界
 
-- Phase 1A 只开放 panel/sidebar；admission/shield/goal/preset 的写操作留给 Phase 1B。
+- Phase 1B 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
+- UI 不自动运行 helper；helper 需要用户双击，因为它会关闭并重启 DSH。
 - 不复制官方包管理、安装或升级逻辑；这些留给后续阶段。
-- 不复制 skills manager 的状态；只读取并提示到「设置 → 技能」管理。
+- 冷切换写的是 profile patch，不修改 `package.json`、lockfile 或官方包。
 - 不是兼容性证明：`ready` 只表示该组合在已验证 BOM 内；`ready-unverified` 明确表示未验证。

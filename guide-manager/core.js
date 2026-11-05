@@ -21,9 +21,10 @@ export const COMPONENTS = [
 const READY = new Set(['ready', 'ready-unverified'])
 
 /**
- * Phase 1A action policy. Only the two components with a designed dispose /
- * restore path are hot-switchable; the cold core, the goal driver pair and the
- * session preset stay non-actionable until their own phase.
+ * Action policy. Phase 1A keeps panel/sidebar hot; Phase 1B stages the cold
+ * core and the goal pair as pending intents that a restart helper applies while
+ * the Host is stopped. The preset stays locked because it affects session
+ * recovery, and the manager is always protected.
  */
 export const ACTION_POLICIES = {
   panel: { policy: 'hot', reason: null },
@@ -34,9 +35,42 @@ export const ACTION_POLICIES = {
   preset: { policy: 'locked', reason: 'session-recovery' },
 }
 
-export const MANAGER_ACTION = { policy: 'locked', reason: 'self-protection', canToggle: false, blockers: [] }
+export const MANAGER_ACTION = { policy: 'locked', reason: 'self-protection', canToggle: false, kind: 'locked', blockers: [] }
 
 export const PANEL_REQUIREMENTS = ['preset', 'admission', 'shield']
+
+/**
+ * Profile patch rows for the cold intents. The goal pair is atomic: enabling
+ * the adapter disables the original driver, and disabling the adapter restores
+ * it, so the two can never both be disabled or both enabled.
+ */
+export const COLD_PATCHES = {
+  admission: [
+    { patchId: 'guide-admission', moduleName: '@local/dsh-guide-admission', opposite: false },
+  ],
+  shield: [
+    { patchId: 'guide-settlement-shield', moduleName: '@local/dsh-guide-shield', opposite: false },
+  ],
+  goal: [
+    { patchId: 'guide-goal-adapter', moduleName: '@local/dsh-guide-goal-adapter', opposite: false },
+    { patchId: 'goal-round-driver', moduleName: '@deepseek-ai/dsh-goal-round-driver', opposite: true },
+  ],
+}
+
+/** Build the pending patch list for a cold component toggle. */
+export function coldIntent(component, enabled) {
+  const specs = COLD_PATCHES[component]
+  if (specs === undefined) return null
+  return {
+    component,
+    enabled,
+    patches: specs.map((spec) => ({
+      patchId: spec.patchId,
+      moduleName: spec.moduleName,
+      enabled: spec.opposite ? !enabled : enabled,
+    })),
+  }
+}
 
 const HARD_BLOCKING = new Set(['missing', 'disabled', 'incompatible', 'failed'])
 
@@ -64,19 +98,22 @@ export function dependencyBlockers(component, components = []) {
 export function actionForComponent(component, components = [], host = null) {
   const base = ACTION_POLICIES[component?.key] ?? { policy: 'locked', reason: 'unknown-component' }
   const enabled = typeof component?.enabled === 'boolean' ? component.enabled : component?.bundleEnabled === true
-  if (base.policy !== 'hot') return { ...base, enabled, canToggle: false, blockers: [] }
-  if (!component.installed) return { ...base, enabled, canToggle: false, reason: 'not-installed', blockers: [] }
-  if (component.bundleEnabled === null) return { ...base, enabled, canToggle: false, reason: 'enablement-unknown', blockers: [] }
+  const hot = base.policy === 'hot'
+  const cold = base.policy === 'restart-required' || base.policy === 'paired-restart'
+  if (!hot && !cold) return { ...base, enabled, canToggle: false, kind: 'locked', blockers: [] }
+  if (!component.installed) return { ...base, enabled, canToggle: false, kind: cold ? 'cold' : 'hot', reason: 'not-installed', blockers: [] }
+  if (component.bundleEnabled === null) return { ...base, enabled, canToggle: false, kind: cold ? 'cold' : 'hot', reason: 'enablement-unknown', blockers: [] }
+  if (cold) return { ...base, enabled, canToggle: true, kind: 'cold', blockers: [] }
   if (!enabled) {
     if (component.key === 'panel') {
       const blockers = dependencyBlockers(component, components)
-      if (blockers.length > 0) return { ...base, enabled, canToggle: false, reason: 'dependency-conflict', blockers }
+      if (blockers.length > 0) return { ...base, enabled, canToggle: false, kind: 'hot', reason: 'dependency-conflict', blockers }
     }
     if (component.key === 'sidebar' && host?.betterSidebar?.match === false) {
-      return { ...base, enabled, canToggle: false, reason: 'unsupported-sidebar-host', blockers: [] }
+      return { ...base, enabled, canToggle: false, kind: 'hot', reason: 'unsupported-sidebar-host', blockers: [] }
     }
   }
-  return { ...base, enabled, canToggle: true, blockers: [] }
+  return { ...base, enabled, canToggle: true, kind: 'hot', blockers: [] }
 }
 
 /** Normalize the official pluginManager action result for the client. */

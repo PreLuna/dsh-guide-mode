@@ -9,6 +9,7 @@ import {
   MANAGER_ACTION,
   actionForComponent,
   buildEdges,
+  coldIntent,
   componentStatus,
   dependencyBlockers,
   hostStatus,
@@ -187,7 +188,7 @@ test('skill state distinguishes missing, disabled and incomplete data', () => {
   }
 })
 
-test('phase 1A action policy keeps only panel and sidebar hot', () => {
+test('action policy keeps panel/sidebar hot and cold components staged', () => {
   assert.equal(ACTION_POLICIES.panel.policy, 'hot')
   assert.equal(ACTION_POLICIES.sidebar.policy, 'hot')
   assert.equal(ACTION_POLICIES.admission.policy, 'restart-required')
@@ -216,9 +217,13 @@ test('action affordances enforce panel dependencies and sidebar host checks', ()
   assert.equal(unsupported.canToggle, false)
   assert.equal(unsupported.reason, 'unsupported-sidebar-host')
 
-  const cold = actionForComponent(component('admission', 'ready'), [], {})
+  const cold = actionForComponent(component('admission', 'ready', { installed: true }), [], {})
   assert.equal(cold.policy, 'restart-required')
-  assert.equal(cold.canToggle, false)
+  assert.equal(cold.kind, 'cold')
+  assert.equal(cold.canToggle, true)
+
+  const coldMissing = actionForComponent(component('admission', 'missing', { installed: false }), [], {})
+  assert.equal(coldMissing.canToggle, false)
 
   const rowDisabled = component('panel', 'disabled', {
     bundleEnabled: true,
@@ -256,4 +261,26 @@ test('official action results are normalized without claiming success', () => {
   assert.deepEqual(failed.error, { code: 'unknown-plugin', message: 'nope' })
   assert.equal(normalizeActionResult('overridden', 'panel', true).application, 'overridden')
   assert.equal(normalizeActionResult(undefined, 'panel', true).application, 'unknown')
+})
+
+test('cold intents map components to their profile patch rows', () => {
+  assert.deepEqual(coldIntent('admission', false), {
+    component: 'admission',
+    enabled: false,
+    patches: [{ patchId: 'guide-admission', moduleName: '@local/dsh-guide-admission', enabled: false }],
+  })
+  assert.deepEqual(coldIntent('shield', true), {
+    component: 'shield',
+    enabled: true,
+    patches: [{ patchId: 'guide-settlement-shield', moduleName: '@local/dsh-guide-shield', enabled: true }],
+  })
+  assert.deepEqual(coldIntent('goal', true).patches, [
+    { patchId: 'guide-goal-adapter', moduleName: '@local/dsh-guide-goal-adapter', enabled: true },
+    { patchId: 'goal-round-driver', moduleName: '@deepseek-ai/dsh-goal-round-driver', enabled: false },
+  ])
+  assert.deepEqual(coldIntent('goal', false).patches, [
+    { patchId: 'guide-goal-adapter', moduleName: '@local/dsh-guide-goal-adapter', enabled: false },
+    { patchId: 'goal-round-driver', moduleName: '@deepseek-ai/dsh-goal-round-driver', enabled: true },
+  ])
+  assert.equal(coldIntent('preset', false), null)
 })

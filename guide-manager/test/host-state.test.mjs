@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -116,9 +116,11 @@ test('host state reports six ready components, edges and the skill', async () =>
     await apply(ctx)
     const state = await store.get('guideManager').getState()
     assert.equal(state.readOnly, false)
-    assert.equal(state.actionScope, 'phase-1a')
+    assert.equal(state.actionScope, 'phase-1b')
     assert.equal(state.manager.mode, 'ready')
     assert.equal(state.manager.action.policy, 'locked')
+    assert.equal(state.pending.present, false)
+    assert.match(state.pending.helper, /restart-guide-manager\.cmd$/)
     assert.equal(state.dataSource, 'plugin-manager')
     assert.equal(state.components.length, 6)
     assert.ok(state.components.every((component) => component.status === 'ready'), JSON.stringify(state.components, null, 2))
@@ -185,8 +187,61 @@ test('phase 1A routes panel and sidebar toggles through the official manager', a
   }
 })
 
-test('phase 1A refuses manager, cold and dependency-blocked actions', async () => {
+test('phase 1B stages and clears a cold admission intent without touching the profile', async () => {
   const data = fixture()
+  try {
+    const { ctx, store, calls } = makeCtx(data, { services: componentServices })
+    await apply(ctx)
+    const service = store.get('guideManager')
+    const staged = await service.setComponentEnabled('admission', false)
+    assert.equal(staged.ok, true)
+    assert.equal(staged.value.application, 'pending-restart')
+    assert.deepEqual(staged.value.patches, [{ patchId: 'guide-admission', moduleName: '@local/dsh-guide-admission', enabled: false }])
+    assert.deepEqual(calls, [])
+    const pendingPath = join(data.profile, '.guide-manager', 'pending.json')
+    assert.equal(existsSync(pendingPath), true)
+    const pending = JSON.parse(readFileSync(pendingPath, 'utf8'))
+    assert.equal(pending.version, 1)
+    assert.equal(pending.intents[0].component, 'admission')
+    const shield = await service.setComponentEnabled('shield', false)
+    assert.equal(shield.ok, true)
+    const merged = JSON.parse(readFileSync(pendingPath, 'utf8'))
+    assert.deepEqual(merged.intents.map((intent) => intent.component).sort(), ['admission', 'shield'])
+    const state = await service.getState()
+    assert.equal(state.pending.present, true)
+    assert.equal(state.components.find((item) => item.key === 'admission').pending.enabled, false)
+
+    const cleared = await service.setComponentEnabled('admission', true)
+    assert.equal(cleared.ok, true)
+    assert.equal(cleared.value.application, 'pending-cleared')
+    const remaining = JSON.parse(readFileSync(pendingPath, 'utf8'))
+    assert.deepEqual(remaining.intents.map((intent) => intent.component), ['shield'])
+    assert.deepEqual(calls, [])
+  } finally {
+    rmSync(data.root, { recursive: true, force: true })
+  }
+})
+
+test('phase 1B stages the goal pair and refuses manager/blocked panel actions', async () => {
+  const data = fixture()
+  try {
+    const { ctx, store, calls } = makeCtx(data, { services: componentServices })
+    await apply(ctx)
+    const service = store.get('guideManager')
+    assert.equal((await service.setComponentEnabled('manager', false)).code, 'locked')
+    const goal = await service.setComponentEnabled('goal', false)
+    assert.equal(goal.ok, true)
+    assert.equal(goal.value.application, 'pending-restart')
+    assert.deepEqual(goal.value.patches, [
+      { patchId: 'guide-goal-adapter', moduleName: '@local/dsh-guide-goal-adapter', enabled: false },
+      { patchId: 'goal-round-driver', moduleName: '@deepseek-ai/dsh-goal-round-driver', enabled: true },
+    ])
+    assert.deepEqual(calls, [])
+  } finally {
+    rmSync(data.root, { recursive: true, force: true })
+  }
+
+  const blockedData = fixture()
   try {
     const bundles = PACKAGES.map((name) => ({
       name,
@@ -195,22 +250,19 @@ test('phase 1A refuses manager, cold and dependency-blocked actions', async () =
       version: '1.1.0',
       rows: [],
     }))
-    const { ctx, store, calls } = makeCtx(data, { bundles, services: componentServices })
+    const { ctx, store, calls } = makeCtx(blockedData, { bundles, services: componentServices })
     await apply(ctx)
-    const service = store.get('guideManager')
-    assert.equal((await service.setComponentEnabled('manager', false)).code, 'locked')
-    assert.equal((await service.setComponentEnabled('admission', false)).code, 'restart-required')
-    const blocked = await service.setComponentEnabled('panel', true)
+    const blocked = await store.get('guideManager').setComponentEnabled('panel', true)
     assert.equal(blocked.ok, false)
     assert.equal(blocked.code, 'dependency-conflict')
     assert.ok(blocked.blockers.some((item) => item.key === 'admission'))
     assert.deepEqual(calls, [])
   } finally {
-    rmSync(data.root, { recursive: true, force: true })
+    rmSync(blockedData.root, { recursive: true, force: true })
   }
 })
 
-test('phase 1A surfaces official action failures without claiming success', async () => {
+test('hot action failures are surfaced without claiming success', async () => {
   const data = fixture()
   try {
     const { ctx, store } = makeCtx(data, {

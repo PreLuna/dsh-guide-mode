@@ -1,5 +1,6 @@
-# Product manager. Phase 1A allows only panel/sidebar hot switches through the
-# official pluginManager; it never writes the profile itself.
+# Product manager. Phase 1B: panel/sidebar use the official pluginManager hot
+# switch; admission/shield/goal stage a pending intent applied by the restart
+# helper. The manager never writes the profile itself.
 - insert:
     - id: guide-manager
       name: '@local/dsh-guide-manager'

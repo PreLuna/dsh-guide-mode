@@ -8,12 +8,12 @@ window.__ModuleLoader__.load({
     const zh = {
       tab: '指导',
       title: '指导模式',
-      subtitle: '六个组件的状态、依赖关系、兼容检查与安全开关',
+      subtitle: '六个组件的状态、依赖关系、兼容检查与安全开关/冷切换',
       refresh: '刷新',
       loading: '正在读取 Host 状态…',
       hostStale: '管理服务未加载：请确认 guide-manager 已在 Host 启动，或重启 DSH。',
       retry: '重试',
-      readOnly: '仅 panel / sidebar 支持热开关；其他组件不写入 profile',
+      readOnly: 'panel / sidebar 热切换；admission / shield / goal 先准备，重启 helper 后生效',
       updated: '更新时间',
       manager: '管理器',
       managerReady: '就绪',
@@ -44,6 +44,10 @@ window.__ModuleLoader__.load({
       disable: '停用',
       confirmEnable: '确认启用',
       confirmDisable: '确认停用',
+      prepareEnable: '准备启用',
+      prepareDisable: '准备停用',
+      confirmPrepareEnable: '确认准备启用',
+      confirmPrepareDisable: '确认准备停用',
       cancel: '取消',
       actionBusy: '处理中…',
       actionApplied: '已应用',
@@ -51,8 +55,14 @@ window.__ModuleLoader__.load({
       actionOverridden: '已保存，但被更高层配置覆盖',
       actionFailed: '操作失败',
       actionUnknown: '操作结果未知',
-      restartRequired: '需要重启 DSH 后生效（暂未开放）',
-      pairedRestart: '需要与原 goal driver 成对切换（暂未开放）',
+      restartRequired: '需要重启 DSH 后生效',
+      pairedRestart: '需要与原 goal driver 成对切换',
+      pendingRestart: '已准备，重启后生效',
+      pendingCleared: '已取消准备',
+      pendingBanner: '有已准备的冷切换。运行下面的 helper 后 DSH 会重启并应用：',
+      pendingHint: '已准备',
+      cancelPending: '取消准备',
+      helper: 'helper',
       locked: '受保护，不提供开关',
       dependencyConflict: '依赖组件未就绪',
       blockedBy: '依赖',
@@ -92,12 +102,12 @@ window.__ModuleLoader__.load({
     const en = {
       tab: 'Guide',
       title: 'Guidance Mode',
-      subtitle: 'Component status, dependency edges, compatibility checks, and safe switches',
+      subtitle: 'Component status, compatibility checks, hot switches and staged cold changes',
       refresh: 'Refresh',
       loading: 'Reading Host state…',
       hostStale: 'Manager service is not loaded: confirm guide-manager started on the Host, or restart DSH.',
       retry: 'Retry',
-      readOnly: 'Only panel/sidebar support hot switches; no other profile writes',
+      readOnly: 'panel/sidebar switch hot; admission/shield/goal stage a change for the restart helper',
       updated: 'Updated',
       manager: 'Manager',
       managerReady: 'Ready',
@@ -128,6 +138,10 @@ window.__ModuleLoader__.load({
       disable: 'Disable',
       confirmEnable: 'Confirm enable',
       confirmDisable: 'Confirm disable',
+      prepareEnable: 'Prepare enable',
+      prepareDisable: 'Prepare disable',
+      confirmPrepareEnable: 'Confirm prepare enable',
+      confirmPrepareDisable: 'Confirm prepare disable',
       cancel: 'Cancel',
       actionBusy: 'Working…',
       actionApplied: 'Applied',
@@ -135,8 +149,14 @@ window.__ModuleLoader__.load({
       actionOverridden: 'Saved but overridden by a higher layer',
       actionFailed: 'Action failed',
       actionUnknown: 'Unknown action result',
-      restartRequired: 'Restart required; not available yet',
-      pairedRestart: 'Requires a paired goal-driver switch; not available yet',
+      restartRequired: 'Restart DSH to apply',
+      pairedRestart: 'Requires a paired goal-driver switch',
+      pendingRestart: 'Prepared; applies after restart',
+      pendingCleared: 'Preparation cancelled',
+      pendingBanner: 'A cold change is staged. Run the helper below; it restarts DSH and applies it:',
+      pendingHint: 'Prepared',
+      cancelPending: 'Cancel preparation',
+      helper: 'helper',
       locked: 'Protected; no switch',
       dependencyConflict: 'A required component is not ready',
       blockedBy: 'Requirements',
@@ -302,6 +322,8 @@ window.__ModuleLoader__.load({
       if (application === 'applied') return t('actionApplied')
       if (application === 'restart-required') return `${t('actionRestart')}${result?.restartReason ? ` (${result.restartReason})` : ''}`
       if (application === 'overridden') return t('actionOverridden')
+      if (application === 'pending-restart') return `${t('pendingRestart')}${result?.helperPath ? ` · ${result.helperPath}` : ''}`
+      if (application === 'pending-cleared') return t('pendingCleared')
       if (application === 'failed' || application === 'cancelled') {
         const detail = result?.error?.message ?? result?.error?.code ?? ''
         return detail === '' ? t('actionFailed') : `${t('actionFailed')}: ${detail}`
@@ -344,12 +366,18 @@ window.__ModuleLoader__.load({
         : t('none')
       const versionText = `${component.version ?? t('none')} / ${component.expectedVersion ?? t('none')}`
       const contractText = `${component.contract ?? t('none')} / ${component.expectedContract ?? t('none')}`
-      const action = component.action ?? { policy: 'locked', reason: null, canToggle: false, blockers: [] }
+      const action = component.action ?? { policy: 'locked', reason: null, canToggle: false, kind: 'locked', blockers: [] }
       const enabled = typeof component.enabled === 'boolean' ? component.enabled : component.bundleEnabled === true
-      const hot = action.policy === 'hot' && action.canToggle === true
+      const hot = action.kind === 'hot' && action.canToggle === true
+      const cold = action.kind === 'cold' && action.canToggle === true
       const actionText = hot
         ? enabled ? t('disable') : t('enable')
-        : actionLockText(action, t)
+        : cold ? enabled ? t('prepareDisable') : t('prepareEnable')
+          : actionLockText(action, t)
+      const confirmText = hot
+        ? enabled ? t('confirmDisable') : t('confirmEnable')
+        : enabled ? t('confirmPrepareDisable') : t('confirmPrepareEnable')
+      const pending = component.pending ?? null
       const blockers = Array.isArray(action.blockers) ? action.blockers : []
       return h('div', { style: S.card },
         h('div', { style: S.cardHead },
@@ -364,14 +392,17 @@ window.__ModuleLoader__.load({
         h('div', { style: S.kv }, h('span', { style: S.key }, t('service')), h('span', null, serviceLabel(serviceState, t))),
         component.bundleError ? h('div', { style: S.reason }, `${t('reason')}: ${component.bundleError.code ?? component.bundleError.reason ?? 'bundle-error'}`) : null,
         component.reason ? h('div', { style: S.reason }, `${t('reason')}: ${component.reason}`) : null,
-        hot
+        pending
+          ? h('div', { style: S.reason }, `${t('pendingHint')}: ${pending.enabled ? t('enable') : t('disable')} · ${t('pendingRestart')}`)
+          : null,
+        (hot || cold)
           ? (confirming
             ? h('div', { style: S.actionRow },
               h('button', {
                 style: S.dangerButton,
                 disabled: busy,
                 onClick: () => onConfirm(component, !enabled),
-              }, busy ? t('actionBusy') : enabled ? t('confirmDisable') : t('confirmEnable')),
+              }, busy ? t('actionBusy') : confirmText),
               h('button', { style: S.actionButton, disabled: busy, onClick: onCancel }, t('cancel')),
             )
             : h('div', { style: S.actionRow },
@@ -380,6 +411,13 @@ window.__ModuleLoader__.load({
                 disabled: busy,
                 onClick: () => onAsk(component),
               }, busy ? t('actionBusy') : actionText),
+              pending
+                ? h('button', {
+                  style: S.actionButton,
+                  disabled: busy,
+                  onClick: () => onConfirm(component, enabled),
+                }, t('cancelPending'))
+                : null,
             ))
           : h('div', { style: S.note }, `${actionText}${action.reason ? `: ${action.reason}` : ''}`),
         blockers.length > 0
@@ -523,6 +561,13 @@ window.__ModuleLoader__.load({
         ),
         error ? h('div', { style: S.banner }, error) : null,
         notice ? h('div', { style: { ...S.notice, ...(noticeError ? S.noticeError : {}) } }, notice) : null,
+        state.pending?.present
+          ? h('div', { style: S.notice },
+            h('div', null, t('pendingBanner')),
+            h('div', { style: S.mono }, state.pending.helper ?? t('none')),
+          )
+          : null,
+        state.pending?.error ? h('div', { style: S.banner }, `pending: ${state.pending.error}`) : null,
         h('div', { style: S.card },
           h('div', { style: S.cardHead },
             h('strong', null, t('manager')),
