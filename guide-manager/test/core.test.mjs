@@ -5,9 +5,11 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   ACTION_POLICIES,
+  ARTIFACT_REQUIREMENTS,
   COMPONENTS,
   MANAGER_ACTION,
   actionForComponent,
+  actionGate,
   buildEdges,
   coldIntent,
   componentStatus,
@@ -283,4 +285,33 @@ test('cold intents map components to their profile patch rows', () => {
     { patchId: 'goal-round-driver', moduleName: '@deepseek-ai/dsh-goal-round-driver', enabled: true },
   ])
   assert.equal(coldIntent('preset', false), null)
+})
+
+test('action gate blocks hard incompatibilities but allows disabling for recovery', () => {
+  const admission = component('admission', 'ready', { installed: true, contractMatch: true, versionMatch: true })
+  const brokenArtifacts = {
+    verified: false,
+    artifacts: {
+      checked: true,
+      verified: false,
+      items: [{ name: '@deepseek-ai/dsh-subagent', match: false }],
+    },
+  }
+  const enable = actionGate(admission, [admission], brokenArtifacts, true)
+  assert.equal(enable.allowed, false)
+  assert.ok(enable.blockers.some((item) => item.code === 'artifact-mismatch' && item.name === '@deepseek-ai/dsh-subagent'))
+  assert.ok(enable.warnings.some((item) => item.code === 'host-version-unverified'))
+
+  const disable = actionGate(admission, [admission], brokenArtifacts, false)
+  assert.equal(disable.allowed, true)
+  assert.ok(disable.warnings.some((item) => item.code === 'host-artifacts-unverified'))
+
+  const contract = actionGate(component('admission', 'ready', { installed: true, contractMatch: false }), [admission], {}, true)
+  assert.equal(contract.allowed, false)
+  assert.ok(contract.blockers.some((item) => item.code === 'contract-mismatch'))
+
+  const warningOnly = actionGate(admission, [admission], { verified: false, artifacts: { checked: false, verified: null, items: [] } }, true)
+  assert.equal(warningOnly.allowed, true)
+  assert.ok(warningOnly.warnings.some((item) => item.code === 'host-version-unverified'))
+  assert.ok(ARTIFACT_REQUIREMENTS.goal.includes('@deepseek-ai/dsh-goal-round-driver'))
 })

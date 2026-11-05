@@ -1,6 +1,6 @@
 # 工程维护手册
 
-更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 1B）、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 2）、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 1. 版本、基线与 CI
 
@@ -24,7 +24,7 @@
 | `guide-shield/` | 8 | 0.03 MB | ✅ | 独立 Host 结算防护；`contracts.js` 记契约哈希 |
 | `guide-admission/` | 6 | 0.02 MB | ✅ | 原生 materialize 同步准入、容量／身份／按池快照 |
 | `guide-preset/` | 3 | 0.01 MB | ✅ | `guide` persona 与工具面 |
-| `guide-manager/` | 13 | 0.06 MB | ✅ | 官方插件页「指导」tab：六组件、依赖边、BOM、skill；热切换与 pending 冷切换 helper |
+| `guide-manager/` | 13 | 0.06 MB | ✅ | 官方插件页「指导」tab：六组件、依赖边、BOM/产物、skill；兼容门禁、热切换与 pending 冷切换 helper |
 | `docs/` | 4 | 0.04 MB | ✅ | 架构、已定边界、维护、历史 |
 | `scripts/` | 7 | 0.04 MB | ✅ | 维护入口脚本 |
 | `.github/workflows/test.yml` | 1 | 0 | ✅ | 最小 CI |
@@ -57,7 +57,7 @@
 - **goal**：原 driver 产物、waitForChildren/join 函数与独占调度入口。
 - **sidebar**：官方 client、client-modules、Cordis、树/图/计数/auto-open 与注册的存活/卸载行为。
 - **panel/shield**：官方 descriptor fold、自身 inheritedEventCount + first-wins、deprecated snapshotEvents 同步读；Host 必需服务/方法，以及 sidebarRight/slots/uiWorkspace 原生客户端形状。契约源哈希在 `guide-shield/contracts.js`。
-- **manager**：官方 `pluginManager` 的 `listPlugins`/`listBundles`/`setPluginEnabled`、Plugins 页 `plugins.tab` slot、`dshGuide` BOM 字段与 `$DSH_HOME` skill 状态；Phase 1B 的热切换转调官方，冷切换写 `profile/.guide-manager/pending.json` 并由 `helper/restart-guide-manager.cmd` 停 Host、调用官方 patch writer、重启；manager 不直接改 profile 依赖。
+- **manager**：官方 `pluginManager` 的 `listPlugins`/`listBundles`/`setPluginEnabled`、Plugins 页 `plugins.tab` slot、`dshGuide` BOM 的 host/components/artifacts 哈希、`$DSH_HOME` skill 状态；Phase 2 先跑操作门禁（契约/必需产物/依赖硬阻断，版本/未知警告）。热切换转调官方，冷切换写 `profile/.guide-manager/pending.json` 并由 `helper/restart-guide-manager.cmd` 停 Host、调用官方 patch writer、重启；manager 不直接改 profile 依赖。
 - **O6**：tools/register、精确注册层、来源 runtime/execute 指针及现有五个源码哈希。**不能只改哈希让预检通过。**
 
 不支持时明确显示不可用/只读，阻止新指导与自动归档，建议重启或恢复已支持版本；不注册半套 provider。缺少客户端注册必需形状时不挂半套 tab，并提供 `guidePanelClientCompatibility` 诊断。已有对话仍可从宿主原生入口查看。
@@ -69,7 +69,7 @@
 3. 在隔离 profile 运行 `npm test`、`build:check`、`doctor`。
 4. 运行真实 Host、真实 Runtime、浏览器回归；保存新证据目录。
 5. 停 Host，冷更新准入/shield 核心；**不要用 HMR 代替**。
-6. 检查 `/guide/api/state`：`panelCompat`、`guideAdmission`、`settlementShield`、`modelProjection`、`goalAdapter`；检查 `/guide-manager/api/state` 的组件状态、BOM 与 action policy。
+6. 检查 `/guide/api/state`：`panelCompat`、`guideAdmission`、`settlementShield`、`modelProjection`、`goalAdapter`；检查 `/guide-manager/api/state` 的组件状态、BOM/产物、action policy 与 gate。
 7. 保存回滚组合；失败则停在旧基线。
 8. 不在未重验的情况下只改 pin。
 

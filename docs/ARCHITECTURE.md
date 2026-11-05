@@ -52,9 +52,9 @@ panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 
 
 核心服务采用冷更新，panel HMR 不卸载它；服务自身卸载/重载不承诺连续执法。未知源码/函数/形状或方法所有权变化报告 unsupported，不能声称所有原生入口仍受策略保护。生产隔离验收与实际 desktop 冷部署通过，见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
 
-## guide-manager（Phase 1B）
+## guide-manager（Phase 2）
 
-[guide-manager](../guide-manager/README.md) 是独立 Host + client bundle，不 import 六个组件。Host 半边从官方 `pluginManager.listPlugins()`/`listBundles()`（不可用时降级读 profile 清单）、组件自己的可选 state 服务和 `$DSH_HOME` 下的 skill 文件聚合状态，经 `/guide-manager/api/state` 暴露；client 半边在官方插件页注册 `plugins.tab`「指导」标签页。`/guide-manager/api/action` 接受带确认的切换：panel/sidebar 转调官方 `pluginManager.setPluginEnabled` 热生效；admission/shield/goal 只写 `profile/.guide-manager/pending.json`，由 `helper/restart-guide-manager.cmd` 在 Host 停止时调用官方 `writePluginEnabled` 应用并重启。goal 的 intent 同时包含 adapter 和原 driver，保持成对；preset/manager 为 `locked`。状态区分 `ready`、`ready-unverified`、`degraded`、`unsupported`、`failed`、`disabled`、`missing`、`unknown`，并把 version/contract/host 漂移显示为未验证而不是不兼容。
+[guide-manager](../guide-manager/README.md) 是独立 Host + client bundle，不 import 六个组件。Host 半边从官方 `pluginManager.listPlugins()`/`listBundles()`（不可用时降级读 profile 清单）、组件自己的可选 state 服务、`pluginPackages` 解析的实际产物哈希和 `$DSH_HOME` 下的 skill 文件聚合状态，经 `/guide-manager/api/state` 暴露；client 半边在官方插件页注册 `plugins.tab`「指导」标签页。每个组件带 `action.gate.enable/disable`：契约、必需产物、依赖、组件 unsupported/failed 是硬阻断；宿主版本/构建、产物未知、版本漂移是警告；停用始终允许用于恢复。`/guide-manager/api/action` 只有门禁通过才执行：panel/sidebar 转调官方 `pluginManager.setPluginEnabled` 热生效；admission/shield/goal 只写 `profile/.guide-manager/pending.json`，由 `helper/restart-guide-manager.cmd` 在 Host 停止时调用官方 `writePluginEnabled` 应用并重启。goal 的 intent 同时包含 adapter 和原 driver，保持成对；preset/manager 为 `locked`。状态区分 `ready`、`ready-unverified`、`degraded`、`unsupported`、`failed`、`disabled`、`missing`、`unknown`，并把 version/contract/host 漂移显示为未验证而不是不兼容。
 
 ## O21 契约与维护边界
 

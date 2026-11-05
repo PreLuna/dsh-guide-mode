@@ -74,6 +74,16 @@ export function coldIntent(component, enabled) {
 
 const HARD_BLOCKING = new Set(['missing', 'disabled', 'incompatible', 'failed'])
 
+/** Artifacts whose exact bytes the action gate must verify for each component. */
+export const ARTIFACT_REQUIREMENTS = {
+  panel: ['@deepseek-ai/dsh-subagent', '@deepseek-ai/cordis'],
+  admission: ['@deepseek-ai/dsh-subagent', '@deepseek-ai/cordis'],
+  shield: ['@deepseek-ai/dsh-subagent', '@deepseek-ai/cordis'],
+  preset: ['@deepseek-ai/dsh-subagent', '@deepseek-ai/cordis'],
+  sidebar: ['dsh-better-sidebar', '@deepseek-ai/dsh-client-modules'],
+  goal: ['@deepseek-ai/dsh-goal-round-driver', '@deepseek-ai/dsh-subagent', '@deepseek-ai/cordis'],
+}
+
 /** Required components that would make enabling the panel a broken mount. */
 export function dependencyBlockers(component, components = []) {
   if (component?.key !== 'panel') return []
@@ -91,6 +101,48 @@ export function dependencyBlockers(component, components = []) {
 }
 
 /**
+ * Pre-action compatibility gate. Enabling is blocked by missing contracts,
+ * failed components, panel dependency conflicts and known artifact mismatches;
+ * disabling stays available for recovery. Version/build/version drift are
+ * warnings unless a required artifact is known to be wrong.
+ */
+export function actionGate(component, components = [], host = null, enabled = false) {
+  const blockers = []
+  const warnings = []
+  if (enabled) {
+    if (!component.installed) blockers.push({ code: 'not-installed' })
+    if (component.bundleEnabled === null) blockers.push({ code: 'enablement-unknown' })
+    if (component.bundleError) blockers.push({ code: 'bundle-error', reason: component.bundleError.code ?? component.bundleError.reason ?? 'bundle-error' })
+    if (component.contractMatch === false) blockers.push({ code: 'contract-mismatch' })
+    if (component.status === 'unsupported' || component.status === 'failed' || component.status === 'incompatible') {
+      blockers.push({ code: 'component-unsupported', reason: component.reason ?? component.status })
+    }
+    if (component.key === 'panel') {
+      for (const dep of dependencyBlockers(component, components)) {
+        blockers.push({ code: 'dependency', key: dep.key, status: dep.status, reason: dep.reason })
+      }
+    }
+    if (component.key === 'sidebar' && host?.betterSidebar?.match === false) {
+      blockers.push({ code: 'sidebar-host-mismatch' })
+    }
+    if (host?.artifacts?.checked === true) {
+      for (const name of ARTIFACT_REQUIREMENTS[component.key] ?? []) {
+        const item = host.artifacts.items?.find((entry) => entry.name === name)
+        if (item === undefined || item.match === null) warnings.push({ code: 'artifact-unknown', name })
+        else if (item.match === false) blockers.push({ code: 'artifact-mismatch', name })
+      }
+    }
+    if (host?.verified === false) warnings.push({ code: 'host-version-unverified' })
+    if (component.versionMatch === false) warnings.push({ code: 'version-drift' })
+    if (component.contractMatch === null) warnings.push({ code: 'contract-unknown' })
+    if (component.status === 'degraded') warnings.push({ code: 'component-degraded' })
+  } else if (host?.artifacts?.checked === true && host.artifacts.verified === false) {
+    warnings.push({ code: 'host-artifacts-unverified' })
+  }
+  return { allowed: blockers.length === 0, blockers, warnings }
+}
+
+/**
  * Derive one component's action affordance from its runtime status and the
  * cross-component requirements. `canToggle` is the final gate the Host checks
  * again before it calls the official pluginManager.
@@ -100,20 +152,35 @@ export function actionForComponent(component, components = [], host = null) {
   const enabled = typeof component?.enabled === 'boolean' ? component.enabled : component?.bundleEnabled === true
   const hot = base.policy === 'hot'
   const cold = base.policy === 'restart-required' || base.policy === 'paired-restart'
-  if (!hot && !cold) return { ...base, enabled, canToggle: false, kind: 'locked', blockers: [] }
-  if (!component.installed) return { ...base, enabled, canToggle: false, kind: cold ? 'cold' : 'hot', reason: 'not-installed', blockers: [] }
-  if (component.bundleEnabled === null) return { ...base, enabled, canToggle: false, kind: cold ? 'cold' : 'hot', reason: 'enablement-unknown', blockers: [] }
-  if (cold) return { ...base, enabled, canToggle: true, kind: 'cold', blockers: [] }
-  if (!enabled) {
-    if (component.key === 'panel') {
-      const blockers = dependencyBlockers(component, components)
-      if (blockers.length > 0) return { ...base, enabled, canToggle: false, kind: 'hot', reason: 'dependency-conflict', blockers }
-    }
-    if (component.key === 'sidebar' && host?.betterSidebar?.match === false) {
-      return { ...base, enabled, canToggle: false, kind: 'hot', reason: 'unsupported-sidebar-host', blockers: [] }
-    }
+  const gate = {
+    enable: actionGate(component, components, host, true),
+    disable: actionGate(component, components, host, false),
   }
-  return { ...base, enabled, canToggle: true, kind: 'hot', blockers: [] }
+  if (!hot && !cold) {
+    return { ...base, enabled, canToggle: false, kind: 'locked', gate, blockers: [{ code: 'locked' }], warnings: [] }
+  }
+  if (!component.installed) {
+    return { ...base, enabled: false, canToggle: false, kind: cold ? 'cold' : 'hot', gate, blockers: gate.enable.blockers, warnings: [], reason: 'not-installed' }
+  }
+  const direction = enabled ? gate.disable : gate.enable
+  const first = direction.blockers[0]
+  const reason = first === undefined
+    ? null
+    : first.code === 'dependency'
+      ? 'dependency-conflict'
+      : first.code === 'sidebar-host-mismatch'
+        ? 'unsupported-sidebar-host'
+        : first.code
+  return {
+    ...base,
+    enabled,
+    canToggle: direction.allowed,
+    kind: cold ? 'cold' : 'hot',
+    gate,
+    blockers: direction.blockers,
+    warnings: direction.warnings,
+    reason,
+  }
 }
 
 /** Normalize the official pluginManager action result for the client. */

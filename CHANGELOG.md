@@ -5,6 +5,7 @@
 - Add a `guide-manager` bundle and an official-Plugins-page “指导” tab that reports the six components, host BOM, dependency edges, and `guide` skill state.
 - Phase 1A adds confirmed `guide-panel` / `guide-sidebar-adapter` hot switches through the official `pluginManager`; admission/shield remain restart-required, goal is paired, preset/manager locked, and the manager never writes the profile directly.
 - Phase 1B stages admission/shield and the goal adapter/driver pair as `pending.json` intents. The restart helper stops DSH, applies the patch through the official `writePluginEnabled`, restores the patch on failure, and restarts; the UI never claims a cold change applied before that restart.
+- Phase 2 adds per-component `enable`/`disable` gates and host artifact SHA-256 checks. Contract, required-artifact, dependency and unsupported/failed states block enabling; host-version, unknown-artifact and version drift are warnings; disabling stays available for recovery.
 - Prepare a private GitHub repository and commit-based local snapshots; public and marketplace distribution remain deferred, with private metadata unchanged.
 - Summarize retired fork, duplicate archive documents, deferred research plans and one-off deployment scripts in `docs/HISTORY-AND-MAINTENANCE-NOTES.md`, then remove those obsolete files while preserving active tests and recovery dependencies.
 

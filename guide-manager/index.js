@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -164,6 +165,53 @@ function readHostState(ctx, profileContext, expected) {
   return hostStatus(actual, expected ?? {})
 }
 
+function packageDirOf(ctx, name, profileContext) {
+  const packages = serviceOf(ctx, 'pluginPackages')
+  const anchor = anchorOf(profileContext)
+  try {
+    const located = packages?.packageOf?.(name, anchor)
+    if (typeof located?.dir === 'string' && existsSync(located.dir)) return located.dir
+  } catch {
+    // Fall through to the profile node_modules spelling.
+  }
+  if (profileContext?.dir !== undefined) {
+    const fallback = join(profileContext.dir, 'node_modules', ...name.split('/'))
+    if (existsSync(fallback)) return fallback
+  }
+  return null
+}
+
+function readArtifactState(ctx, profileContext, artifacts) {
+  const entries = artifacts !== null && typeof artifacts === 'object' ? Object.entries(artifacts) : []
+  if (entries.length === 0) return { checked: false, verified: null, items: [] }
+  const items = []
+  for (const [name, spec] of entries) {
+    const file = spec?.file
+    const expected = spec?.sha256 ?? null
+    const dir = packageDirOf(ctx, name, profileContext)
+    if (dir === null || typeof file !== 'string') {
+      items.push({ name, file, expected, actual: null, match: null, error: 'package-unavailable' })
+      continue
+    }
+    const path = join(dir, file)
+    if (!existsSync(path)) {
+      items.push({ name, file, expected, actual: null, match: null, error: 'file-unavailable' })
+      continue
+    }
+    try {
+      const actual = createHash('sha256').update(readFileSync(path)).digest('hex')
+      items.push({ name, file, expected, actual, match: actual === expected, error: null })
+    } catch (error) {
+      items.push({ name, file, expected, actual: null, match: null, error: String(error.message ?? error) })
+    }
+  }
+  const known = items.filter((item) => item.match !== null)
+  const verified = items.some((item) => item.match === false)
+    ? false
+    : known.length === items.length && items.length > 0 ? true : null
+  return { checked: true, verified, items }
+}
+
 function collectComponents(ctx, pluginData, guide, profileContext, host, pendingByComponent = new Map()) {
   const definitions = guide.components ?? {}
   const components = [...COMPONENTS].sort((a, b) => a.order - b.order).map((component) => {
@@ -262,6 +310,7 @@ function buildWarnings(state) {
   }
   if (state.skills.status !== 'ready') warnings.push(`skills:${state.skills.status}:${state.skills.reason ?? 'unknown'}`)
   if (state.pending?.error) warnings.push(`pending:${state.pending.error}`)
+  if (state.host.artifacts?.checked === true && state.host.artifacts.verified === false) warnings.push('host:artifact-mismatch')
   if (state.dataSource === 'profile-fallback') warnings.push('data:profile-fallback')
   return [...new Set(warnings)]
 }
@@ -327,10 +376,13 @@ function pendingView(profileContext) {
   }
 }
 
-async function collectState(ctx) {
+async function collectState(ctx, config = {}) {
   const bom = readBom()
   const profileContext = serviceOf(ctx, 'profileContext')
   const host = readHostState(ctx, profileContext, bom.guide.host ?? {})
+  host.artifacts = config?.checkArtifacts === false
+    ? { checked: false, verified: null, items: [] }
+    : readArtifactState(ctx, profileContext, bom.guide.artifacts ?? {})
   const pluginData = await readPluginData(ctx, profileContext)
   const pending = pendingView(profileContext)
   const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host, pending.byComponent)
@@ -341,7 +393,7 @@ async function collectState(ctx) {
     product: bom.guide.product ?? 'dsh-guide-mode',
     release: bom.guide.release ?? bom.manifest.version ?? null,
     readOnly: false,
-    actionScope: 'phase-1b',
+    actionScope: 'phase-2',
     manager: { ...manager, version: bom.manifest.version ?? null, action: MANAGER_ACTION },
     profile: {
       name: profileContext?.name ?? null,
@@ -405,13 +457,13 @@ async function stageCold(ctx, key, enabled, component) {
  * components only stage a pending intent for the restart helper. The manager
  * never edits the profile itself.
  */
-async function setComponentEnabled(ctx, key, enabled) {
+async function setComponentEnabled(ctx, key, enabled, config = {}) {
   if (key === 'manager') return { ok: false, code: 'locked', message: 'the manager is protected and has no switch' }
   const definition = COMPONENTS.find((item) => item.key === key)
   if (definition === undefined) return { ok: false, code: 'unknown-component', message: `Unknown component: ${key}` }
   let state
   try {
-    state = await collectState(ctx)
+    state = await collectState(ctx, config)
   } catch (error) {
     return { ok: false, code: 'state-unavailable', message: String(error.message ?? error) }
   }
@@ -421,7 +473,8 @@ async function setComponentEnabled(ctx, key, enabled) {
   if (action.kind !== 'hot' && action.kind !== 'cold') {
     return { ok: false, code: action.policy, message: action.reason ?? 'component is not switchable' }
   }
-  if (action.canToggle !== true) {
+  const clearingPending = action.kind === 'cold' && component.pending !== null && component.pending !== undefined && component.enabled === enabled
+  if (action.canToggle !== true && !clearingPending) {
     return {
       ok: false,
       code: action.reason ?? 'not-toggleable',
@@ -556,7 +609,7 @@ async function handle(injected, getState, setEnabled, req, res) {
     return
   }
   if (pathname === `${ROUTE_PREFIX}/ping`) {
-    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-1b' } })
+    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-2' } })
     return
   }
   if (pathname !== `${ROUTE_PREFIX}/state`) {
@@ -572,10 +625,10 @@ async function handle(injected, getState, setEnabled, req, res) {
 
 export const name = 'guide-manager'
 
-export async function apply(ctx) {
-  const getState = () => collectState(ctx)
-  const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled)
-  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-1b' })
+export async function apply(ctx, config = {}) {
+  const getState = () => collectState(ctx, config)
+  const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled, config)
+  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-2' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
     const connection = serviceOf(injected, 'connection')
@@ -586,6 +639,6 @@ export async function apply(ctx) {
       handler: (req, res) => {
         void handle(injected, getState, setEnabled, req, res)
       },
-    }), 'guide-manager: status and phase-1b action route')
+    }), 'guide-manager: status and phase-2 action route')
   })
 }

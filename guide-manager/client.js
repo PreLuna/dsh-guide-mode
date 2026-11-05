@@ -65,6 +65,10 @@ window.__ModuleLoader__.load({
       helper: 'helper',
       locked: '受保护，不提供开关',
       dependencyConflict: '依赖组件未就绪',
+      gateBlocked: '兼容门禁未通过',
+      gateWarning: '兼容警告',
+      artifacts: '构建产物',
+      notChecked: '未检查',
       blockedBy: '依赖',
       none: '—',
       optional: '可选',
@@ -159,6 +163,10 @@ window.__ModuleLoader__.load({
       helper: 'helper',
       locked: 'Protected; no switch',
       dependencyConflict: 'A required component is not ready',
+      gateBlocked: 'Compatibility gate blocked',
+      gateWarning: 'Compatibility warning',
+      artifacts: 'Build artifacts',
+      notChecked: 'Not checked',
       blockedBy: 'Requirements',
       none: '—',
       optional: 'optional',
@@ -368,17 +376,24 @@ window.__ModuleLoader__.load({
       const contractText = `${component.contract ?? t('none')} / ${component.expectedContract ?? t('none')}`
       const action = component.action ?? { policy: 'locked', reason: null, canToggle: false, kind: 'locked', blockers: [] }
       const enabled = typeof component.enabled === 'boolean' ? component.enabled : component.bundleEnabled === true
-      const hot = action.kind === 'hot' && action.canToggle === true
-      const cold = action.kind === 'cold' && action.canToggle === true
-      const actionText = hot
+      const hotKind = action.kind === 'hot'
+      const coldKind = action.kind === 'cold'
+      const switchable = (hotKind || coldKind) && action.canToggle === true
+      const actionText = hotKind
         ? enabled ? t('disable') : t('enable')
-        : cold ? enabled ? t('prepareDisable') : t('prepareEnable')
+        : coldKind ? enabled ? t('prepareDisable') : t('prepareEnable')
           : actionLockText(action, t)
-      const confirmText = hot
+      const confirmText = hotKind
         ? enabled ? t('confirmDisable') : t('confirmEnable')
         : enabled ? t('confirmPrepareDisable') : t('confirmPrepareEnable')
       const pending = component.pending ?? null
-      const blockers = Array.isArray(action.blockers) ? action.blockers : []
+      const gate = enabled ? action.gate?.disable : action.gate?.enable
+      const blockers = Array.isArray(gate?.blockers) ? gate.blockers : Array.isArray(action.blockers) ? action.blockers : []
+      const warnings = Array.isArray(gate?.warnings) ? gate.warnings : Array.isArray(action.warnings) ? action.warnings : []
+      const blockerText = (item) => item.code === 'dependency'
+        ? `${item.key} (${item.status})`
+        : item.code === 'artifact-mismatch' ? `artifact:${item.name}` : item.code ?? 'blocked'
+      const warningText = (item) => item.code === 'artifact-unknown' ? `artifact:${item.name}` : item.code ?? 'warning'
       return h('div', { style: S.card },
         h('div', { style: S.cardHead },
           h('strong', { style: { fontSize: 13 } }, componentLabel(component, t)),
@@ -395,7 +410,7 @@ window.__ModuleLoader__.load({
         pending
           ? h('div', { style: S.reason }, `${t('pendingHint')}: ${pending.enabled ? t('enable') : t('disable')} · ${t('pendingRestart')}`)
           : null,
-        (hot || cold)
+        switchable
           ? (confirming
             ? h('div', { style: S.actionRow },
               h('button', {
@@ -411,17 +426,24 @@ window.__ModuleLoader__.load({
                 disabled: busy,
                 onClick: () => onAsk(component),
               }, busy ? t('actionBusy') : actionText),
-              pending
-                ? h('button', {
-                  style: S.actionButton,
-                  disabled: busy,
-                  onClick: () => onConfirm(component, enabled),
-                }, t('cancelPending'))
-                : null,
             ))
-          : h('div', { style: S.note }, `${actionText}${action.reason ? `: ${action.reason}` : ''}`),
-        blockers.length > 0
-          ? h('div', { style: S.reason }, `${t('blockedBy')}: ${blockers.map((item) => `${item.key} (${item.status})`).join(', ')}`)
+          : h('div', { style: S.note }, hotKind || coldKind
+            ? `${t('gateBlocked')}${blockers.length > 0 ? `: ${blockers.map(blockerText).join(', ')}` : ''}`
+            : `${actionText}${action.reason ? `: ${action.reason}` : ''}`),
+        pending
+          ? h('div', { style: S.actionRow },
+            h('button', {
+              style: S.actionButton,
+              disabled: busy,
+              onClick: () => onConfirm(component, enabled),
+            }, t('cancelPending')),
+          )
+          : null,
+        blockers.length > 0 && switchable
+          ? h('div', { style: S.reason }, `${t('gateBlocked')}: ${blockers.map(blockerText).join(', ')}`)
+          : null,
+        warnings.length > 0
+          ? h('div', { style: S.reason }, `${t('gateWarning')}: ${warnings.map(warningText).join(', ')}`)
           : null,
         typeof openPackage === 'function'
           ? h('button', {
@@ -576,6 +598,8 @@ window.__ModuleLoader__.load({
           h('div', { style: S.kv }, h('span', { style: S.key }, t('release')), h('span', null, state.release ?? t('none'))),
           h('div', { style: S.kv }, h('span', { style: S.key }, t('host')), h('span', null, hostLine)),
           h('div', { style: S.kv }, h('span', { style: S.key }, t('verified')), h('span', null, host.verified === true ? t('verified') : t('unverified'))),
+          h('div', { style: S.kv }, h('span', { style: S.key }, t('artifacts')), h('span', null,
+            host.artifacts?.checked !== true ? t('notChecked') : host.artifacts.verified === true ? t('verified') : t('unverified'))),
           h('div', { style: S.kv }, h('span', { style: S.key }, t('dataSource')), h('span', null, state.dataSource ?? t('none'))),
           manager.reason ? h('div', { style: S.reason }, `${t('reason')}: ${manager.reason}`) : null,
           h('div', { style: S.note }, t('managerLocked')),

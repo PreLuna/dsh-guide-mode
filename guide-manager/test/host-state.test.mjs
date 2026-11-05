@@ -113,10 +113,10 @@ test('host state reports six ready components, edges and the skill', async () =>
   const data = fixture()
   try {
     const { ctx, store } = makeCtx(data, { services: componentServices })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const state = await store.get('guideManager').getState()
     assert.equal(state.readOnly, false)
-    assert.equal(state.actionScope, 'phase-1b')
+    assert.equal(state.actionScope, 'phase-2')
     assert.equal(state.manager.mode, 'ready')
     assert.equal(state.manager.action.policy, 'locked')
     assert.equal(state.pending.present, false)
@@ -141,7 +141,7 @@ test('host state falls back to the profile manifest without pluginManager', asyn
   const data = fixture()
   try {
     const { ctx, store } = makeCtx(data, { manager: false })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const state = await store.get('guideManager').getState()
     assert.equal(state.manager.mode, 'fallback')
     assert.equal(state.dataSource, 'profile-fallback')
@@ -159,7 +159,7 @@ test('a disabled panel is reported as disabled and its outgoing edges inactive',
   try {
     const bundles = PACKAGES.map((name) => ({ name, installed: true, enabled: name !== '@local/dsh-guide-panel', version: '1.1.0', rows: [] }))
     const { ctx, store } = makeCtx(data, { bundles })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const state = await store.get('guideManager').getState()
     const panel = state.components.find((component) => component.key === 'panel')
     assert.equal(panel.status, 'disabled')
@@ -173,7 +173,7 @@ test('phase 1A routes panel and sidebar toggles through the official manager', a
   const data = fixture()
   try {
     const { ctx, store, calls } = makeCtx(data, { services: componentServices })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const service = store.get('guideManager')
     const panel = await service.setComponentEnabled('panel', false)
     assert.equal(panel.ok, true)
@@ -191,7 +191,7 @@ test('phase 1B stages and clears a cold admission intent without touching the pr
   const data = fixture()
   try {
     const { ctx, store, calls } = makeCtx(data, { services: componentServices })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const service = store.get('guideManager')
     const staged = await service.setComponentEnabled('admission', false)
     assert.equal(staged.ok, true)
@@ -226,7 +226,7 @@ test('phase 1B stages the goal pair and refuses manager/blocked panel actions', 
   const data = fixture()
   try {
     const { ctx, store, calls } = makeCtx(data, { services: componentServices })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const service = store.get('guideManager')
     assert.equal((await service.setComponentEnabled('manager', false)).code, 'locked')
     const goal = await service.setComponentEnabled('goal', false)
@@ -251,7 +251,7 @@ test('phase 1B stages the goal pair and refuses manager/blocked panel actions', 
       rows: [],
     }))
     const { ctx, store, calls } = makeCtx(blockedData, { bundles, services: componentServices })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const blocked = await store.get('guideManager').setComponentEnabled('panel', true)
     assert.equal(blocked.ok, false)
     assert.equal(blocked.code, 'dependency-conflict')
@@ -269,7 +269,7 @@ test('hot action failures are surfaced without claiming success', async () => {
       services: componentServices,
       setPluginEnabled: () => ({ application: 'failed', error: { code: 'operation-error', diagnostic: 'boom' } }),
     })
-    await apply(ctx)
+    await apply(ctx, { checkArtifacts: false })
     const result = await store.get('guideManager').setComponentEnabled('panel', false)
     assert.equal(result.ok, true)
     assert.equal(result.value.application, 'failed')

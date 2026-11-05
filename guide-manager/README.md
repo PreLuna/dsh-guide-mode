@@ -1,11 +1,11 @@
-# Guide manager（Phase 1B）
+# Guide manager（Phase 2）
 
 独立的 Host + client 包，在官方 **插件** 页增加一个「指导」标签页，展示指导模式的六个组件、依赖关系、宿主版本和 `guide` skill 状态，并提供两档切换：
 
 - **热切换**：`guide-panel`、`guide-sidebar-adapter`，通过官方 `pluginManager.setPluginEnabled` 立即生效。
 - **冷切换**：`guide-admission`、`guide-shield`、`guide-goal-adapter`，只写 pending intent；由独立 helper 在 DSH 停止时应用 profile patch 并重启。
 
-manager 不 import 六个组件，也不直接写 profile；冷 patch 由 helper 调用官方 `writePluginEnabled` 完成。
+Phase 2 在执行任何切换前先跑兼容门禁：硬阻断（契约/产物/依赖/组件不可用）会禁用按钮；宿主版本、产物未知、版本漂移只作为警告。manager 不 import 六个组件，也不直接写 profile。
 
 ## 显示内容
 
@@ -48,6 +48,26 @@ manager 不 import 六个组件，也不直接写 profile；冷 patch 由 helper
 - goal 的 pending 必须同时包含 adapter 和原 driver 两项，避免两个都启用或都停用。
 - 取消准备：再次触发“准备当前状态”即可清掉该组件的 intent；UI 提供“取消准备”按钮。
 - 冷切换不会自动执行；需要用户双击 `helper/restart-guide-manager.cmd`，该 helper 会关闭并重启 DSH。
+
+## 操作门禁（Phase 2）
+
+每个组件在状态里带 `action.gate.enable` / `action.gate.disable`：
+
+| 结果 | 条件 | 效果 |
+|---|---|---|
+| 硬阻断 | 未安装、bundle error、契约版本不一致、组件 unsupported/failed/incompatible、panel 依赖未就绪、sidebar 宿主版本不符、必需产物哈希不匹配 | 不显示可执行按钮；UI 显示 `兼容门禁未通过` 和具体 blockers |
+| 软警告 | 宿主版本/构建未验证、产物不可用或未知、版本漂移、组件 degraded | 允许操作，UI 显示 `兼容警告` |
+| 停用 | 不受启用门禁阻断 | 始终允许停用，便于恢复 |
+
+Phase 2 的 BOM 还记录敏感上游产物的 SHA-256：
+
+- `@deepseek-ai/dsh-subagent` / `@deepseek-ai/cordis`
+- `@deepseek-ai/dsh-goal-round-driver`
+- `dsh-better-sidebar` client
+- `@deepseek-ai/dsh-client-modules` client
+- right-sidebar / workspace client
+
+Host 通过 `pluginPackages` 解析实际目录并哈希；包或文件不可用时记 `unknown`，不会伪称已验证。`host.artifacts.verified` 为 `true` 仅当所有声明产物都匹配；存在未知项时为 `null`，存在不匹配时为 `false`。
 
 ## Pending helper
 
@@ -96,14 +116,14 @@ POST /guide-manager/api/action  # set-component-enabled
 1. 官方 `pluginManager` 的 `listPlugins()` / `listBundles()`；不可用时降级读取 profile `package.json` 和已安装 manifest。
 2. 六个组件自己的可选服务：`guidePanelCompatibility`、`guideAdmission`、`guideSettlementShield`、`guideSidebarHost`、`guideGoalAdapter`。
 3. `$DSH_HOME/skills/guide/SKILL.md`、`$DSH_HOME/skills-guide/`、`$DSH_HOME/skills-manager/state.json`。
-4. 包自己的 `dshGuide` BOM（`package.json`）。
+4. 包自己的 `dshGuide` BOM（`package.json`），包括 components、host 与 artifacts 哈希。
 5. `profile/.guide-manager/pending.json`。
 
 它不 import 六个组件中的任何一个，因此 panel 被禁用或损坏时，管理页仍能显示状态。
 
 ## 安装与测试
 
-本机 desktop 已安装并验证「指导」tab。Phase 1B 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
+本机 desktop 已安装并验证「指导」tab。Phase 2 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
 node guide-manager/test/core.test.mjs
@@ -122,11 +142,16 @@ node guide-manager/test/helper.test.mjs
   - admission 单项写入 `guide-admission disabled:true`；
   - goal 成对写入 `guide-goal-adapter disabled:true` 和 `goal-round-driver disabled:false`；
   - pending 成功删除，receipt 状态 `applied`。
+- 隔离 Host 的产物门禁实测：
+  - `dsh-subagent`、`cordis`、`goal-round-driver`、`client-modules`、`sidebar-right`、`workspace` 的哈希全部匹配；
+  - 缺少 `dsh-better-sidebar` 时记为 `unknown`，`host.artifacts.verified=null`，sidebar 启用被 `component-unsupported` / `sidebar-host-mismatch` 阻断；
+  - panel/admission/shield/goal 的启用门禁允许，但带 `host-version-unverified` 警告。
 - 该隔离 profile 没有安装官方 `dsh-better-sidebar` 和 `guide` skill，因此 sidebar 显示 `unsupported/package-unavailable`、skills 显示 `missing`；这是预期的降级。
 
 ## 边界
 
-- Phase 1B 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
+- Phase 2 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
+- 操作前门禁只阻断明确不兼容的组合；宿主版本、产物不可用、版本漂移作为警告，不把“未验证”伪称为“不兼容”。
 - UI 不自动运行 helper；helper 需要用户双击，因为它会关闭并重启 DSH。
 - 不复制官方包管理、安装或升级逻辑；这些留给后续阶段。
 - 冷切换写的是 profile patch，不修改 `package.json`、lockfile 或官方包。

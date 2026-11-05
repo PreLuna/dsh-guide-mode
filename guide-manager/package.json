@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Product manager for the DSH guidance mode components with phase-1B pending cold intents",
+  "description": "Product manager for the DSH guidance mode components with phase-2 compatibility gate",
   "exports": {
     ".": "./index.js",
     "./core": "./core.js",
@@ -39,7 +39,7 @@
     "product": "dsh-guide-mode",
     "release": "1.1.0",
     "readOnly": false,
-    "actionScope": "phase-1b",
+    "actionScope": "phase-2",
     "components": {
       "@local/dsh-guide-preset": {
         "component": "preset",
@@ -104,6 +104,36 @@
       "build": "be72761",
       "cordis": "4.0.5",
       "betterSidebar": "0.28.2"
+    },
+    "artifacts": {
+      "@deepseek-ai/dsh-subagent": {
+        "file": "lib/index.js",
+        "sha256": "9a9572e70fffdb100deb63326167f32bbf63016ce49c0017495dabcb95b44168"
+      },
+      "@deepseek-ai/cordis": {
+        "file": "lib/index.js",
+        "sha256": "6a9394c0877ff45218818c6e815edd038f8057e1a1deb390a8d43ec81c57691e"
+      },
+      "@deepseek-ai/dsh-goal-round-driver": {
+        "file": "lib/index.js",
+        "sha256": "255483fbf86bed0dac5f641d89684de1933695e2c034475b2fa3953ec7f1ff92"
+      },
+      "dsh-better-sidebar": {
+        "file": "lib/client.js",
+        "sha256": "dd93b4563f6fe3d384c0e8270fcf76656398ae358d18316a91aae4046bdf2432"
+      },
+      "@deepseek-ai/dsh-client-modules": {
+        "file": "lib/client.js",
+        "sha256": "426084f8672c26a469566a3f43c91a9b0d1dd73d0834028e553a6d0fa9cffa44"
+      },
+      "@deepseek-ai/dsh-client-ui-sidebar-right": {
+        "file": "lib/client.js",
+        "sha256": "87e13d16e47b9eb00f8f25096d2c674ebe71a31026161a10d7c89ad6e6dfe379"
+      },
+      "@deepseek-ai/dsh-client-ui-workspace": {
+        "file": "lib/client.js",
+        "sha256": "bafd2d6eea2f82674cc0606bec13fc891e44b42fb2ac973f01cb32c735d4062f"
+      }
     }
   },
   "license": "UNLICENSED"
