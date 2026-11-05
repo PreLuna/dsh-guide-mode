@@ -6,6 +6,8 @@
 
 截至 2026-11-05，`guide-manager` 已在工作区实现并登记到本机 desktop：官方插件页提供「指导」标签页，聚合六个组件、依赖边、宿主 BOM 和 `guide` skill 状态。Phase 2 在切换前跑兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚；Phase 4 接入 `@michengai/dsh-skills-manager` 的状态与“设置 → 技能”深链。Registry/tarball 升级仍由官方插件页负责。
 
+**2026-11-05：Phase 1–4 整体验收完成。** 20 个 Node 进程、manager 30 用例、隔离端到端（热切换、pending 准备/取消、skills 深链）及 live 三项冒烟均通过。Phase 5 技术上可进入，但当前建议暂缓；评估与进入条件见 [Phase 5 评估](docs/PHASE-5-ASSESSMENT.md)。
+
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。工作区在 1.1.0 基线上另有未发布的本地改动：自动归档默认关闭、专区改为混合分组，见 [CHANGELOG](CHANGELOG.md) 的 Unreleased。
 
 ## 使用
@@ -34,7 +36,7 @@
 | [guide-sidebar-adapter](guide-sidebar-adapter/README.md) | 官方 sidebar 的局部数据视图与原任务组件装饰 |
 | [guide-manager](guide-manager/README.md) | 产品管理页：六组件、依赖边、宿主 BOM/产物、`guide` skill 与 skills manager 深链；兼容门禁、热/冷切换、reload 与回滚 |
 
-本机 desktop 已登记六个运行组件与 `guide-manager`，官方 `dsh-better-sidebar` 保持 registry 版本 `0.28.2`。`guide-manager` 在 2026-11-05 的隔离 Host 中完成了 panel 热切换、admission pending 准备/取消和 goal 成对 patch 实测，并已登记到本机 desktop；其 BOM 写在自身 `package.json` 的 `dshGuide` 字段。最近一次核对：准入 active、`C/R/M=8/2/4`，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。证据见 [O19 生产部署](evidence/O19-production-2026-11-03/report.md) / [O2/R6 迁移](evidence/O2-R6-desktop-migration-2026-11-03/report.md) / [1.1.0 实施](evidence/O12-O21-engineering-2026-11-03/report.md)。
+本机 desktop 已登记六个运行组件与 `guide-manager`，官方 `dsh-better-sidebar` 保持 registry 版本 `0.28.2`。`guide-manager` 在 2026-11-05 完成四阶段整体验收：隔离 Host 的 panel 热切换、admission pending 准备/取消、goal 成对 patch、skills 深链，以及 live 的指导页、构建产物和技能管理页三项冒烟全部通过；其 BOM 写在自身 `package.json` 的 `dshGuide` 字段。最近一次核对：准入 active、`C/R/M=8/2/4`，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。证据见 [O19 生产部署](evidence/O19-production-2026-11-03/report.md) / [O2/R6 迁移](evidence/O2-R6-desktop-migration-2026-11-03/report.md) / [1.1.0 实施](evidence/O12-O21-engineering-2026-11-03/report.md)。
 
 生产代码不包含上游 driver、join 或任务组件副本；旧 fork 已提炼为 [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除。UI 的 label 前缀过滤和 goal 的可信 provider 身份是不同判据，不能互相替代。
 

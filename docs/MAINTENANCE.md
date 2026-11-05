@@ -1,6 +1,6 @@
 # 工程维护手册
 
-更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 4）、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 1–4，整体验收完成）、`private:true`、`UNLICENSED` 的私有维护期。Phase 5 暂缓，见 [评估](PHASE-5-ASSESSMENT.md)。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 1. 版本、基线与 CI
 
@@ -25,7 +25,7 @@
 | `guide-admission/` | 6 | 0.02 MB | ✅ | 原生 materialize 同步准入、容量／身份／按池快照 |
 | `guide-preset/` | 3 | 0.01 MB | ✅ | `guide` persona 与工具面 |
 | `guide-manager/` | 15 | 0.06 MB | ✅ | 官方插件页「指导」tab：六组件、依赖边、BOM/产物、skill；门禁、热/冷切换、reload 与 rollback helper |
-| `docs/` | 4 | 0.04 MB | ✅ | 架构、已定边界、维护、历史 |
+| `docs/` | 5 | 0.05 MB | ✅ | 架构、已定边界、维护、历史、Phase 5 评估 |
 | `scripts/` | 7 | 0.04 MB | ✅ | 维护入口脚本 |
 | `.github/workflows/test.yml` | 1 | 0 | ✅ | 最小 CI |
 | `evidence/` | 1827 | **72.1 MB** | ❌ | 本机原始验收证据 |

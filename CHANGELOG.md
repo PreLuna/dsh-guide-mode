@@ -8,6 +8,7 @@
 - Phase 2 adds per-component `enable`/`disable` gates and host artifact SHA-256 checks. Contract, required-artifact, dependency and unsupported/failed states block enabling; host-version, unknown-artifact and version drift are warnings; disabling stays available for recovery.
 - Phase 3 detects local `link:` source changes by comparing package mtime with Host start, offers a restart-only `reload-guide-manager.cmd`, and adds `rollback-guide-manager.cmd` for the newest cold-patch backup. Registry/tarball/git updates stay on the official Plugins page rather than duplicating its remove/install transaction.
 - Phase 4 reports `@michengai/dsh-skills-manager` presence/version and links to the official Settings → Skills section without copying its install/disable logic. A non-ready `guide` skill becomes a compatibility-gate warning, never a hard block.
+- Mark Phases 1–4 accepted after the 2026-11-05 live smoke (guide page, build artifacts, skills page). Phase 5 is feasible but deferred pending a distribution/version-coupling decision; see `docs/PHASE-5-ASSESSMENT.md`.
 - Prepare a private GitHub repository and commit-based local snapshots; public and marketplace distribution remain deferred, with private metadata unchanged.
 - Summarize retired fork, duplicate archive documents, deferred research plans and one-off deployment scripts in `docs/HISTORY-AND-MAINTENANCE-NOTES.md`, then remove those obsolete files while preserving active tests and recovery dependencies.
 
