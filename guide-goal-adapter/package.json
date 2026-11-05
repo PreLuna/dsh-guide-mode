@@ -22,5 +22,9 @@
       "patch": "./cordis.patch.yml"
     }
   },
+  "dshGuide": {
+    "component": "goal",
+    "contract": 1
+  },
   "license": "UNLICENSED"
 }

@@ -29,5 +29,9 @@
       "patch": "./cordis.patch.yml"
     }
   },
+  "dshGuide": {
+    "component": "shield",
+    "contract": 1
+  },
   "license": "UNLICENSED"
 }

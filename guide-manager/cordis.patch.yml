@@ -1,0 +1,4 @@
+# Read-only product manager. It never writes the profile or package files.
+- insert:
+    - id: guide-manager
+      name: '@local/dsh-guide-manager'

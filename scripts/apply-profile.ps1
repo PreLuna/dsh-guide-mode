@@ -1,4 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$Plan,[switch]$Restore)
+if($PSVersionTable.PSVersion.Major -lt 7){throw 'apply-profile.ps1 requires PowerShell 7 (pwsh). Run it with: pwsh -NoProfile -ExecutionPolicy Bypass -File <this script> -Plan <plan.json>'}
 $ErrorActionPreference='Stop'
 $planPath=[IO.Path]::GetFullPath($Plan)
 $output=Split-Path -Parent $planPath

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..')
-const packages=['guide-preset','guide-shield','guide-admission','guide-panel','guide-sidebar-adapter','guide-goal-adapter']
+const packages=['guide-preset','guide-shield','guide-admission','guide-panel','guide-sidebar-adapter','guide-goal-adapter','guide-manager']
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
 const args=process.argv.slice(2),option=name=>{const i=args.indexOf(name);return i<0?undefined:args[i+1]}
 const command=args[0]??'doctor'

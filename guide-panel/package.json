@@ -41,5 +41,9 @@
       "inject": []
     }
   },
+  "dshGuide": {
+    "component": "panel",
+    "contract": 1
+  },
   "license": "UNLICENSED"
 }

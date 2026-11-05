@@ -1,0 +1,106 @@
+{
+  "name": "@local/dsh-guide-manager",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only product manager for the DSH guidance mode components",
+  "exports": {
+    ".": "./index.js",
+    "./core": "./core.js",
+    "./client": "./client.js"
+  },
+  "files": [
+    "index.js",
+    "core.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.5",
+    "@deepseek-ai/dsh-plugin-manager": "0.2.1-rc.3",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.1-rc.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-plugin-manager"
+      ]
+    }
+  },
+  "dshGuide": {
+    "product": "dsh-guide-mode",
+    "release": "1.1.0",
+    "readOnly": true,
+    "components": {
+      "@local/dsh-guide-preset": {
+        "component": "preset",
+        "contract": 1,
+        "version": "1.1.0"
+      },
+      "@local/dsh-guide-shield": {
+        "component": "shield",
+        "contract": 1,
+        "version": "1.1.0"
+      },
+      "@local/dsh-guide-admission": {
+        "component": "admission",
+        "contract": 1,
+        "version": "1.1.0"
+      },
+      "@local/dsh-guide-panel": {
+        "component": "panel",
+        "contract": 1,
+        "version": "1.1.0"
+      },
+      "@local/dsh-guide-sidebar-adapter": {
+        "component": "sidebar",
+        "contract": 1,
+        "version": "1.1.0"
+      },
+      "@local/dsh-guide-goal-adapter": {
+        "component": "goal",
+        "contract": 1,
+        "version": "1.1.0"
+      }
+    },
+    "edges": [
+      {
+        "from": "panel",
+        "to": "preset",
+        "optional": false
+      },
+      {
+        "from": "panel",
+        "to": "admission",
+        "optional": false
+      },
+      {
+        "from": "panel",
+        "to": "shield",
+        "optional": false
+      },
+      {
+        "from": "panel",
+        "to": "sidebar",
+        "optional": true
+      },
+      {
+        "from": "goal",
+        "to": "@deepseek-ai/dsh-goal-round-driver",
+        "optional": false
+      }
+    ],
+    "host": {
+      "dsh": "0.2.1-rc.3",
+      "build": "be72761",
+      "cordis": "4.0.5",
+      "betterSidebar": "0.28.2"
+    }
+  },
+  "license": "UNLICENSED"
+}

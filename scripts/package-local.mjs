@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const packages = ['guide-preset', 'guide-shield', 'guide-admission', 'guide-panel', 'guide-sidebar-adapter', 'guide-goal-adapter']
+const packages = ['guide-preset', 'guide-shield', 'guide-admission', 'guide-panel', 'guide-sidebar-adapter', 'guide-goal-adapter', 'guide-manager']
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true }).trim()
 if (git(['status', '--porcelain'])) throw Error('Commit the reviewed workspace before packaging; a snapshot must have an exact source commit.')
 const commit = git(['rev-parse', 'HEAD'])

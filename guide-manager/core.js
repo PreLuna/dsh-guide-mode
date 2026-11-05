@@ -1,0 +1,256 @@
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
+/**
+ * Pure status model for the read-only manager. Nothing in this file starts a
+ * plugin, writes a file, or imports a managed component: tests can exercise it
+ * with plain fixtures, and the Host half can keep reporting when one of the
+ * components it describes is disabled or broken.
+ */
+
+export const COMPONENTS = [
+  { key: 'panel', package: '@local/dsh-guide-panel', service: 'guidePanelCompatibility', state: 'getState', order: 10 },
+  { key: 'admission', package: '@local/dsh-guide-admission', service: 'guideAdmission', state: 'state', order: 20 },
+  { key: 'shield', package: '@local/dsh-guide-shield', service: 'guideSettlementShield', state: 'getState', order: 30 },
+  { key: 'preset', package: '@local/dsh-guide-preset', service: null, state: null, order: 40 },
+  { key: 'sidebar', package: '@local/dsh-guide-sidebar-adapter', service: 'guideSidebarHost', state: 'getState', order: 50 },
+  { key: 'goal', package: '@local/dsh-guide-goal-adapter', service: 'guideGoalAdapter', state: 'getState', order: 60 },
+]
+
+const READY = new Set(['ready', 'ready-unverified'])
+
+/** SHA-256 of a UTF-8 string, used for the skill file fingerprint. */
+export function sha256(text) {
+  return createHash('sha256').update(text).digest('hex')
+}
+
+/**
+ * Derive one component's status from installed/bundle/row/service facts.
+ * Version drift and an unverified host build are warnings, not failures: the
+ * user may run a technically compatible combination whose exact versions are
+ * outside the verified set.
+ */
+export function componentStatus({
+  installed = false,
+  bundleError = null,
+  bundleEnabled = false,
+  rows = [],
+  service = null,
+  expectedVersion = null,
+  actualVersion = null,
+  expectedContract = null,
+  actualContract = null,
+  hostVerified = null,
+} = {}) {
+  const versionMatch = expectedVersion == null ? null : actualVersion === expectedVersion
+  const contractMatch = expectedContract == null ? null : actualContract === expectedContract
+  const base = { versionMatch, contractMatch }
+  const at = (status, reason = null, extra = {}) => ({ status, reason, ...base, ...extra })
+
+  if (!installed) return at('missing', 'not-installed')
+  if (bundleError) return at('incompatible', bundleError.code ?? bundleError.reason ?? 'bundle-error', { bundleError })
+  if (bundleEnabled === null) return at('unknown', 'enablement-unknown')
+  if (bundleEnabled !== true) return at('disabled', 'bundle-disabled')
+  if (rows.length > 0 && !rows.some((row) => row.enabled === true)) return at('disabled', 'row-disabled')
+  if (rows.some((row) => row.fiberPhase === 'failed')) return at('failed', 'fiber-failed')
+
+  if (service !== null) {
+    if (service.available === false) return at('degraded', 'service-unavailable')
+    if (service.error) return at('degraded', 'service-error', { serviceError: service.error })
+    const state = service.state
+    if (state === null || state === undefined) return at('degraded', 'service-state-unavailable')
+    if (state.supported === false || state.mode === 'unsupported') return at('unsupported', state.reason ?? 'service-unsupported')
+    if (state.mode === 'partial' || state.mode === 'degraded' || state.mode === 'off' || state.writable === false) {
+      return at('degraded', state.reason ?? `service-${state.mode}`)
+    }
+    if (state.mode === 'native') return at('degraded', state.reason ?? 'native-fallback')
+    if (state.mode === 'starting' || state.mode === 'reconciling') return at('unknown', state.reason ?? `service-${state.mode}`)
+  }
+
+  const reasons = []
+  if (versionMatch === false) reasons.push('installed-version-differs')
+  if (contractMatch === false) reasons.push(actualContract == null ? 'contract-undeclared' : 'contract-version-differs')
+  if (hostVerified === false) reasons.push('host-build-unverified')
+  if (reasons.length > 0) return at('ready-unverified', reasons.join(','))
+  return at('ready')
+}
+
+/** Compare the running host identity with the manager's verified host set. */
+export function hostStatus(actual = {}, expected = {}) {
+  const field = (value) => {
+    if (typeof value === 'string') return { version: value, commit: null }
+    if (value !== null && typeof value === 'object') return { version: value.version ?? null, commit: value.commit ?? null }
+    return { version: null, commit: null }
+  }
+  const dsh = field(actual.dsh)
+  const cordis = field(actual.cordis)
+  const betterSidebar = field(actual.betterSidebar)
+  const dshMatch = expected.dsh == null ? null : dsh.version === expected.dsh
+  const buildMatch = expected.build == null ? null : dsh.commit == null ? null : dsh.commit.startsWith(expected.build)
+  const cordisMatch = expected.cordis == null ? null : cordis.version === expected.cordis
+  const sidebarMatch = expected.betterSidebar == null ? null : betterSidebar.version === expected.betterSidebar
+  const checked = [dshMatch, cordisMatch, sidebarMatch].filter((value) => value !== null)
+  const buildChecked = expected.build == null ? [] : [buildMatch === true]
+  const verified = checked.length === 0 && buildChecked.length === 0
+    ? null
+    : [...checked, ...buildChecked].every((value) => value === true)
+  return {
+    dsh: { expected: expected.dsh ?? null, actual: dsh.version, commit: dsh.commit, match: dshMatch, buildExpected: expected.build ?? null, buildMatch },
+    cordis: { expected: expected.cordis ?? null, actual: cordis.version, match: cordisMatch },
+    betterSidebar: { expected: expected.betterSidebar ?? null, actual: betterSidebar.version, match: sidebarMatch },
+    verified,
+  }
+}
+
+/** Derive the cross-component edges. The goal edge is a mutual exclusion. */
+export function buildEdges(components = [], edgeDefs = [], rows = []) {
+  const byKey = new Map(components.map((component) => [component.key, component]))
+  return edgeDefs.map((edge) => {
+    const base = { from: edge.from, to: edge.to, optional: edge.optional === true }
+    const from = byKey.get(edge.from)
+    if (from === undefined || !READY.has(from.status)) {
+      return { ...base, status: 'inactive', reason: `source-${from?.status ?? 'unknown'}` }
+    }
+    if (typeof edge.to === 'string' && edge.to.startsWith('@')) {
+      const driverRows = rows.filter((row) => row.moduleName === edge.to)
+      const driverEnabled = driverRows.some((row) => row.enabled === true)
+      const adapterEnabled = from.rows?.length
+        ? from.rows.some((row) => row.enabled === true)
+        : from.bundleEnabled === true
+      if (adapterEnabled && driverEnabled) return { ...base, status: 'conflict', reason: 'both-driver-and-adapter-enabled' }
+      if (adapterEnabled && !driverEnabled) return { ...base, status: 'ready', reason: 'adapter-owns-driver' }
+      if (!adapterEnabled && driverEnabled) return { ...base, status: 'native', reason: 'original-driver-enabled' }
+      return { ...base, status: 'blocked', reason: 'neither-driver-nor-adapter-enabled' }
+    }
+    const to = byKey.get(edge.to)
+    if (to === undefined) return { ...base, status: 'unknown', reason: 'target-unknown' }
+    if (to.status === 'missing' || to.status === 'disabled') {
+      return { ...base, status: edge.optional === true ? 'optional-absent' : 'degraded', reason: `target-${to.status}` }
+    }
+    if (to.status === 'unsupported' || to.status === 'failed' || to.status === 'incompatible') {
+      return { ...base, status: 'degraded', reason: `target-${to.status}` }
+    }
+    return { ...base, status: 'ready', reason: to.status === 'ready-unverified' ? 'target-unverified' : null }
+  })
+}
+
+function walkFiles(directory, result) {
+  let entries
+  try {
+    entries = readdirSync(directory, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (result.files >= 1000) return
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) walkFiles(path, result)
+    else if (entry.isFile()) {
+      result.files += 1
+      try {
+        result.bytes += statSync(path).size
+      } catch {
+        // A file that disappears during the read still counts as seen.
+      }
+    }
+  }
+}
+
+function readSkillsData(home) {
+  const directory = join(home, 'skills-guide')
+  const exists = existsSync(directory)
+  const result = { path: directory, present: exists, files: 0, bytes: 0, routes: existsSync(join(directory, '02-routes.md')) }
+  if (exists) walkFiles(directory, result)
+  return result
+}
+
+function readSkillsManagerState(path) {
+  if (!existsSync(path)) return null
+  try {
+    const doc = JSON.parse(readFileSync(path, 'utf8'))
+    const disabledList = doc?.disabledSkills?.dsh
+    return { disabled: Array.isArray(disabledList) && disabledList.includes('guide'), sources: doc?.sources ?? null }
+  } catch (error) {
+    return { disabled: null, error: String(error.message ?? error) }
+  }
+}
+
+/** Parse the small YAML frontmatter block used by SKILL.md files. */
+export function parseSkillFrontmatter(text) {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
+  if (match === null) return {}
+  const result = {}
+  for (const line of match[1].split(/\r?\n/)) {
+    const separator = line.indexOf(':')
+    if (separator <= 0) continue
+    const key = line.slice(0, separator).trim()
+    let value = line.slice(separator + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+    if (key !== '') result[key] = value
+  }
+  return result
+}
+
+/** Read the human version line from the guide skill body, when present. */
+export function skillVersion(text) {
+  const match = /(?:^|\n)>\s*版本[:：]\s*(v?[0-9][^\s·]*)/.exec(text)
+    ?? /版本[:：]\s*(v?[0-9][^\s·]*)/.exec(text)
+  return match?.[1] ?? null
+}
+
+/**
+ * Read the guide skill and the local routing data it depends on. The skill is
+ * user-level ($DSH_HOME/skills), not profile-level, and the skills manager owns
+ * its disable state; this only reports facts and never writes them.
+ */
+export function readSkillsState(home) {
+  if (typeof home !== 'string' || home === '') {
+    return { status: 'unknown', reason: 'home-unavailable', present: false, disabled: null, data: null }
+  }
+  const path = join(home, 'skills', 'guide', 'SKILL.md')
+  const statePath = join(home, 'skills-manager', 'state.json')
+  const present = existsSync(path)
+  let text = null
+  let error = null
+  if (present) {
+    try {
+      text = readFileSync(path, 'utf8')
+    } catch (reason) {
+      error = String(reason.message ?? reason)
+    }
+  }
+  const data = readSkillsData(home)
+  const state = readSkillsManagerState(statePath)
+  const disabled = state?.disabled ?? null
+  let status = 'ready'
+  let reason = null
+  if (!present) {
+    status = 'missing'
+    reason = 'skill-file-missing'
+  } else if (error !== null) {
+    status = 'degraded'
+    reason = 'skill-file-unreadable'
+  } else if (disabled === true) {
+    status = 'disabled'
+    reason = 'disabled-by-skills-manager'
+  } else if (!data.present || !data.routes) {
+    status = 'degraded'
+    reason = data.present ? 'missing-02-routes' : 'missing-skills-guide-data'
+  }
+  return {
+    status,
+    reason,
+    present,
+    path,
+    error,
+    version: text === null ? null : skillVersion(text),
+    hash: text === null ? null : sha256(text),
+    frontmatter: text === null ? null : parseSkillFrontmatter(text),
+    disabled,
+    data,
+    statePath,
+    statePresent: state !== null,
+    state,
+  }
+}

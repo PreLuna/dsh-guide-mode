@@ -10,6 +10,8 @@
   },
   "license": "UNLICENSED",
   "dshGuide": {
+    "component": "preset",
+    "contract": 1,
     "externalSkills": [
       "guide"
     ],

@@ -52,6 +52,10 @@ panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 
 
 核心服务采用冷更新，panel HMR 不卸载它；服务自身卸载/重载不承诺连续执法。未知源码/函数/形状或方法所有权变化报告 unsupported，不能声称所有原生入口仍受策略保护。生产隔离验收与实际 desktop 冷部署通过，见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
 
+## guide-manager（只读 MVP）
+
+[guide-manager](../guide-manager/README.md) 是独立 Host + client bundle，不 import 六个组件。Host 半边从官方 `pluginManager.listPlugins()`/`listBundles()`（不可用时降级读 profile 清单）、组件自己的可选 state 服务和 `$DSH_HOME` 下的 skill 文件聚合状态，经 `/guide-manager/api/state` 暴露；client 半边在官方插件页注册 `plugins.tab`「指导」标签页。它只读，不写 profile、包或 skill；状态区分 `ready`、`ready-unverified`、`degraded`、`unsupported`、`failed`、`disabled`、`missing`、`unknown`，并把 version/contract/host 漂移显示为未验证而不是不兼容。
+
 ## O21 契约与维护边界
 
 1.1.0 先核对官方 subagent/Cordis 及右栏/workspace 客户端产物，Host 检查必需服务/方法，客户端检查原生注册、保存 tab inventory 和主视图 selection。`/guide/api/state` 暴露 panelCompat，未知或缺失时只读/不可用并拒绝创建和自动归档；不挂半套 provider/tab。shield 独立预检，不支持时不声称 inject 防护 active。官方同步身份读取已 deprecated，当前按固定产物受控使用并公开诊断；升级与核心重载遵循冷更新，见 [维护手册](MAINTENANCE.md)。

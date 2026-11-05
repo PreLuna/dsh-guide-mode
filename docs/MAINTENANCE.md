@@ -1,10 +1,10 @@
 # 工程维护手册
 
-更新：2026-11-04（Asia/Shanghai）。适用于本机六包 1.1.0、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-04（Asia/Shanghai）。适用于本机六个运行组件 + 只读 `guide-manager` 1.1.0、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 1. 版本、基线与 CI
 
-一个工作区 Git 仓库管理六个自有包、当前文档与测试。六包同版本；内部 peer 锁定同版本。
+一个工作区 Git 仓库管理七个自有包（六个运行组件 + 只读 manager）、当前文档与测试。七个包同版本；内部 peer 锁定同版本。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。peer 范围收窄到该基线，不表示其他版本一定有缺陷。
 
@@ -24,6 +24,7 @@
 | `guide-shield/` | 8 | 0.03 MB | ✅ | 独立 Host 结算防护；`contracts.js` 记契约哈希 |
 | `guide-admission/` | 6 | 0.02 MB | ✅ | 原生 materialize 同步准入、容量／身份／按池快照 |
 | `guide-preset/` | 3 | 0.01 MB | ✅ | `guide` persona 与工具面 |
+| `guide-manager/` | 9 | 0.05 MB | ✅ | 官方插件页只读「指导」tab：六组件、依赖边、宿主 BOM、skill 状态 |
 | `docs/` | 4 | 0.04 MB | ✅ | 架构、已定边界、维护、历史 |
 | `scripts/` | 7 | 0.04 MB | ✅ | 维护入口脚本 |
 | `.github/workflows/test.yml` | 1 | 0 | ✅ | 最小 CI |
@@ -41,10 +42,12 @@
 2. 在隔离副本修改，运行 Node、真实 Host 与浏览器回归。运行中的生产 junction 指向工作区，**禁止先直接覆盖源码再等停机**。
 3. 选择新的证据目录，停止目标 profile 的 Host；其他独立 profile 不应被停止。保存原源码、profile、生成物和前后哈希。
 4. `node scripts/workspace.mjs prepare --mode install --output <新的目录>`；可用 `--profile <绝对路径>` 指定目标。
-5. 审阅计划后执行 `./scripts/apply-profile.ps1 -Plan <目录>/plan.json`。脚本再核对停机、来源 junction、候选哈希与其他配置；保留 registry 图，失败恢复已改文件及原链接状态。
-6. 完整卸载：先 `prepare --mode uninstall`，再 apply。仅移除六个自有依赖、bundle、lock importer 和经核对的 junction；保留官方包、工作区、会话、localStorage 和证据。若有自有 profile override，先准备明确移除方案，不能遗留可执行孤立条目。
-7. 回退同一操作：停 Host 后 `./scripts/apply-profile.ps1 -Plan <目录>/plan.json -Restore`。代码版本必须和 profile 选择**成对**回退；profile 工具不擅自覆盖源码。
+5. 审阅计划后执行 `pwsh -NoProfile -File ./scripts/apply-profile.ps1 -Plan <目录>/plan.json`。脚本再核对停机、来源 junction、候选哈希与其他配置；保留 registry 图，失败恢复已改文件及原链接状态。
+6. 完整卸载：先 `prepare --mode uninstall`，再 apply。仅移除七个自有依赖、bundle、lock importer 和经核对的 junction；保留官方包、工作区、会话、localStorage 和证据。若有自有 profile override，先准备明确移除方案，不能遗留可执行孤立条目。
+7. 回退同一操作：停 Host 后 `pwsh -NoProfile -File ./scripts/apply-profile.ps1 -Plan <目录>/plan.json -Restore`。代码版本必须和 profile 选择**成对**回退；profile 工具不擅自覆盖源码。
 8. 冷启动检查 `/guide/api/state` 的 `panelCompat.mode=ready`、准入 active、shield active、goal/sidebar 支持状态，并在正常 UI 确认组件运行。升级不自动重发用户问题或恢复 goal。
+
+> 本仓库的 `.ps1` 维护/安装脚本要求 PowerShell 7（`pwsh`）；Windows PowerShell 5.1 不支持 `ConvertFrom-Json -AsHashtable` 和覆盖式 `[IO.File]::Move`。`apply-profile.ps1` 会在版本不足时先给出明确提示。
 
 完整卸载后已有指导日志仍保留，但其 guide preset/provider 不再可用；不把卸载当作删除对话。
 
@@ -54,6 +57,7 @@
 - **goal**：原 driver 产物、waitForChildren/join 函数与独占调度入口。
 - **sidebar**：官方 client、client-modules、Cordis、树/图/计数/auto-open 与注册的存活/卸载行为。
 - **panel/shield**：官方 descriptor fold、自身 inheritedEventCount + first-wins、deprecated snapshotEvents 同步读；Host 必需服务/方法，以及 sidebarRight/slots/uiWorkspace 原生客户端形状。契约源哈希在 `guide-shield/contracts.js`。
+- **manager**：官方 `pluginManager` 的 `listPlugins`/`listBundles`、Plugins 页 `plugins.tab` slot、`dshGuide` BOM 字段与 `$DSH_HOME` skill 状态；缺失时只读/降级，不写 profile。
 - **O6**：tools/register、精确注册层、来源 runtime/execute 指针及现有五个源码哈希。**不能只改哈希让预检通过。**
 
 不支持时明确显示不可用/只读，阻止新指导与自动归档，建议重启或恢复已支持版本；不注册半套 provider。缺少客户端注册必需形状时不挂半套 tab，并提供 `guidePanelClientCompatibility` 诊断。已有对话仍可从宿主原生入口查看。
@@ -65,7 +69,7 @@
 3. 在隔离 profile 运行 `npm test`、`build:check`、`doctor`。
 4. 运行真实 Host、真实 Runtime、浏览器回归；保存新证据目录。
 5. 停 Host，冷更新准入/shield 核心；**不要用 HMR 代替**。
-6. 检查 `/guide/api/state`：`panelCompat`、`guideAdmission`、`settlementShield`、`modelProjection`、`goalAdapter`。
+6. 检查 `/guide/api/state`：`panelCompat`、`guideAdmission`、`settlementShield`、`modelProjection`、`goalAdapter`；检查 `/guide-manager/api/state` 的组件状态与 BOM。
 7. 保存回滚组合；失败则停在旧基线。
 8. 不在未重验的情况下只改 pin。
 
@@ -75,7 +79,7 @@ panel HMR 的既有保护回归保留；准入和 shield 核心更新采用冷�
 
 ## 5. 仓库范围与本地打包
 
-仓库收录六个自有包、可重复构建的源码与生成物、确定性测试、当前文档和 GitHub Actions。**不入库**：运行 profile、用户会话、凭据、官方包缓存、原始 evidence、旧 fork、Python 缓存与本地产物。个人机器路径出现在历史说明或默认诊断中，不等于发布的安装路径。
+仓库收录七个自有包、可重复构建的源码与生成物、确定性测试、当前文档和 GitHub Actions。**不入库**：运行 profile、用户会话、凭据、官方包缓存、原始 evidence、旧 fork、Python 缓存与本地产物。个人机器路径出现在历史说明或默认诊断中，不等于发布的安装路径。
 
 打包：
 
@@ -114,7 +118,7 @@ tgz 从 Git ZIP 解出的提交字节生成，避免 Windows 工作树换行转�
 ```powershell
 npm test                 # 无需安装 DSH 的回归
 npm run repo:check       # 入库边界 + 文档链接
-npm run doctor           # 六包元数据与 guide skill
+npm run doctor           # 七包元数据与 guide skill
 npm run build:check      # client.js 生成物一致性
 npm run pack:local       # 重建 dist/ 离线快照
 ```

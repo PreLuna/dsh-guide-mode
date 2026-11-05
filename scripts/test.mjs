@@ -4,7 +4,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..')
 const paths=['guide-sidebar-adapter/scripts/build.mjs --check']
-for(const dir of ['guide-panel','guide-admission','guide-sidebar-adapter'])for(const name of readdirSync(resolve(root,dir,'test'))){
+for(const dir of ['guide-panel','guide-admission','guide-sidebar-adapter','guide-manager'])for(const name of readdirSync(resolve(root,dir,'test'))){
   if(!name.endsWith('.test.mjs')||['projection-runtime.test.mjs','official-consumers.test.mjs'].includes(name))continue
   paths.push(`${dir}/test/${name}`)
 }

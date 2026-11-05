@@ -35,5 +35,9 @@
       ]
     }
   },
+  "dshGuide": {
+    "component": "sidebar",
+    "contract": 1
+  },
   "license": "UNLICENSED"
 }
