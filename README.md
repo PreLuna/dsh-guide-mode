@@ -4,7 +4,7 @@
 
 截至 2026-11-04，两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。当前版本 `1.1.0`，先以私有 GitHub 仓库维护，市场／公开源码发布待稳定后另行决定。当前保留 `private:true`、`UNLICENSED`。
 
-截至 2026-11-05，`guide-manager` 已在工作区实现并登记到本机 desktop：官方插件页提供「指导」标签页，聚合六个组件、依赖边、宿主 BOM 和 `guide` skill 状态。Phase 2 在切换前跑兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚。Registry/tarball 升级仍由官方插件页负责。
+截至 2026-11-05，`guide-manager` 已在工作区实现并登记到本机 desktop：官方插件页提供「指导」标签页，聚合六个组件、依赖边、宿主 BOM 和 `guide` skill 状态。Phase 2 在切换前跑兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚；Phase 4 接入 `@michengai/dsh-skills-manager` 的状态与“设置 → 技能”深链。Registry/tarball 升级仍由官方插件页负责。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。工作区在 1.1.0 基线上另有未发布的本地改动：自动归档默认关闭、专区改为混合分组，见 [CHANGELOG](CHANGELOG.md) 的 Unreleased。
 
@@ -32,7 +32,7 @@
 | [guide-preset](guide-preset/README.md) | `guide` persona 与工具面；外部用户级 guide skill 缺失时明确降级 |
 | [guide-goal-adapter](guide-goal-adapter/README.md) | 在私有 subagents 作用域复用原 driver/join |
 | [guide-sidebar-adapter](guide-sidebar-adapter/README.md) | 官方 sidebar 的局部数据视图与原任务组件装饰 |
-| [guide-manager](guide-manager/README.md) | 产品管理页：六组件、依赖边、宿主 BOM/产物、`guide` skill；兼容门禁、热/冷切换、本地源码 reload 与冷切换回滚 |
+| [guide-manager](guide-manager/README.md) | 产品管理页：六组件、依赖边、宿主 BOM/产物、`guide` skill 与 skills manager 深链；兼容门禁、热/冷切换、reload 与回滚 |
 
 本机 desktop 已登记六个运行组件与 `guide-manager`，官方 `dsh-better-sidebar` 保持 registry 版本 `0.28.2`。`guide-manager` 在 2026-11-05 的隔离 Host 中完成了 panel 热切换、admission pending 准备/取消和 goal 成对 patch 实测，并已登记到本机 desktop；其 BOM 写在自身 `package.json` 的 `dshGuide` 字段。最近一次核对：准入 active、`C/R/M=8/2/4`，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。证据见 [O19 生产部署](evidence/O19-production-2026-11-03/report.md) / [O2/R6 迁移](evidence/O2-R6-desktop-migration-2026-11-03/report.md) / [1.1.0 实施](evidence/O12-O21-engineering-2026-11-03/report.md)。
 
@@ -53,7 +53,7 @@
 | 归档 | 阻止模型执行；其他原生 UI 可能仍允许点开/输入，用户已接受；自动归档默认关闭 |
 | 嵌套指导 | v1 不专门支持，保留默认 depth 限制 |
 | 版本变化 | 未知 driver/join/sidebar/tool 来源回退明确状态；完整面板预检见 O21 |
-| 管理页 | Phase 3：兼容门禁；panel/sidebar 热切换；admission/shield/goal pending 冷切换；本地 link 源码变更检测 + reload；冷切换 patch 回滚；registry/tarball 升级走官方插件页 |
+| 管理页 | Phase 4：兼容门禁；panel/sidebar 热切换；admission/shield/goal pending 冷切换；本地 link 源码变更检测 + reload；冷切换 patch 回滚；skills manager 状态/深链；registry/tarball 升级走官方插件页 |
 
 ## 配置
 

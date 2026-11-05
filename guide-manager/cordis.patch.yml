@@ -1,6 +1,6 @@
-# Product manager. Phase 3 gates actions against contracts/artifacts, reloads
-# changed local links, rolls back cold-patch backups, and stages
-# admission/shield/goal intents. The manager never writes the profile itself.
+# Product manager. Phase 4 gates actions, reloads changed local links, rolls
+# back cold-patch backups, stages admission/shield/goal intents, and links to
+# the official skills manager settings. The manager never writes the profile.
 - insert:
     - id: guide-manager
       name: '@local/dsh-guide-manager'

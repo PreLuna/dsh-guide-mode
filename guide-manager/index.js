@@ -274,7 +274,7 @@ function readBackups(profileContext) {
   return { count: items.length, latest: items[0] ?? null }
 }
 
-function collectComponents(ctx, pluginData, guide, profileContext, host, pendingByComponent = new Map(), dependencies = {}) {
+function collectComponents(ctx, pluginData, guide, profileContext, host, pendingByComponent = new Map(), dependencies = {}, skills = null) {
   const definitions = guide.components ?? {}
   const components = [...COMPONENTS].sort((a, b) => a.order - b.order).map((component) => {
     const bundle = pluginData.bundles.find((item) => item.name === component.package) ?? null
@@ -350,7 +350,7 @@ function collectComponents(ctx, pluginData, guide, profileContext, host, pending
     }
   })
   for (const component of components) {
-    component.action = actionForComponent(component, components, host)
+    component.action = actionForComponent(component, components, host, skills)
     component.pending = pendingByComponent.get(component.key) ?? null
   }
   return components
@@ -469,16 +469,28 @@ async function collectState(ctx, config = {}) {
     : readArtifactState(ctx, profileContext, bom.guide.artifacts ?? {})
   const pluginData = await readPluginData(ctx, profileContext)
   const pending = pendingView(profileContext)
-  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host, pending.byComponent, profileManifest?.dependencies ?? {})
-  const edges = buildEdges(components, bom.guide.edges ?? [], pluginData.rows)
   const skills = readSkillsState(profileContext?.home)
+  const skillsManagerName = '@michengai/dsh-skills-manager'
+  const skillsManagerInfo = readPackageManifest(ctx, skillsManagerName, profileContext)
+  const skillsManagerSpec = typeof profileManifest?.dependencies?.[skillsManagerName] === 'string'
+    ? profileManifest.dependencies[skillsManagerName]
+    : null
+  skills.manager = {
+    name: skillsManagerName,
+    spec: skillsManagerSpec,
+    installed: skillsManagerSpec !== null || skillsManagerInfo !== null,
+    version: skillsManagerInfo?.version ?? null,
+    path: skillsManagerInfo?.path ?? null,
+  }
+  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host, pending.byComponent, profileManifest?.dependencies ?? {}, skills)
+  const edges = buildEdges(components, bom.guide.edges ?? [], pluginData.rows)
   const manager = checkManager(ctx)
   const backups = readBackups(profileContext)
   const state = {
     product: bom.guide.product ?? 'dsh-guide-mode',
     release: bom.guide.release ?? bom.manifest.version ?? null,
     readOnly: false,
-    actionScope: 'phase-3',
+    actionScope: 'phase-4',
     manager: { ...manager, version: bom.manifest.version ?? null, action: MANAGER_ACTION },
     profile: {
       name: profileContext?.name ?? null,
@@ -704,7 +716,7 @@ async function handle(injected, getState, setEnabled, req, res) {
     return
   }
   if (pathname === `${ROUTE_PREFIX}/ping`) {
-    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-3' } })
+    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-4' } })
     return
   }
   if (pathname !== `${ROUTE_PREFIX}/state`) {
@@ -723,7 +735,7 @@ export const name = 'guide-manager'
 export async function apply(ctx, config = {}) {
   const getState = () => collectState(ctx, config)
   const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled, config)
-  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-3' })
+  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-4' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
     const connection = serviceOf(injected, 'connection')
@@ -734,6 +746,6 @@ export async function apply(ctx, config = {}) {
       handler: (req, res) => {
         void handle(injected, getState, setEnabled, req, res)
       },
-    }), 'guide-manager: status and phase-3 action route')
+    }), 'guide-manager: status and phase-4 action route')
   })
 }

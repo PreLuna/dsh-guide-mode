@@ -317,6 +317,10 @@ test('action gate blocks hard incompatibilities but allows disabling for recover
   assert.equal(warningOnly.allowed, true)
   assert.ok(warningOnly.warnings.some((item) => item.code === 'host-version-unverified'))
   assert.ok(ARTIFACT_REQUIREMENTS.goal.includes('@deepseek-ai/dsh-goal-round-driver'))
+
+  const skillWarning = actionGate(admission, [admission], {}, true, { status: 'missing', reason: 'skill-file-missing' })
+  assert.equal(skillWarning.allowed, true)
+  assert.ok(skillWarning.warnings.some((item) => item.code === 'skill-not-ready'))
 })
 
 test('dependency sources select local reload or the official package manager', () => {

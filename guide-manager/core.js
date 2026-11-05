@@ -106,7 +106,7 @@ export function dependencyBlockers(component, components = []) {
  * disabling stays available for recovery. Version/build/version drift are
  * warnings unless a required artifact is known to be wrong.
  */
-export function actionGate(component, components = [], host = null, enabled = false) {
+export function actionGate(component, components = [], host = null, enabled = false, skills = null) {
   const blockers = []
   const warnings = []
   if (enabled) {
@@ -136,6 +136,9 @@ export function actionGate(component, components = [], host = null, enabled = fa
     if (component.versionMatch === false) warnings.push({ code: 'version-drift' })
     if (component.contractMatch === null) warnings.push({ code: 'contract-unknown' })
     if (component.status === 'degraded') warnings.push({ code: 'component-degraded' })
+    if (skills !== null && skills?.status !== 'ready') {
+      warnings.push({ code: 'skill-not-ready', status: skills?.status ?? 'unknown', reason: skills?.reason ?? null })
+    }
   } else if (host?.artifacts?.checked === true && host.artifacts.verified === false) {
     warnings.push({ code: 'host-artifacts-unverified' })
   }
@@ -147,14 +150,14 @@ export function actionGate(component, components = [], host = null, enabled = fa
  * cross-component requirements. `canToggle` is the final gate the Host checks
  * again before it calls the official pluginManager.
  */
-export function actionForComponent(component, components = [], host = null) {
+export function actionForComponent(component, components = [], host = null, skills = null) {
   const base = ACTION_POLICIES[component?.key] ?? { policy: 'locked', reason: 'unknown-component' }
   const enabled = typeof component?.enabled === 'boolean' ? component.enabled : component?.bundleEnabled === true
   const hot = base.policy === 'hot'
   const cold = base.policy === 'restart-required' || base.policy === 'paired-restart'
   const gate = {
-    enable: actionGate(component, components, host, true),
-    disable: actionGate(component, components, host, false),
+    enable: actionGate(component, components, host, true, skills),
+    disable: actionGate(component, components, host, false, skills),
   }
   if (!hot && !cold) {
     return { ...base, enabled, canToggle: false, kind: 'locked', gate, blockers: [{ code: 'locked' }], warnings: [] }

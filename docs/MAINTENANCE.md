@@ -1,6 +1,6 @@
 # 工程维护手册
 
-更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 3）、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 4）、`private:true`、`UNLICENSED` 的私有维护期。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 1. 版本、基线与 CI
 
@@ -57,7 +57,7 @@
 - **goal**：原 driver 产物、waitForChildren/join 函数与独占调度入口。
 - **sidebar**：官方 client、client-modules、Cordis、树/图/计数/auto-open 与注册的存活/卸载行为。
 - **panel/shield**：官方 descriptor fold、自身 inheritedEventCount + first-wins、deprecated snapshotEvents 同步读；Host 必需服务/方法，以及 sidebarRight/slots/uiWorkspace 原生客户端形状。契约源哈希在 `guide-shield/contracts.js`。
-- **manager**：官方 `pluginManager` 的 `listPlugins`/`listBundles`/`setPluginEnabled`、Plugins 页 `plugins.tab` slot、`dshGuide` BOM 的 host/components/artifacts 哈希、`$DSH_HOME` skill 状态；Phase 2 先跑操作门禁（契约/必需产物/依赖硬阻断，版本/未知警告）。Phase 3 比较本地 link 源码 mtime 与 Host 启动时间，提供 `reload-guide-manager.cmd` 和 `rollback-guide-manager.cmd`；registry/tarball 升级仍由官方插件页负责。热切换转调官方，冷切换写 `profile/.guide-manager/pending.json` 并由 `restart-guide-manager.cmd` 停 Host、调用官方 patch writer、重启；manager 不直接改 profile 依赖。
+- **manager**：官方 `pluginManager` 的 `listPlugins`/`listBundles`/`setPluginEnabled`、Plugins 页 `plugins.tab` slot、`dshGuide` BOM 的 host/components/artifacts 哈希、`$DSH_HOME` skill 状态；Phase 2 先跑操作门禁（契约/必需产物/依赖硬阻断，版本/未知/skill 未就绪警告）。Phase 3 比较本地 link 源码 mtime 与 Host 启动时间，提供 `reload-guide-manager.cmd` 和 `rollback-guide-manager.cmd`；registry/tarball 升级仍由官方插件页负责。Phase 4 检测 `@michengai/dsh-skills-manager`，用官方设置 UI 深链到“技能”section，只读状态、不复制安装/禁用逻辑。热切换转调官方，冷切换写 `profile/.guide-manager/pending.json` 并由 `restart-guide-manager.cmd` 停 Host、调用官方 patch writer、重启；manager 不直接改 profile 依赖。
 - **O6**：tools/register、精确注册层、来源 runtime/execute 指针及现有五个源码哈希。**不能只改哈希让预检通过。**
 
 不支持时明确显示不可用/只读，阻止新指导与自动归档，建议重启或恢复已支持版本；不注册半套 provider。缺少客户端注册必需形状时不挂半套 tab，并提供 `guidePanelClientCompatibility` 诊断。已有对话仍可从宿主原生入口查看。

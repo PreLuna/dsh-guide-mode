@@ -103,6 +103,11 @@ window.__ModuleLoader__.load({
       skillDisabled: '已被技能管理器禁用',
       dataMissing: '缺少 skills-guide 路由数据',
       manageSkills: '到「设置 → 技能」中安装或管理 guide skill。',
+      skillsManager: '技能管理器',
+      openSkills: '打开设置 → 技能',
+      skillManagerMissing: '未安装技能管理器；可将 guide 目录放入 $DSH_HOME/skills/guide，或安装 @michengai/dsh-skills-manager。',
+      skillsManagerHint: '打开技能管理器，或到设置 → 技能。',
+      skillNotReady: 'guide skill 未就绪',
       hash: '哈希',
       data: '路由数据',
       dataSource: '数据来源',
@@ -209,6 +214,11 @@ window.__ModuleLoader__.load({
       skillDisabled: 'Disabled by the skills manager',
       dataMissing: 'skills-guide routing data is missing',
       manageSkills: 'Install or manage the guide skill in Settings → Skills.',
+      skillsManager: 'Skills manager',
+      openSkills: 'Open Settings → Skills',
+      skillManagerMissing: 'Skills manager is not installed; place guide in $DSH_HOME/skills/guide or install @michengai/dsh-skills-manager.',
+      skillsManagerHint: 'Open the skills manager, or go to Settings → Skills.',
+      skillNotReady: 'guide skill is not ready',
       hash: 'Hash',
       data: 'Routing data',
       dataSource: 'Data source',
@@ -409,7 +419,9 @@ window.__ModuleLoader__.load({
       const blockerText = (item) => item.code === 'dependency'
         ? `${item.key} (${item.status})`
         : item.code === 'artifact-mismatch' ? `artifact:${item.name}` : item.code ?? 'blocked'
-      const warningText = (item) => item.code === 'artifact-unknown' ? `artifact:${item.name}` : item.code ?? 'warning'
+      const warningText = (item) => item.code === 'artifact-unknown'
+        ? `artifact:${item.name}`
+        : item.code === 'skill-not-ready' ? `${t('skillNotReady')} (${item.status})` : item.code ?? 'warning'
       return h('div', { style: S.card },
         h('div', { style: S.cardHead },
           h('strong', { style: { fontSize: 13 } }, componentLabel(component, t)),
@@ -484,9 +496,10 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function SkillsCard({ skills, t }) {
+    function SkillsCard({ skills, t, onOpenSkills }) {
       if (!skills) return null
       const data = skills.data
+      const manager = skills.manager ?? null
       return h('div', { style: S.skills },
         h('div', { style: S.cardHead },
           h('strong', { style: { fontSize: 13 } }, 'guide skill'),
@@ -497,13 +510,18 @@ window.__ModuleLoader__.load({
         h('div', { style: S.kv }, h('span', { style: S.key }, t('data')), h('span', null,
           data?.present ? `${data.files} files / ${Math.round((data.bytes ?? 0) / 1024)} KB` : t('dataMissing'))),
         skills.hash ? h('div', { style: S.kv }, h('span', { style: S.key }, t('hash')), h('span', { style: S.mono }, skills.hash.slice(0, 16))) : null,
+        h('div', { style: S.kv }, h('span', { style: S.key }, t('skillsManager')), h('span', null,
+          manager?.installed === true ? `${manager.version ?? t('none')}` : t('missing'))),
         skills.disabled === true ? h('div', { style: S.reason }, t('skillDisabled')) : null,
         skills.status === 'missing' ? h('div', { style: S.reason }, t('skillMissing')) : null,
-        h('div', { style: S.note }, t('manageSkills')),
+        manager?.installed === true && typeof onOpenSkills === 'function'
+          ? h('button', { style: S.actionButton, onClick: onOpenSkills }, t('openSkills'))
+          : null,
+        h('div', { style: S.note }, manager?.installed === true ? t('skillsManagerHint') : t('skillManagerMissing')),
       )
     }
 
-    function ManagerTab({ t, openPackage }) {
+    function ManagerTab({ t, openPackage, onOpenSkills }) {
       const [state, setState] = React.useState(null)
       const [error, setError] = React.useState(null)
       const [loading, setLoading] = React.useState(true)
@@ -665,7 +683,7 @@ window.__ModuleLoader__.load({
         ),
         h('section', { style: S.section },
           h('h3', { style: S.sectionTitle }, t('skills')),
-          h(SkillsCard, { skills: state.skills, t }),
+          h(SkillsCard, { skills: state.skills, t, onOpenSkills }),
         ),
         state.warnings?.length
           ? h('section', { style: S.section },
@@ -681,6 +699,29 @@ window.__ModuleLoader__.load({
       inject: ['slots', 'locale'],
       apply(ctx) {
         const t = ctx.locale.bind(NS)
+        const openSkills = async () => {
+          const label = t('skills')
+          const findNav = () => [...document.querySelectorAll('[role="dialog"] button')]
+            .find((element) => (element.textContent ?? '').trim() === label)
+          const existing = findNav()
+          if (existing !== undefined) {
+            existing.click()
+            return true
+          }
+          const account = document.querySelector('button[aria-label="账号菜单"], button[aria-label="Account menu"], button[aria-label*="账号"], button[aria-label*="Account"]')
+          if (account === null) return false
+          account.click()
+          await new Promise((resolve) => setTimeout(resolve, 150))
+          const settingsItem = [...document.querySelectorAll('[role="menuitem"]')]
+            .find((element) => /设置|Settings/.test(element.textContent ?? ''))
+          if (settingsItem === undefined) return false
+          settingsItem.click()
+          await new Promise((resolve) => setTimeout(resolve, 300))
+          const nav = findNav()
+          if (nav === undefined) return false
+          nav.click()
+          return true
+        }
         const offZh = ctx.locale.register(NS, 'zh', zh)
         const offEn = ctx.locale.register(NS, 'en', en)
         const offSlot = ctx.slots.inject('plugins.tab', () => ctx.slots.register({
@@ -689,7 +730,7 @@ window.__ModuleLoader__.load({
           order: 10,
           label: () => t('tab'),
           locale: NS,
-        }, (owner = {}) => h(ManagerTab, { ...owner, t })))
+        }, (owner = {}) => h(ManagerTab, { ...owner, t, onOpenSkills: openSkills })))
         ctx.effect(() => () => {
           try {
             offSlot?.()

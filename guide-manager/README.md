@@ -1,11 +1,11 @@
-# Guide manager（Phase 3）
+# Guide manager（Phase 4）
 
 独立的 Host + client 包，在官方 **插件** 页增加一个「指导」标签页，展示指导模式的六个组件、依赖关系、宿主版本和 `guide` skill 状态，并提供两档切换：
 
 - **热切换**：`guide-panel`、`guide-sidebar-adapter`，通过官方 `pluginManager.setPluginEnabled` 立即生效。
 - **冷切换**：`guide-admission`、`guide-shield`、`guide-goal-adapter`，只写 pending intent；由独立 helper 在 DSH 停止时应用 profile patch 并重启。
 
-Phase 2 在执行任何切换前先跑兼容门禁。Phase 3 增加本地 link 源码变更检测、重启加载 helper 和冷切换 patch 回滚。manager 不 import 六个组件，也不直接写 profile。
+Phase 2 增加兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚；Phase 4 接入 `@michengai/dsh-skills-manager` 的状态与设置深链。manager 不 import 六个组件，也不直接写 profile。
 
 ## 显示内容
 
@@ -48,6 +48,18 @@ Phase 2 在执行任何切换前先跑兼容门禁。Phase 3 增加本地 link �
 - goal 的 pending 必须同时包含 adapter 和原 driver 两项，避免两个都启用或都停用。
 - 取消准备：再次触发“准备当前状态”即可清掉该组件的 intent；UI 提供“取消准备”按钮。
 - 冷切换不会自动执行；需要用户双击 `helper/restart-guide-manager.cmd`，该 helper 会关闭并重启 DSH。
+
+## 技能管理（Phase 4）
+
+Host 读取 `$DSH_HOME/skills/guide/SKILL.md`、`$DSH_HOME/skills-guide/` 和 `$DSH_HOME/skills-manager/state.json`，展示：
+
+- `guide` skill 是否存在、版本、哈希、路由文件数量；
+- 是否被 skills manager 禁用；
+- `@michengai/dsh-skills-manager` 是否安装及其版本。
+
+如果已安装 skills manager，卡片显示“打开设置 → 技能”按钮。按钮用官方设置 UI 的 DOM 顺序打开账号菜单 → 设置 → “技能” section；设置 section 标签由 skills manager 自己注册。这是 best-effort 深链，不调用其内部 store，也不安装/禁用 skill。
+
+skills manager 未安装时只显示说明，不伪造管理入口。`guide` skill 未就绪会在组件 `action.gate.enable` 里产生 `skill-not-ready` **软警告**，不阻断切换；用户仍可先启用组件，之后安装 skill。
 
 ## 操作门禁（Phase 2）
 
@@ -169,7 +181,7 @@ POST /guide-manager/api/action  # set-component-enabled
 
 ## 安装与测试
 
-本机 desktop 已安装并验证「指导」tab。Phase 3 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
+本机 desktop 已安装并验证「指导」tab。Phase 4 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
 node guide-manager/test/core.test.mjs
@@ -196,13 +208,18 @@ node guide-manager/test/helper.test.mjs
   - Host 启动后修改 `guide-panel/icon.svg` 的 mtime，state 返回 `update.sourceChanged=true`、`update.mode='source-reload'`；
   - UI 显示“源码已更新，重启加载后生效”、reload helper 路径和“可回滚上次冷切换 (1)”；
   - 放置一份 `.guide-manager/backups/*.bak` 后，`state.backups.count=1`，rollback helper 路径出现。
-- 该隔离 profile 没有安装官方 `dsh-better-sidebar` 和 `guide` skill，因此 sidebar 显示 `unsupported/package-unavailable`、skills 显示 `missing`；这是预期的降级。
+- Phase 4 技能集成实测（隔离 profile 加入 `@michengai/dsh-skills-manager@1.2.21` 和 `guide` skill）：
+  - state 返回 `skills.status=ready`、`skills.manager.installed=true`、版本 `1.2.21`；
+  - SkillsCard 显示“打开设置 → 技能”按钮；
+  - 点击按钮打开官方设置对话框并选中“技能”section，显示 skills manager 的“统一加载和管理本机 Agent Skills”页面。
+- 在未安装 skills manager 的隔离 profile 中，sidebar 显示 `unsupported/package-unavailable`、skills 显示 `missing`，SkillsCard 不显示深链按钮；这是预期的降级。
 
 ## 边界
 
-- Phase 3 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
-- 操作前门禁只阻断明确不兼容的组合；宿主版本、产物不可用、版本漂移作为警告，不把“未验证”伪称为“不兼容”。
+- Phase 4 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
+- 操作前门禁只阻断明确不兼容的组合；宿主版本、产物不可用、版本漂移、skill 未就绪作为警告，不把“未验证”伪称为“不兼容”。
 - 本地 link 的“升级”是源码更新 + reload helper；registry/tarball/git 的安装/升级仍由官方插件页负责。
+- 技能安装、禁用、来源管理由 `@michengai/dsh-skills-manager` 负责；本 manager 只读状态并深链到它的设置 section。
 - rollback helper 只恢复最新一份 patch 备份，不等同于完整的包版本回滚。
 - UI 不自动运行 helper；helper 需要用户双击，因为它会关闭并重启 DSH。
 - 冷切换写的是 profile patch，不修改 `package.json`、lockfile 或官方包。
