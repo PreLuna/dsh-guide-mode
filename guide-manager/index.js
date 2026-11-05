@@ -1,7 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { COMPONENTS, buildEdges, componentStatus, hostStatus, readSkillsState } from './core.js'
+import {
+  COMPONENTS,
+  MANAGER_ACTION,
+  actionForComponent,
+  buildEdges,
+  componentStatus,
+  hostStatus,
+  normalizeActionResult,
+  readSkillsState,
+} from './core.js'
 
 /**
  * Read-only Host half of the guidance manager.
@@ -148,9 +157,9 @@ function readHostState(ctx, profileContext, expected) {
   return hostStatus(actual, expected ?? {})
 }
 
-function collectComponents(ctx, pluginData, guide, profileContext, hostVerified) {
+function collectComponents(ctx, pluginData, guide, profileContext, host) {
   const definitions = guide.components ?? {}
-  return [...COMPONENTS].sort((a, b) => a.order - b.order).map((component) => {
+  const components = [...COMPONENTS].sort((a, b) => a.order - b.order).map((component) => {
     const bundle = pluginData.bundles.find((item) => item.name === component.package) ?? null
     const rows = pluginData.rows
       .filter((row) => row.moduleName === component.package)
@@ -165,6 +174,9 @@ function collectComponents(ctx, pluginData, guide, profileContext, hostVerified)
     const expected = definitions[component.package] ?? {}
     const installed = bundle?.installed === true || info !== null || rows.length > 0
     const actualVersion = bundle?.version ?? info?.version ?? null
+    const enabled = bundle?.enabled === false
+      ? false
+      : rows.length > 0 ? rows.some((row) => row.enabled === true) : bundle?.enabled === true
     const service = readServiceState(ctx, component)
     const status = componentStatus({
       installed,
@@ -176,7 +188,7 @@ function collectComponents(ctx, pluginData, guide, profileContext, hostVerified)
       actualVersion,
       expectedContract: expected.contract ?? null,
       actualContract: meta.contract ?? null,
-      hostVerified,
+      hostVerified: host.verified,
     })
     return {
       key: component.key,
@@ -187,6 +199,7 @@ function collectComponents(ctx, pluginData, guide, profileContext, hostVerified)
       expectedVersion: expected.version ?? null,
       contract: meta.contract ?? null,
       expectedContract: expected.contract ?? null,
+      enabled,
       bundleEnabled: bundle === null ? null : bundle.enabled === true,
       bundleError: bundle?.error ?? null,
       rows,
@@ -198,6 +211,8 @@ function collectComponents(ctx, pluginData, guide, profileContext, hostVerified)
       contractMatch: status.contractMatch,
     }
   })
+  for (const component of components) component.action = actionForComponent(component, components, host)
+  return components
 }
 
 function checkManager(ctx) {
@@ -245,15 +260,16 @@ async function collectState(ctx) {
   const profileContext = serviceOf(ctx, 'profileContext')
   const host = readHostState(ctx, profileContext, bom.guide.host ?? {})
   const pluginData = await readPluginData(ctx, profileContext)
-  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host.verified)
+  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host)
   const edges = buildEdges(components, bom.guide.edges ?? [], pluginData.rows)
   const skills = readSkillsState(profileContext?.home)
   const manager = checkManager(ctx)
   const state = {
     product: bom.guide.product ?? 'dsh-guide-mode',
     release: bom.guide.release ?? bom.manifest.version ?? null,
-    readOnly: true,
-    manager: { ...manager, version: bom.manifest.version ?? null },
+    readOnly: false,
+    actionScope: 'phase-1a',
+    manager: { ...manager, version: bom.manifest.version ?? null, action: MANAGER_ACTION },
     profile: {
       name: profileContext?.name ?? null,
       dir: profileContext?.dir ?? null,
@@ -271,6 +287,102 @@ async function collectState(ctx) {
   return state
 }
 
+/**
+ * Phase 1A action: only hot-switchable components, only through the official
+ * pluginManager. The manager never edits the profile itself.
+ */
+async function setComponentEnabled(ctx, key, enabled) {
+  if (key === 'manager') return { ok: false, code: 'locked', message: 'the manager is protected and has no switch' }
+  const definition = COMPONENTS.find((item) => item.key === key)
+  if (definition === undefined) return { ok: false, code: 'unknown-component', message: `Unknown component: ${key}` }
+  let state
+  try {
+    state = await collectState(ctx)
+  } catch (error) {
+    return { ok: false, code: 'state-unavailable', message: String(error.message ?? error) }
+  }
+  const component = state.components.find((item) => item.key === key)
+  if (component === undefined) return { ok: false, code: 'unknown-component', message: `Unknown component: ${key}` }
+  const action = component.action ?? { policy: 'locked', reason: 'missing-action-policy', canToggle: false, blockers: [] }
+  if (action.policy !== 'hot') {
+    return { ok: false, code: action.policy, message: action.reason ?? 'component is not hot-switchable' }
+  }
+  if (action.canToggle !== true) {
+    return {
+      ok: false,
+      code: action.reason ?? 'not-toggleable',
+      message: action.reason ?? 'component cannot be toggled in this state',
+      blockers: action.blockers ?? [],
+    }
+  }
+  if (component.enabled === enabled) {
+    return { ok: true, value: { component: key, enabled, application: 'applied', changed: false, noop: true, error: null } }
+  }
+  const manager = serviceOf(ctx, 'pluginManager')
+  if (manager === undefined || typeof manager.setPluginEnabled !== 'function') {
+    return { ok: false, code: 'plugin-manager-unavailable', message: 'official pluginManager.setPluginEnabled is unavailable' }
+  }
+  let rows
+  try {
+    rows = await manager.listPlugins()
+  } catch (error) {
+    return { ok: false, code: 'plugin-manager-error', message: String(error.message ?? error) }
+  }
+  const targetRows = rows.filter((row) => row.moduleName === definition.package)
+  if (targetRows.length !== 1) {
+    return { ok: false, code: 'entry-not-unique', message: `expected one Loader row for ${definition.package}, found ${targetRows.length}` }
+  }
+  const row = targetRows[0]
+  if (row.readOnlyReason !== undefined) {
+    return { ok: false, code: row.readOnlyReason, message: `row is read-only: ${row.readOnlyReason}` }
+  }
+  try {
+    const result = await manager.setPluginEnabled(row.entryId, enabled)
+    return { ok: true, value: normalizeActionResult(result, key, enabled) }
+  } catch (error) {
+    return { ok: false, code: error.code ?? 'operation-error', message: String(error.message ?? error) }
+  }
+}
+
+const MAX_BODY_BYTES = 16 * 1024
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    let settled = false
+    const fail = (error) => {
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+    req.on('data', (chunk) => {
+      if (settled) return
+      size += chunk.length
+      if (size > MAX_BODY_BYTES) {
+        fail(new Error('request body is too large'))
+        req.destroy()
+        return
+      }
+      chunks.push(chunk)
+    })
+    req.on('end', () => {
+      if (settled) return
+      settled = true
+      if (chunks.length === 0) {
+        resolve({})
+        return
+      }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+      } catch {
+        reject(new Error('request body is not valid JSON'))
+      }
+    })
+    req.on('error', (error) => fail(error))
+  })
+}
+
 function writeJson(res, status, body) {
   const payload = JSON.stringify(body)
   res.statusCode = status
@@ -279,20 +391,57 @@ function writeJson(res, status, body) {
   res.end(payload)
 }
 
-async function handle(injected, getState, req, res) {
+async function handle(injected, getState, setEnabled, req, res) {
   const connection = serviceOf(injected, 'connection')
   const rejection = typeof connection?.requestRejection === 'function' ? connection.requestRejection(req) : undefined
   if (rejection !== undefined) {
     writeJson(res, typeof rejection === 'number' ? rejection : 403, { ok: false, error: { message: 'forbidden' } })
     return
   }
+  const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
+  if (pathname === `${ROUTE_PREFIX}/action`) {
+    if (req.method !== 'POST') {
+      writeJson(res, 405, { ok: false, error: { message: 'method not allowed' } })
+      return
+    }
+    try {
+      const payload = await readJsonBody(req)
+      if (payload?.action !== 'set-component-enabled') {
+        writeJson(res, 400, { ok: false, error: { code: 'invalid-action', message: 'unsupported action' } })
+        return
+      }
+      if (payload.confirm !== true) {
+        writeJson(res, 400, { ok: false, error: { code: 'confirmation-required', message: 'explicit confirmation is required' } })
+        return
+      }
+      if (typeof payload.component !== 'string' || typeof payload.enabled !== 'boolean') {
+        writeJson(res, 400, { ok: false, error: { code: 'invalid-action', message: 'component and enabled are required' } })
+        return
+      }
+      const result = await setEnabled(payload.component, payload.enabled)
+      if (result.ok !== true) {
+        writeJson(res, 409, {
+          ok: false,
+          error: {
+            code: result.code ?? 'action-refused',
+            message: result.message ?? 'action refused',
+            ...(Array.isArray(result.blockers) && result.blockers.length > 0 ? { blockers: result.blockers } : {}),
+          },
+        })
+        return
+      }
+      writeJson(res, 200, { ok: true, value: result.value })
+    } catch (error) {
+      writeJson(res, 400, { ok: false, error: { code: 'invalid-request', message: String(error.message ?? error) } })
+    }
+    return
+  }
   if (req.method !== 'GET') {
     writeJson(res, 405, { ok: false, error: { message: 'method not allowed' } })
     return
   }
-  const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
   if (pathname === `${ROUTE_PREFIX}/ping`) {
-    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: true } })
+    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-1a' } })
     return
   }
   if (pathname !== `${ROUTE_PREFIX}/state`) {
@@ -310,7 +459,8 @@ export const name = 'guide-manager'
 
 export async function apply(ctx) {
   const getState = () => collectState(ctx)
-  ctx.provide('guideManager', { getState, readOnly: true })
+  const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled)
+  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-1a' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
     const connection = serviceOf(injected, 'connection')
@@ -319,8 +469,8 @@ export async function apply(ctx) {
       kind: 'prefix',
       path: ROUTE_PREFIX,
       handler: (req, res) => {
-        void handle(injected, getState, req, res)
+        void handle(injected, getState, setEnabled, req, res)
       },
-    }), 'guide-manager: read-only status route')
+    }), 'guide-manager: status and phase-1a action route')
   })
 }

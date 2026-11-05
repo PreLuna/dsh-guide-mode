@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Add a read-only `guide-manager` bundle and an official-Plugins-page “指导” tab that reports the six components, host BOM, dependency edges, and `guide` skill state; the manager never writes the profile, packages, or skills, and is not installed on the live desktop yet.
+- Add a `guide-manager` bundle and an official-Plugins-page “指导” tab that reports the six components, host BOM, dependency edges, and `guide` skill state.
+- Phase 1A adds confirmed `guide-panel` / `guide-sidebar-adapter` hot switches through the official `pluginManager`; admission/shield remain restart-required, goal is paired, preset/manager locked, and the manager never writes the profile directly.
 - Prepare a private GitHub repository and commit-based local snapshots; public and marketplace distribution remain deferred, with private metadata unchanged.
 - Summarize retired fork, duplicate archive documents, deferred research plans and one-off deployment scripts in `docs/HISTORY-AND-MAINTENANCE-NOTES.md`, then remove those obsolete files while preserving active tests and recovery dependencies.
 

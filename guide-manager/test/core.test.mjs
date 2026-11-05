@@ -4,10 +4,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import {
+  ACTION_POLICIES,
   COMPONENTS,
+  MANAGER_ACTION,
+  actionForComponent,
   buildEdges,
   componentStatus,
+  dependencyBlockers,
   hostStatus,
+  normalizeActionResult,
   parseSkillFrontmatter,
   readSkillsState,
   skillVersion,
@@ -180,4 +185,75 @@ test('skill state distinguishes missing, disabled and incomplete data', () => {
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('phase 1A action policy keeps only panel and sidebar hot', () => {
+  assert.equal(ACTION_POLICIES.panel.policy, 'hot')
+  assert.equal(ACTION_POLICIES.sidebar.policy, 'hot')
+  assert.equal(ACTION_POLICIES.admission.policy, 'restart-required')
+  assert.equal(ACTION_POLICIES.shield.policy, 'restart-required')
+  assert.equal(ACTION_POLICIES.goal.policy, 'paired-restart')
+  assert.equal(ACTION_POLICIES.preset.policy, 'locked')
+  assert.equal(MANAGER_ACTION.policy, 'locked')
+})
+
+test('action affordances enforce panel dependencies and sidebar host checks', () => {
+  const panel = component('panel', 'disabled', { bundleEnabled: false, installed: true })
+  const admission = component('admission', 'ready')
+  const shield = component('shield', 'ready')
+  const preset = component('preset', 'ready')
+  const clean = actionForComponent(panel, [panel, admission, shield, preset], { betterSidebar: { match: true } })
+  assert.equal(clean.policy, 'hot')
+  assert.equal(clean.canToggle, true)
+
+  const blocked = actionForComponent(panel, [panel, admission, shield, component('preset', 'missing')], { betterSidebar: { match: true } })
+  assert.equal(blocked.canToggle, false)
+  assert.equal(blocked.reason, 'dependency-conflict')
+  assert.deepEqual(blocked.blockers.map((item) => item.key), ['preset'])
+
+  const sidebar = component('sidebar', 'disabled', { bundleEnabled: false, installed: true })
+  const unsupported = actionForComponent(sidebar, [sidebar], { betterSidebar: { match: false } })
+  assert.equal(unsupported.canToggle, false)
+  assert.equal(unsupported.reason, 'unsupported-sidebar-host')
+
+  const cold = actionForComponent(component('admission', 'ready'), [], {})
+  assert.equal(cold.policy, 'restart-required')
+  assert.equal(cold.canToggle, false)
+
+  const rowDisabled = component('panel', 'disabled', {
+    bundleEnabled: true,
+    enabled: false,
+    installed: true,
+    rows: [{ enabled: false, fiberPhase: 'pending' }],
+  })
+  const rowAction = actionForComponent(rowDisabled, [rowDisabled, admission, shield, preset], { betterSidebar: { match: true } })
+  assert.equal(rowAction.enabled, false)
+  assert.equal(rowAction.canToggle, true)
+})
+
+test('dependencyBlockers only looks at the panel requirements', () => {
+  const panel = component('panel', 'disabled')
+  const admission = component('admission', 'disabled')
+  const shield = component('shield', 'ready')
+  const preset = component('preset', 'ready')
+  assert.deepEqual(dependencyBlockers(panel, [panel, admission, shield, preset]), [
+    { key: 'admission', status: 'disabled', reason: null },
+  ])
+  assert.deepEqual(dependencyBlockers(component('sidebar', 'disabled'), [admission]), [])
+})
+
+test('official action results are normalized without claiming success', () => {
+  assert.deepEqual(normalizeActionResult({ application: 'applied', enabled: false, changed: true }, 'panel', false), {
+    component: 'panel',
+    enabled: false,
+    application: 'applied',
+    restartReason: null,
+    changed: true,
+    error: null,
+  })
+  const failed = normalizeActionResult({ application: 'failed', error: { code: 'unknown-plugin', diagnostic: 'nope' } }, 'panel', true)
+  assert.equal(failed.application, 'failed')
+  assert.deepEqual(failed.error, { code: 'unknown-plugin', message: 'nope' })
+  assert.equal(normalizeActionResult('overridden', 'panel', true).application, 'overridden')
+  assert.equal(normalizeActionResult(undefined, 'panel', true).application, 'unknown')
 })

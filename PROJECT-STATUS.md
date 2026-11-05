@@ -1,6 +1,6 @@
 # 项目状态与待办
 
-更新：2026-11-04（Asia/Shanghai）。本文件是**当前事实与待办的唯一出处**：交付状态、已定决定、真正剩余的工作。已接受边界与暂缓事项见 [已定边界](docs/DECISIONS.md)，实现机制见 [架构](docs/ARCHITECTURE.md)，历史经验见 [历史经验](docs/HISTORY-AND-MAINTENANCE-NOTES.md)。
+更新：2026-11-05（Asia/Shanghai）。本文件是**当前事实与待办的唯一出处**：交付状态、已定决定、真正剩余的工作。已接受边界与暂缓事项见 [已定边界](docs/DECISIONS.md)，实现机制见 [架构](docs/ARCHITECTURE.md)，历史经验见 [历史经验](docs/HISTORY-AND-MAINTENANCE-NOTES.md)。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 better-sidebar `0.28.2`。未知 adapter 构建回退原行为，不承诺任意版本免维护。
 
@@ -20,14 +20,14 @@
 | O19/O7/R1 生产实现 | 支持基线及核心冷更新边界内关闭 | 43 项生产 Host 断言、44 项核心检查及 O2/R6 回归；实际 desktop C/R/M=8/2/4；[生产实施](evidence/O19-production-2026-11-03/report.md) |
 | O12 / O20 / O21 | 1.1.0 实现与实际 desktop 冷部署完成 | 旧页签精准清理、Host 核实身份的自动归档、完整必需契约与只读/unsupported 状态；[证据](evidence/O12-O21-engineering-2026-11-03/report.md) |
 | R4 / R7 / R8 / R9 / O10 | 本机工程基线完成 | 本地 Git、最小 CI、生成物检查/加载、guide skill 降级、locale 清理、六包统一装卸恢复 |
-| guide-manager 只读 MVP | 隔离 Host 验证完成，待本机 desktop 安装 | 独立 bundle；官方 Plugins 页「指导」tab 已在隔离 profile 渲染；六组件、依赖边、宿主 BOM、`guide` skill 状态；不写 profile；[README](guide-manager/README.md) |
+| guide-manager Phase 1A | 本机 desktop 安装与隔离 Host 实测完成 | 独立 bundle；官方 Plugins 页「指导」tab；六组件、依赖边、宿主 BOM、`guide` skill；panel/sidebar 热开关经官方 `pluginManager`；admission/shield 重启提示，goal/preset 锁定；[README](guide-manager/README.md) |
 | O11 / PT-6 | 暂缓，保留当前设计 | 原生结果卡与测试保留；默认沙箱 failed、无沙箱对照 45/45 passed，不改写为整体通过；[报告](evidence/O11-validation-2026-11-04/pt6/report.md) |
 | O11 / RM-3/5/7 | 按宿主默认机制收口 | 接受 persona／压缩／重试与上下文复制成本；[验收取舍](docs/DECISIONS.md) |
 | O11 / 多 pane、Git 与归档补测 | 主流程通过，边界已接受或划出范围 | 同 child 重复视图残留接受现状；原生编辑关闭保护不列为插件任务；[范围](docs/DECISIONS.md) / [报告](evidence/O11-residual-check-2026-11-04/report.md) |
 | R5 有界扩展观察 | 约 124 秒未复现，不代表长期修复 | 五页、六次刷新、六次重挂；660 次请求全部 200，关闭其他页面后 TCP 回落 |
 | 文档收口 | 2026-11-04 完成 | 12 篇合并为 7 篇，每类事实单一出处 |
 
-2026-11-03 desktop 状态：六个 `@local` link/bundle 已登记，准入 active、C/R/M=8/2/4，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。O6 的 idle 说明代码已加载，不表示本轮执行过用户真实模型的 list/control。工作区另有只读 `guide-manager` 1.1.0，**尚未登记到该 profile**。
+2026-11-03 desktop 状态：六个 `@local` link/bundle 已登记，准入 active、C/R/M=8/2/4，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。O6 的 idle 说明代码已加载，不表示本轮执行过用户真实模型的 list/control。`guide-manager` 1.1.0（Phase 1A）已登记到该 profile，并在隔离 Host 完成 panel 停用/启用实测。
 
 ## 2. 已定决定
 
@@ -101,7 +101,7 @@ O2/R6 已覆盖真实 scoped closing 与 panel HMR；整个 Host graceful shutdo
 
 ### 3.4 工程维护与分发
 
-本机自用六个运行组件统一为 1.1.0，另有只读 `guide-manager` 1.1.0（尚未登记到 desktop）；具备本地 Git、最小 CI、生成物检查、真实 client 加载测试、卸载与回退流程，见 [维护手册](docs/MAINTENANCE.md)。市场发布、公开仓库、公开许可与作者／命名空间留到稳定或再次检查后决定。需要持续维护的是两个 adapter 的兼容边界，不是重新开启 fork 维护。
+本机自用六个运行组件统一为 1.1.0，另有 `guide-manager` 1.1.0（Phase 1A，已登记到 desktop）；具备本地 Git、最小 CI、生成物检查、真实 client 加载测试、卸载与回退流程，见 [维护手册](docs/MAINTENANCE.md)。市场发布、公开仓库、公开许可与作者／命名空间留到稳定或再次检查后决定。需要持续维护的是两个 adapter 的兼容边界，不是重新开启 fork 维护。
 
 ## 4. 验证索引
 

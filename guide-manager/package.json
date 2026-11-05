@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Read-only product manager for the DSH guidance mode components",
+  "description": "Product manager for the DSH guidance mode components with phase-1A hot switches",
   "exports": {
     ".": "./index.js",
     "./core": "./core.js",
@@ -35,7 +35,8 @@
   "dshGuide": {
     "product": "dsh-guide-mode",
     "release": "1.1.0",
-    "readOnly": true,
+    "readOnly": false,
+    "actionScope": "phase-1a",
     "components": {
       "@local/dsh-guide-preset": {
         "component": "preset",

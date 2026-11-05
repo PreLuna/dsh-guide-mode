@@ -1,4 +1,5 @@
-# Read-only product manager. It never writes the profile or package files.
+# Product manager. Phase 1A allows only panel/sidebar hot switches through the
+# official pluginManager; it never writes the profile itself.
 - insert:
     - id: guide-manager
       name: '@local/dsh-guide-manager'

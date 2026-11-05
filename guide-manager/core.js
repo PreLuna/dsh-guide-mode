@@ -20,6 +20,82 @@ export const COMPONENTS = [
 
 const READY = new Set(['ready', 'ready-unverified'])
 
+/**
+ * Phase 1A action policy. Only the two components with a designed dispose /
+ * restore path are hot-switchable; the cold core, the goal driver pair and the
+ * session preset stay non-actionable until their own phase.
+ */
+export const ACTION_POLICIES = {
+  panel: { policy: 'hot', reason: null },
+  sidebar: { policy: 'hot', reason: null },
+  admission: { policy: 'restart-required', reason: 'cold-core' },
+  shield: { policy: 'restart-required', reason: 'cold-core' },
+  goal: { policy: 'paired-restart', reason: 'goal-driver-exclusion' },
+  preset: { policy: 'locked', reason: 'session-recovery' },
+}
+
+export const MANAGER_ACTION = { policy: 'locked', reason: 'self-protection', canToggle: false, blockers: [] }
+
+export const PANEL_REQUIREMENTS = ['preset', 'admission', 'shield']
+
+const HARD_BLOCKING = new Set(['missing', 'disabled', 'incompatible', 'failed'])
+
+/** Required components that would make enabling the panel a broken mount. */
+export function dependencyBlockers(component, components = []) {
+  if (component?.key !== 'panel') return []
+  const byKey = new Map(components.map((item) => [item.key, item]))
+  const blockers = []
+  for (const key of PANEL_REQUIREMENTS) {
+    const target = byKey.get(key)
+    if (target === undefined) {
+      blockers.push({ key, status: 'unknown', reason: 'requirement-missing' })
+      continue
+    }
+    if (HARD_BLOCKING.has(target.status)) blockers.push({ key, status: target.status, reason: target.reason ?? null })
+  }
+  return blockers
+}
+
+/**
+ * Derive one component's action affordance from its runtime status and the
+ * cross-component requirements. `canToggle` is the final gate the Host checks
+ * again before it calls the official pluginManager.
+ */
+export function actionForComponent(component, components = [], host = null) {
+  const base = ACTION_POLICIES[component?.key] ?? { policy: 'locked', reason: 'unknown-component' }
+  const enabled = typeof component?.enabled === 'boolean' ? component.enabled : component?.bundleEnabled === true
+  if (base.policy !== 'hot') return { ...base, enabled, canToggle: false, blockers: [] }
+  if (!component.installed) return { ...base, enabled, canToggle: false, reason: 'not-installed', blockers: [] }
+  if (component.bundleEnabled === null) return { ...base, enabled, canToggle: false, reason: 'enablement-unknown', blockers: [] }
+  if (!enabled) {
+    if (component.key === 'panel') {
+      const blockers = dependencyBlockers(component, components)
+      if (blockers.length > 0) return { ...base, enabled, canToggle: false, reason: 'dependency-conflict', blockers }
+    }
+    if (component.key === 'sidebar' && host?.betterSidebar?.match === false) {
+      return { ...base, enabled, canToggle: false, reason: 'unsupported-sidebar-host', blockers: [] }
+    }
+  }
+  return { ...base, enabled, canToggle: true, blockers: [] }
+}
+
+/** Normalize the official pluginManager action result for the client. */
+export function normalizeActionResult(result, component, enabled) {
+  const application = typeof result === 'string' ? result : result?.application ?? 'unknown'
+  const rawError = typeof result === 'object' && result !== null ? result.error : undefined
+  const error = rawError === undefined || rawError === null
+    ? null
+    : { code: rawError.code ?? null, message: rawError.diagnostic ?? rawError.message ?? null }
+  return {
+    component,
+    enabled: typeof result === 'object' && result !== null && typeof result.enabled === 'boolean' ? result.enabled : enabled,
+    application,
+    restartReason: typeof result === 'object' && result !== null ? result.restartReason ?? null : null,
+    changed: typeof result === 'object' && result !== null && result.changed === true,
+    error,
+  }
+}
+
 /** SHA-256 of a UTF-8 string, used for the skill file fingerprint. */
 export function sha256(text) {
   return createHash('sha256').update(text).digest('hex')

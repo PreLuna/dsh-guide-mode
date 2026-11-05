@@ -45,8 +45,9 @@ function fixture() {
   return { root, home, profile, install }
 }
 
-function makeCtx(data, { manager = true, bundles, rows, services = {} } = {}) {
+function makeCtx(data, { manager = true, bundles, rows, services = {}, setPluginEnabled } = {}) {
   const store = new Map()
+  const calls = []
   store.set('profileContext', {
     name: 'test-profile',
     dir: data.profile,
@@ -75,6 +76,12 @@ function makeCtx(data, { manager = true, bundles, rows, services = {} } = {}) {
       listBundles() {
         return bundles ?? PACKAGES.map((name) => ({ name, installed: true, enabled: true, version: '1.1.0', rows: [] }))
       },
+      async setPluginEnabled(id, enabled) {
+        calls.push([id, enabled])
+        return setPluginEnabled === undefined
+          ? { application: 'applied', enabled, changed: true }
+          : setPluginEnabled(id, enabled)
+      },
     })
   }
   for (const [name, value] of Object.entries(services)) store.set(name, value)
@@ -91,7 +98,7 @@ function makeCtx(data, { manager = true, bundles, rows, services = {} } = {}) {
     },
     logger: { info() {}, warn() {}, error() {} },
   }
-  return { ctx, store }
+  return { ctx, store, calls }
 }
 
 const componentServices = {
@@ -108,11 +115,16 @@ test('host state reports six ready components, edges and the skill', async () =>
     const { ctx, store } = makeCtx(data, { services: componentServices })
     await apply(ctx)
     const state = await store.get('guideManager').getState()
-    assert.equal(state.readOnly, true)
+    assert.equal(state.readOnly, false)
+    assert.equal(state.actionScope, 'phase-1a')
     assert.equal(state.manager.mode, 'ready')
+    assert.equal(state.manager.action.policy, 'locked')
     assert.equal(state.dataSource, 'plugin-manager')
     assert.equal(state.components.length, 6)
     assert.ok(state.components.every((component) => component.status === 'ready'), JSON.stringify(state.components, null, 2))
+    assert.equal(state.components.find((component) => component.key === 'panel').action.policy, 'hot')
+    assert.equal(state.components.find((component) => component.key === 'admission').action.policy, 'restart-required')
+    assert.equal(state.components.find((component) => component.key === 'preset').action.policy, 'locked')
     assert.equal(state.host.verified, true)
     assert.equal(state.skills.status, 'ready')
     assert.equal(state.edges.find((edge) => edge.to === 'admission').status, 'ready')
@@ -150,6 +162,66 @@ test('a disabled panel is reported as disabled and its outgoing edges inactive',
     const panel = state.components.find((component) => component.key === 'panel')
     assert.equal(panel.status, 'disabled')
     assert.ok(state.edges.filter((edge) => edge.from === 'panel').every((edge) => edge.status === 'inactive'))
+  } finally {
+    rmSync(data.root, { recursive: true, force: true })
+  }
+})
+
+test('phase 1A routes panel and sidebar toggles through the official manager', async () => {
+  const data = fixture()
+  try {
+    const { ctx, store, calls } = makeCtx(data, { services: componentServices })
+    await apply(ctx)
+    const service = store.get('guideManager')
+    const panel = await service.setComponentEnabled('panel', false)
+    assert.equal(panel.ok, true)
+    assert.equal(panel.value.application, 'applied')
+    assert.deepEqual(calls, [['entry:@local/dsh-guide-panel', false]])
+    const sidebar = await service.setComponentEnabled('sidebar', false)
+    assert.equal(sidebar.ok, true)
+    assert.deepEqual(calls, [['entry:@local/dsh-guide-panel', false], ['entry:@local/dsh-guide-sidebar-adapter', false]])
+  } finally {
+    rmSync(data.root, { recursive: true, force: true })
+  }
+})
+
+test('phase 1A refuses manager, cold and dependency-blocked actions', async () => {
+  const data = fixture()
+  try {
+    const bundles = PACKAGES.map((name) => ({
+      name,
+      installed: true,
+      enabled: name !== '@local/dsh-guide-panel' && name !== '@local/dsh-guide-admission',
+      version: '1.1.0',
+      rows: [],
+    }))
+    const { ctx, store, calls } = makeCtx(data, { bundles, services: componentServices })
+    await apply(ctx)
+    const service = store.get('guideManager')
+    assert.equal((await service.setComponentEnabled('manager', false)).code, 'locked')
+    assert.equal((await service.setComponentEnabled('admission', false)).code, 'restart-required')
+    const blocked = await service.setComponentEnabled('panel', true)
+    assert.equal(blocked.ok, false)
+    assert.equal(blocked.code, 'dependency-conflict')
+    assert.ok(blocked.blockers.some((item) => item.key === 'admission'))
+    assert.deepEqual(calls, [])
+  } finally {
+    rmSync(data.root, { recursive: true, force: true })
+  }
+})
+
+test('phase 1A surfaces official action failures without claiming success', async () => {
+  const data = fixture()
+  try {
+    const { ctx, store } = makeCtx(data, {
+      services: componentServices,
+      setPluginEnabled: () => ({ application: 'failed', error: { code: 'operation-error', diagnostic: 'boom' } }),
+    })
+    await apply(ctx)
+    const result = await store.get('guideManager').setComponentEnabled('panel', false)
+    assert.equal(result.ok, true)
+    assert.equal(result.value.application, 'failed')
+    assert.deepEqual(result.value.error, { code: 'operation-error', message: 'boom' })
   } finally {
     rmSync(data.root, { recursive: true, force: true })
   }

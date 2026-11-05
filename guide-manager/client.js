@@ -8,17 +8,18 @@ window.__ModuleLoader__.load({
     const zh = {
       tab: '指导',
       title: '指导模式',
-      subtitle: '六个组件的只读状态、依赖关系与兼容检查',
+      subtitle: '六个组件的状态、依赖关系、兼容检查与安全开关',
       refresh: '刷新',
       loading: '正在读取 Host 状态…',
       hostStale: '管理服务未加载：请确认 guide-manager 已在 Host 启动，或重启 DSH。',
       retry: '重试',
-      readOnly: '只读视图，不会修改 profile、包或技能',
+      readOnly: '仅 panel / sidebar 支持热开关；其他组件不写入 profile',
       updated: '更新时间',
       manager: '管理器',
       managerReady: '就绪',
       managerFallback: '降级读取',
       managerUnsupported: '不可用',
+      managerLocked: '管理器自身受保护，不提供开关',
       release: '产品版本',
       host: '宿主',
       dsh: 'DSH',
@@ -39,6 +40,22 @@ window.__ModuleLoader__.load({
       service: '服务',
       reason: '原因',
       open: '打开插件页',
+      enable: '启用',
+      disable: '停用',
+      confirmEnable: '确认启用',
+      confirmDisable: '确认停用',
+      cancel: '取消',
+      actionBusy: '处理中…',
+      actionApplied: '已应用',
+      actionRestart: '已保存，需要重启 DSH 生效',
+      actionOverridden: '已保存，但被更高层配置覆盖',
+      actionFailed: '操作失败',
+      actionUnknown: '操作结果未知',
+      restartRequired: '需要重启 DSH 后生效（暂未开放）',
+      pairedRestart: '需要与原 goal driver 成对切换（暂未开放）',
+      locked: '受保护，不提供开关',
+      dependencyConflict: '依赖组件未就绪',
+      blockedBy: '依赖',
       none: '—',
       optional: '可选',
       ready: '就绪',
@@ -75,17 +92,18 @@ window.__ModuleLoader__.load({
     const en = {
       tab: 'Guide',
       title: 'Guidance Mode',
-      subtitle: 'Read-only status, dependency edges, and compatibility checks for the six components',
+      subtitle: 'Component status, dependency edges, compatibility checks, and safe switches',
       refresh: 'Refresh',
       loading: 'Reading Host state…',
       hostStale: 'Manager service is not loaded: confirm guide-manager started on the Host, or restart DSH.',
       retry: 'Retry',
-      readOnly: 'Read-only view; it does not modify the profile, packages, or skills',
+      readOnly: 'Only panel/sidebar support hot switches; no other profile writes',
       updated: 'Updated',
       manager: 'Manager',
       managerReady: 'Ready',
       managerFallback: 'Fallback',
       managerUnsupported: 'Unavailable',
+      managerLocked: 'The manager itself is protected and has no switch',
       release: 'Product version',
       host: 'Host',
       dsh: 'DSH',
@@ -106,6 +124,22 @@ window.__ModuleLoader__.load({
       service: 'Service',
       reason: 'Reason',
       open: 'Open plugin page',
+      enable: 'Enable',
+      disable: 'Disable',
+      confirmEnable: 'Confirm enable',
+      confirmDisable: 'Confirm disable',
+      cancel: 'Cancel',
+      actionBusy: 'Working…',
+      actionApplied: 'Applied',
+      actionRestart: 'Saved; restart DSH to apply',
+      actionOverridden: 'Saved but overridden by a higher layer',
+      actionFailed: 'Action failed',
+      actionUnknown: 'Unknown action result',
+      restartRequired: 'Restart required; not available yet',
+      pairedRestart: 'Requires a paired goal-driver switch; not available yet',
+      locked: 'Protected; no switch',
+      dependencyConflict: 'A required component is not ready',
+      blockedBy: 'Requirements',
       none: '—',
       optional: 'optional',
       ready: 'Ready',
@@ -199,6 +233,11 @@ window.__ModuleLoader__.load({
       key: { color: 'var(--dsw-alias-label-secondary, #5f6368)' },
       reason: { fontSize: 11, lineHeight: '16px', color: '#8a5a00', wordBreak: 'break-word' },
       linkButton: { alignSelf: 'flex-start', border: 0, background: 'transparent', color: '#0969da', padding: 0, fontSize: 12, cursor: 'pointer' },
+      actionRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+      actionButton: { border: '1px solid var(--dsw-alias-hairline, #d0d7de)', background: 'var(--dsw-alias-bg-elevated, #fff)', color: 'var(--dsw-alias-label-primary, #1f2328)', borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer' },
+      dangerButton: { border: '1px solid #d1242f', background: '#fff', color: '#b42318', borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer' },
+      notice: { border: '1px solid #b7e1c1', background: '#eaf7ee', color: '#1e6b3a', borderRadius: 6, padding: '8px 10px', fontSize: 12, lineHeight: '18px' },
+      noticeError: { border: '1px solid #f0b4b4', background: '#fff0f0', color: '#a61b1b' },
       edges: { display: 'flex', flexDirection: 'column', gap: 6 },
       edgeRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12, lineHeight: '18px' },
       warningList: { margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: '18px', color: '#8a5a00' },
@@ -232,6 +271,44 @@ window.__ModuleLoader__.load({
       return body.value
     }
 
+    async function postAction(component, enabled) {
+      const options = {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'set-component-enabled', component, enabled, confirm: true }),
+      }
+      if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') options.signal = AbortSignal.timeout(15000)
+      const response = await fetch(new URL('./guide-manager/api/action', window.document.baseURI).toString(), options)
+      const text = await response.text()
+      let body = null
+      try {
+        body = text === '' ? null : JSON.parse(text)
+      } catch {
+        body = null
+      }
+      if (!response.ok || body === null || body.ok !== true) {
+        if (response.status === 404 || response.status === 405) throw new Error('host-stale')
+        const error = body?.error
+        const failure = new Error(typeof error?.message === 'string' && error.message !== '' ? error.message : `HTTP ${response.status}`)
+        failure.code = error?.code ?? null
+        failure.blockers = Array.isArray(error?.blockers) ? error.blockers : []
+        throw failure
+      }
+      return body.value
+    }
+
+    function actionNotice(result, t) {
+      const application = result?.application
+      if (application === 'applied') return t('actionApplied')
+      if (application === 'restart-required') return `${t('actionRestart')}${result?.restartReason ? ` (${result.restartReason})` : ''}`
+      if (application === 'overridden') return t('actionOverridden')
+      if (application === 'failed' || application === 'cancelled') {
+        const detail = result?.error?.message ?? result?.error?.code ?? ''
+        return detail === '' ? t('actionFailed') : `${t('actionFailed')}: ${detail}`
+      }
+      return t('actionUnknown')
+    }
+
     function Badge({ status, t }) {
       const key = STATUS_KEY[status] ?? 'unknown'
       const style = STATUS_STYLE[status] ?? STATUS_STYLE.unknown
@@ -251,13 +328,29 @@ window.__ModuleLoader__.load({
       return key === undefined ? component.key : t(key)
     }
 
-    function ComponentCard({ component, t, openPackage }) {
+    function actionLockText(action, t) {
+      if (action.reason === 'dependency-conflict') return t('dependencyConflict')
+      if (action.reason === 'unsupported-sidebar-host') return t('unsupported')
+      if (action.reason === 'not-installed') return t('missing')
+      if (action.policy === 'restart-required') return t('restartRequired')
+      if (action.policy === 'paired-restart') return t('pairedRestart')
+      return t('locked')
+    }
+
+    function ComponentCard({ component, t, openPackage, confirming, busy, onAsk, onConfirm, onCancel }) {
       const serviceState = component.service?.state ?? null
       const phase = component.rows?.length
         ? [...new Set(component.rows.map((row) => row.fiberPhase ?? '—'))].join(', ')
         : t('none')
       const versionText = `${component.version ?? t('none')} / ${component.expectedVersion ?? t('none')}`
       const contractText = `${component.contract ?? t('none')} / ${component.expectedContract ?? t('none')}`
+      const action = component.action ?? { policy: 'locked', reason: null, canToggle: false, blockers: [] }
+      const enabled = typeof component.enabled === 'boolean' ? component.enabled : component.bundleEnabled === true
+      const hot = action.policy === 'hot' && action.canToggle === true
+      const actionText = hot
+        ? enabled ? t('disable') : t('enable')
+        : actionLockText(action, t)
+      const blockers = Array.isArray(action.blockers) ? action.blockers : []
       return h('div', { style: S.card },
         h('div', { style: S.cardHead },
           h('strong', { style: { fontSize: 13 } }, componentLabel(component, t)),
@@ -266,11 +359,32 @@ window.__ModuleLoader__.load({
         h('div', { style: S.mono }, component.package),
         h('div', { style: S.kv }, h('span', { style: S.key }, t('version')), h('span', null, versionText)),
         h('div', { style: S.kv }, h('span', { style: S.key }, t('contract')), h('span', null, contractText)),
-        h('div', { style: S.kv }, h('span', { style: S.key }, t('enabled')), h('span', null, component.bundleEnabled ? t('enabled') : t('disabled'))),
+        h('div', { style: S.kv }, h('span', { style: S.key }, t('enabled')), h('span', null, enabled ? t('enabled') : t('disabled'))),
         h('div', { style: S.kv }, h('span', { style: S.key }, t('fiber')), h('span', null, phase)),
         h('div', { style: S.kv }, h('span', { style: S.key }, t('service')), h('span', null, serviceLabel(serviceState, t))),
         component.bundleError ? h('div', { style: S.reason }, `${t('reason')}: ${component.bundleError.code ?? component.bundleError.reason ?? 'bundle-error'}`) : null,
         component.reason ? h('div', { style: S.reason }, `${t('reason')}: ${component.reason}`) : null,
+        hot
+          ? (confirming
+            ? h('div', { style: S.actionRow },
+              h('button', {
+                style: S.dangerButton,
+                disabled: busy,
+                onClick: () => onConfirm(component, !enabled),
+              }, busy ? t('actionBusy') : enabled ? t('confirmDisable') : t('confirmEnable')),
+              h('button', { style: S.actionButton, disabled: busy, onClick: onCancel }, t('cancel')),
+            )
+            : h('div', { style: S.actionRow },
+              h('button', {
+                style: S.actionButton,
+                disabled: busy,
+                onClick: () => onAsk(component),
+              }, busy ? t('actionBusy') : actionText),
+            ))
+          : h('div', { style: S.note }, `${actionText}${action.reason ? `: ${action.reason}` : ''}`),
+        blockers.length > 0
+          ? h('div', { style: S.reason }, `${t('blockedBy')}: ${blockers.map((item) => `${item.key} (${item.status})`).join(', ')}`)
+          : null,
         typeof openPackage === 'function'
           ? h('button', {
             style: S.linkButton,
@@ -315,6 +429,10 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState(null)
       const [loading, setLoading] = React.useState(true)
       const [nonce, setNonce] = React.useState(0)
+      const [confirming, setConfirming] = React.useState(null)
+      const [busyKey, setBusyKey] = React.useState(null)
+      const [notice, setNotice] = React.useState(null)
+      const [noticeError, setNoticeError] = React.useState(false)
 
       React.useEffect(() => {
         let stopped = false
@@ -343,6 +461,36 @@ window.__ModuleLoader__.load({
       const refresh = () => {
         setLoading(true)
         setNonce((value) => value + 1)
+      }
+
+      const ask = (component) => {
+        setConfirming(component.key)
+        setNotice(null)
+      }
+
+      const cancel = () => {
+        setConfirming(null)
+      }
+
+      const act = async (component, enabled) => {
+        setBusyKey(component.key)
+        setNotice(null)
+        try {
+          const result = await postAction(component.key, enabled)
+          const failed = result?.application === 'failed' || result?.application === 'cancelled'
+          setNotice(actionNotice(result, t))
+          setNoticeError(failed)
+          setConfirming(null)
+          window.setTimeout(refresh, 600)
+        } catch (failure) {
+          const message = String(failure?.message ?? failure) === 'host-stale'
+            ? t('hostStale')
+            : `${t('actionFailed')}: ${failure?.message ?? failure}`
+          setNotice(message)
+          setNoticeError(true)
+        } finally {
+          setBusyKey(null)
+        }
       }
 
       if (state === null && loading) {
@@ -374,6 +522,7 @@ window.__ModuleLoader__.load({
           h('button', { style: S.button, onClick: refresh }, loading ? t('loading') : t('refresh')),
         ),
         error ? h('div', { style: S.banner }, error) : null,
+        notice ? h('div', { style: { ...S.notice, ...(noticeError ? S.noticeError : {}) } }, notice) : null,
         h('div', { style: S.card },
           h('div', { style: S.cardHead },
             h('strong', null, t('manager')),
@@ -384,11 +533,22 @@ window.__ModuleLoader__.load({
           h('div', { style: S.kv }, h('span', { style: S.key }, t('verified')), h('span', null, host.verified === true ? t('verified') : t('unverified'))),
           h('div', { style: S.kv }, h('span', { style: S.key }, t('dataSource')), h('span', null, state.dataSource ?? t('none'))),
           manager.reason ? h('div', { style: S.reason }, `${t('reason')}: ${manager.reason}`) : null,
+          h('div', { style: S.note }, t('managerLocked')),
           state.dataSource === 'profile-fallback' ? h('div', { style: S.note }, t('fallbackNote')) : null,
         ),
         h('section', { style: S.section },
           h('h3', { style: S.sectionTitle }, t('components')),
-          h('div', { style: S.grid }, (state.components ?? []).map((component) => h(ComponentCard, { key: component.key, component, t, openPackage }))),
+          h('div', { style: S.grid }, (state.components ?? []).map((component) => h(ComponentCard, {
+            key: component.key,
+            component,
+            t,
+            openPackage,
+            confirming: confirming === component.key,
+            busy: busyKey === component.key,
+            onAsk: ask,
+            onConfirm: act,
+            onCancel: cancel,
+          }))),
         ),
         h('section', { style: S.section },
           h('h3', { style: S.sectionTitle }, t('edges')),
