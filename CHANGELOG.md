@@ -6,6 +6,7 @@
 - Phase 1A adds confirmed `guide-panel` / `guide-sidebar-adapter` hot switches through the official `pluginManager`; admission/shield remain restart-required, goal is paired, preset/manager locked, and the manager never writes the profile directly.
 - Phase 1B stages admission/shield and the goal adapter/driver pair as `pending.json` intents. The restart helper stops DSH, applies the patch through the official `writePluginEnabled`, restores the patch on failure, and restarts; the UI never claims a cold change applied before that restart.
 - Phase 2 adds per-component `enable`/`disable` gates and host artifact SHA-256 checks. Contract, required-artifact, dependency and unsupported/failed states block enabling; host-version, unknown-artifact and version drift are warnings; disabling stays available for recovery.
+- Phase 3 detects local `link:` source changes by comparing package mtime with Host start, offers a restart-only `reload-guide-manager.cmd`, and adds `rollback-guide-manager.cmd` for the newest cold-patch backup. Registry/tarball/git updates stay on the official Plugins page rather than duplicating its remove/install transaction.
 - Prepare a private GitHub repository and commit-based local snapshots; public and marketplace distribution remain deferred, with private metadata unchanged.
 - Summarize retired fork, duplicate archive documents, deferred research plans and one-off deployment scripts in `docs/HISTORY-AND-MAINTENANCE-NOTES.md`, then remove those obsolete files while preserving active tests and recovery dependencies.
 

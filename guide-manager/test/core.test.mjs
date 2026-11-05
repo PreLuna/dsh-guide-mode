@@ -14,11 +14,14 @@ import {
   coldIntent,
   componentStatus,
   dependencyBlockers,
+  dependencySource,
   hostStatus,
   normalizeActionResult,
   parseSkillFrontmatter,
   readSkillsState,
   skillVersion,
+  sourceChangedSince,
+  updateModeFor,
 } from '../core.js'
 
 const readyService = { available: true, state: { mode: 'ready' }, error: null }
@@ -314,4 +317,21 @@ test('action gate blocks hard incompatibilities but allows disabling for recover
   assert.equal(warningOnly.allowed, true)
   assert.ok(warningOnly.warnings.some((item) => item.code === 'host-version-unverified'))
   assert.ok(ARTIFACT_REQUIREMENTS.goal.includes('@deepseek-ai/dsh-goal-round-driver'))
+})
+
+test('dependency sources select local reload or the official package manager', () => {
+  assert.deepEqual(dependencySource('link:D:/work/guide-panel'), { kind: 'link', path: 'D:/work/guide-panel' })
+  assert.deepEqual(dependencySource('file:./pkg.tgz'), { kind: 'file', path: './pkg.tgz' })
+  assert.deepEqual(dependencySource('workspace:*'), { kind: 'workspace', path: null })
+  assert.equal(dependencySource('0.2.1-rc.3').kind, 'registry')
+  assert.equal(dependencySource('git+https://example.test/repo.git').kind, 'git')
+  assert.equal(dependencySource('https://example.test/pkg.tgz').kind, 'tarball')
+  assert.equal(dependencySource('').kind, 'unknown')
+  assert.equal(updateModeFor('link'), 'source-reload')
+  assert.equal(updateModeFor('workspace'), 'source-reload')
+  assert.equal(updateModeFor('registry'), 'package-manager')
+  assert.equal(updateModeFor('unknown'), 'unavailable')
+  assert.equal(sourceChangedSince(3000, 1000), true)
+  assert.equal(sourceChangedSince(1000, 2000), false)
+  assert.equal(sourceChangedSince(null, 1000), null)
 })

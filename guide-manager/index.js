@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
@@ -9,9 +9,12 @@ import {
   buildEdges,
   coldIntent,
   componentStatus,
+  dependencySource,
   hostStatus,
   normalizeActionResult,
   readSkillsState,
+  sourceChangedSince,
+  updateModeFor,
 } from './core.js'
 
 /**
@@ -30,7 +33,10 @@ const WORKSPACE_ROOT = resolve(PACKAGE_DIR, '..')
 const HELPER_PATH = join(PACKAGE_DIR, 'helper', 'restart-guide-manager.cmd')
 const HELPER_PS1 = join(PACKAGE_DIR, 'helper', 'restart-guide-manager.ps1')
 const HELPER_APPLY = join(PACKAGE_DIR, 'helper', 'apply-pending.mjs')
+const HELPER_RELOAD = join(PACKAGE_DIR, 'helper', 'reload-guide-manager.cmd')
+const HELPER_ROLLBACK = join(PACKAGE_DIR, 'helper', 'rollback-guide-manager.cmd')
 const PENDING_VERSION = 1
+const HOST_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
 function serviceOf(ctx, name) {
   try {
@@ -212,7 +218,63 @@ function readArtifactState(ctx, profileContext, artifacts) {
   return { checked: true, verified, items }
 }
 
-function collectComponents(ctx, pluginData, guide, profileContext, host, pendingByComponent = new Map()) {
+function latestMtime(directory) {
+  if (typeof directory !== 'string' || !existsSync(directory)) return null
+  let latest = null
+  let seen = 0
+  const walk = (current) => {
+    if (seen >= 200) return
+    let entries
+    try {
+      entries = readdirSync(current, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (seen >= 200) return
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.guide-manager') continue
+      if (entry.isSymbolicLink()) continue
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) {
+        walk(path)
+        continue
+      }
+      try {
+        const mtime = statSync(path).mtimeMs
+        latest = latest === null ? mtime : Math.max(latest, mtime)
+        seen += 1
+      } catch {
+        // A file disappearing during the scan does not invalidate the rest.
+      }
+    }
+  }
+  walk(directory)
+  return latest
+}
+
+function readBackups(profileContext) {
+  const directory = profileContext?.dir === undefined ? null : join(profileContext.dir, '.guide-manager', 'backups')
+  if (directory === null || !existsSync(directory)) return { count: 0, latest: null }
+  let names
+  try {
+    names = readdirSync(directory).filter((name) => name.startsWith('cordis.patch.yml.') && name.endsWith('.bak'))
+  } catch {
+    return { count: 0, latest: null }
+  }
+  const items = []
+  for (const name of names) {
+    const path = join(directory, name)
+    try {
+      items.push({ name, path, at: statSync(path).mtime.toISOString() })
+    } catch {
+      // Ignore a backup that disappeared while listing.
+    }
+  }
+  items.sort((left, right) => right.at.localeCompare(left.at))
+  return { count: items.length, latest: items[0] ?? null }
+}
+
+function collectComponents(ctx, pluginData, guide, profileContext, host, pendingByComponent = new Map(), dependencies = {}) {
   const definitions = guide.components ?? {}
   const components = [...COMPONENTS].sort((a, b) => a.order - b.order).map((component) => {
     const bundle = pluginData.bundles.find((item) => item.name === component.package) ?? null
@@ -233,6 +295,14 @@ function collectComponents(ctx, pluginData, guide, profileContext, host, pending
       ? false
       : rows.length > 0 ? rows.some((row) => row.enabled === true) : bundle?.enabled === true
     const service = readServiceState(ctx, component)
+    const spec = typeof dependencies[component.package] === 'string' ? dependencies[component.package] : null
+    const source = dependencySource(spec)
+    const mode = updateModeFor(source.kind)
+    const localPath = mode === 'source-reload' && source.path !== null && profileContext?.dir !== undefined
+      ? resolve(profileContext.dir, source.path)
+      : null
+    const latest = localPath === null ? null : latestMtime(localPath)
+    const changed = sourceChangedSince(latest, HOST_STARTED_AT)
     const status = componentStatus({
       installed,
       bundleError: bundle?.error ?? null,
@@ -260,6 +330,19 @@ function collectComponents(ctx, pluginData, guide, profileContext, host, pending
       rows,
       service,
       manifestPath: info?.path ?? null,
+      update: {
+        spec,
+        kind: source.kind,
+        mode,
+        path: localPath,
+        latestMtime: latest,
+        hostStartedAt: HOST_STARTED_AT,
+        sourceChanged: changed,
+        official: mode === 'package-manager',
+        reason: mode === 'unavailable'
+          ? 'dependency-spec-unknown'
+          : mode === 'package-manager' ? 'use-official-plugins-page' : null,
+      },
       status: status.status,
       reason: status.reason,
       versionMatch: status.versionMatch,
@@ -379,21 +462,23 @@ function pendingView(profileContext) {
 async function collectState(ctx, config = {}) {
   const bom = readBom()
   const profileContext = serviceOf(ctx, 'profileContext')
+  const profileManifest = readProfileManifest(profileContext)
   const host = readHostState(ctx, profileContext, bom.guide.host ?? {})
   host.artifacts = config?.checkArtifacts === false
     ? { checked: false, verified: null, items: [] }
     : readArtifactState(ctx, profileContext, bom.guide.artifacts ?? {})
   const pluginData = await readPluginData(ctx, profileContext)
   const pending = pendingView(profileContext)
-  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host, pending.byComponent)
+  const components = collectComponents(ctx, pluginData, bom.guide, profileContext, host, pending.byComponent, profileManifest?.dependencies ?? {})
   const edges = buildEdges(components, bom.guide.edges ?? [], pluginData.rows)
   const skills = readSkillsState(profileContext?.home)
   const manager = checkManager(ctx)
+  const backups = readBackups(profileContext)
   const state = {
     product: bom.guide.product ?? 'dsh-guide-mode',
     release: bom.guide.release ?? bom.manifest.version ?? null,
     readOnly: false,
-    actionScope: 'phase-2',
+    actionScope: 'phase-3',
     manager: { ...manager, version: bom.manifest.version ?? null, action: MANAGER_ACTION },
     profile: {
       name: profileContext?.name ?? null,
@@ -415,6 +500,16 @@ async function collectState(ctx, config = {}) {
       applyScript: pending.applyScript,
       helperExists: pending.helperExists,
     },
+    helper: {
+      pending: HELPER_PATH,
+      reload: HELPER_RELOAD,
+      rollback: HELPER_ROLLBACK,
+      ps1: HELPER_PS1,
+      applyScript: HELPER_APPLY,
+      reloadExists: existsSync(HELPER_RELOAD),
+      rollbackExists: existsSync(HELPER_ROLLBACK),
+    },
+    backups,
     dataSource: pluginData.mode,
     dataError: pluginData.error,
     generatedAt: new Date().toISOString(),
@@ -609,7 +704,7 @@ async function handle(injected, getState, setEnabled, req, res) {
     return
   }
   if (pathname === `${ROUTE_PREFIX}/ping`) {
-    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-2' } })
+    writeJson(res, 200, { ok: true, value: { service: 'guide-manager', readOnly: false, actionScope: 'phase-3' } })
     return
   }
   if (pathname !== `${ROUTE_PREFIX}/state`) {
@@ -628,7 +723,7 @@ export const name = 'guide-manager'
 export async function apply(ctx, config = {}) {
   const getState = () => collectState(ctx, config)
   const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled, config)
-  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-2' })
+  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-3' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
     const connection = serviceOf(injected, 'connection')
@@ -639,6 +734,6 @@ export async function apply(ctx, config = {}) {
       handler: (req, res) => {
         void handle(injected, getState, setEnabled, req, res)
       },
-    }), 'guide-manager: status and phase-2 action route')
+    }), 'guide-manager: status and phase-3 action route')
   })
 }

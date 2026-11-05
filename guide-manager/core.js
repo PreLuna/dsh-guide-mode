@@ -200,6 +200,31 @@ export function normalizeActionResult(result, component, enabled) {
   }
 }
 
+/** Classify a profile dependency spec into an update source. */
+export function dependencySource(spec) {
+  const value = typeof spec === 'string' ? spec.trim() : ''
+  if (value === '') return { kind: 'unknown', path: null }
+  if (value.startsWith('link:')) return { kind: 'link', path: value.slice(5) }
+  if (value.startsWith('file:')) return { kind: 'file', path: value.slice(5) }
+  if (value.startsWith('workspace:')) return { kind: 'workspace', path: null }
+  if (/\.(tgz|tar\.gz)(\?.*)?$/i.test(value)) return { kind: 'tarball', path: null }
+  if (/^(git\+|git:|github:|https?:\/\/)/i.test(value)) return { kind: 'git', path: null }
+  return { kind: 'registry', path: null }
+}
+
+/** Local sources reload from disk; package sources are handled by the official Plugins page. */
+export function updateModeFor(kind) {
+  if (kind === 'link' || kind === 'file' || kind === 'workspace') return 'source-reload'
+  if (kind === 'registry' || kind === 'git' || kind === 'tarball') return 'package-manager'
+  return 'unavailable'
+}
+
+/** Whether a local package file was written after this Host started. */
+export function sourceChangedSince(latestMtime, hostStartedAt) {
+  if (!Number.isFinite(latestMtime) || !Number.isFinite(hostStartedAt)) return null
+  return latestMtime > hostStartedAt + 1000
+}
+
 /** SHA-256 of a UTF-8 string, used for the skill file fingerprint. */
 export function sha256(text) {
   return createHash('sha256').update(text).digest('hex')

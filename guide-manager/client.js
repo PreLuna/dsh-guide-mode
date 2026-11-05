@@ -69,6 +69,14 @@ window.__ModuleLoader__.load({
       gateWarning: '兼容警告',
       artifacts: '构建产物',
       notChecked: '未检查',
+      updates: '更新与回滚',
+      sourceUpdatePending: '源码已更新，重启加载后生效',
+      noSourceChanges: '未检测到本地源码变更',
+      reloadHelper: '双击 reload helper 重启加载；只停止 DeepSeek Harness',
+      packageManagerUpdate: 'registry/tarball 包请在官方插件页更新',
+      rollbackAvailable: '可回滚上次冷切换',
+      rollbackHelper: '双击 rollback helper 恢复最近的 patch 备份并重启',
+      noBackups: '暂无冷切换备份',
       blockedBy: '依赖',
       none: '—',
       optional: '可选',
@@ -167,6 +175,14 @@ window.__ModuleLoader__.load({
       gateWarning: 'Compatibility warning',
       artifacts: 'Build artifacts',
       notChecked: 'Not checked',
+      updates: 'Updates and rollback',
+      sourceUpdatePending: 'Source changed; reload to apply',
+      noSourceChanges: 'No local source changes detected',
+      reloadHelper: 'Double-click the reload helper; it stops only DeepSeek Harness',
+      packageManagerUpdate: 'Update registry/tarball packages on the official Plugins page',
+      rollbackAvailable: 'Last cold switch can be rolled back',
+      rollbackHelper: 'Double-click the rollback helper to restore the newest patch backup',
+      noBackups: 'No cold-switch backup yet',
       blockedBy: 'Requirements',
       none: '—',
       optional: 'optional',
@@ -407,6 +423,9 @@ window.__ModuleLoader__.load({
         h('div', { style: S.kv }, h('span', { style: S.key }, t('service')), h('span', null, serviceLabel(serviceState, t))),
         component.bundleError ? h('div', { style: S.reason }, `${t('reason')}: ${component.bundleError.code ?? component.bundleError.reason ?? 'bundle-error'}`) : null,
         component.reason ? h('div', { style: S.reason }, `${t('reason')}: ${component.reason}`) : null,
+        component.update?.sourceChanged === true
+          ? h('div', { style: S.reason }, t('sourceUpdatePending'))
+          : null,
         pending
           ? h('div', { style: S.reason }, `${t('pendingHint')}: ${pending.enabled ? t('enable') : t('disable')} · ${t('pendingRestart')}`)
           : null,
@@ -572,6 +591,9 @@ window.__ModuleLoader__.load({
         `${t('cordis')} ${host.cordis?.actual ?? t('none')}`,
         `${t('betterSidebar')} ${host.betterSidebar?.actual ?? t('none')}`,
       ].join(' · ')
+      const changedSources = (state.components ?? []).filter((component) => component.update?.sourceChanged === true)
+      const packageUpdates = (state.components ?? []).filter((component) => component.update?.mode === 'package-manager')
+      const backups = state.backups ?? { count: 0, latest: null }
 
       return h('div', { style: S.page },
         h('div', { style: S.header },
@@ -618,6 +640,24 @@ window.__ModuleLoader__.load({
             onConfirm: act,
             onCancel: cancel,
           }))),
+        ),
+        h('section', { style: S.section },
+          h('h3', { style: S.sectionTitle }, t('updates')),
+          h('div', { style: S.card },
+            changedSources.length > 0
+              ? h('div', { style: S.notice }, `${t('sourceUpdatePending')}: ${changedSources.map((component) => componentLabel(component, t)).join(', ')}`)
+              : h('div', { style: S.note }, t('noSourceChanges')),
+            state.helper?.reload ? h('div', { style: S.mono }, state.helper.reload) : null,
+            h('div', { style: S.note }, t('reloadHelper')),
+            packageUpdates.length > 0
+              ? h('div', { style: S.note }, `${t('packageManagerUpdate')}: ${packageUpdates.map((component) => componentLabel(component, t)).join(', ')}`)
+              : null,
+            backups.count > 0
+              ? h('div', { style: S.notice }, `${t('rollbackAvailable')} (${backups.count})`)
+              : h('div', { style: S.note }, t('noBackups')),
+            backups.count > 0 && state.helper?.rollback ? h('div', { style: S.mono }, state.helper.rollback) : null,
+            backups.count > 0 ? h('div', { style: S.note }, t('rollbackHelper')) : null,
+          ),
         ),
         h('section', { style: S.section },
           h('h3', { style: S.sectionTitle }, t('edges')),

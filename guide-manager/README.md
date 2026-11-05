@@ -1,11 +1,11 @@
-# Guide manager（Phase 2）
+# Guide manager（Phase 3）
 
 独立的 Host + client 包，在官方 **插件** 页增加一个「指导」标签页，展示指导模式的六个组件、依赖关系、宿主版本和 `guide` skill 状态，并提供两档切换：
 
 - **热切换**：`guide-panel`、`guide-sidebar-adapter`，通过官方 `pluginManager.setPluginEnabled` 立即生效。
 - **冷切换**：`guide-admission`、`guide-shield`、`guide-goal-adapter`，只写 pending intent；由独立 helper 在 DSH 停止时应用 profile patch 并重启。
 
-Phase 2 在执行任何切换前先跑兼容门禁：硬阻断（契约/产物/依赖/组件不可用）会禁用按钮；宿主版本、产物未知、版本漂移只作为警告。manager 不 import 六个组件，也不直接写 profile。
+Phase 2 在执行任何切换前先跑兼容门禁。Phase 3 增加本地 link 源码变更检测、重启加载 helper 和冷切换 patch 回滚。manager 不 import 六个组件，也不直接写 profile。
 
 ## 显示内容
 
@@ -69,6 +69,52 @@ Phase 2 的 BOM 还记录敏感上游产物的 SHA-256：
 
 Host 通过 `pluginPackages` 解析实际目录并哈希；包或文件不可用时记 `unknown`，不会伪称已验证。`host.artifacts.verified` 为 `true` 仅当所有声明产物都匹配；存在未知项时为 `null`，存在不匹配时为 `false`。
 
+## 更新与回滚（Phase 3）
+
+### 本地 link
+
+本机六个组件都通过 `link:` 登记。Host 读取 profile 的 dependency spec，递归取包内最新 mtime，和本进程启动时间比较：
+
+- `update.mode: 'source-reload'`；
+- `update.sourceChanged: true` 表示源码在本次 Host 启动后改过；
+- UI 的“更新与回滚”区列出变更组件，并给出：
+  ```
+  helper/reload-guide-manager.cmd
+  ```
+- reload helper 只停/重启 `DeepSeek Harness`，不修改任何包或 profile。
+
+这条路径就是当前本地安装的实际升级方式：改源码 → reload → 重新加载 Host/client。
+
+### registry / tarball / git
+
+这些包在 `update.mode: 'package-manager'`，UI 提示到官方插件页更新。官方 manager 的更新是 `removeBundle` → `installBundle`，本 manager 不重复这套破坏性事务；官方的暂存、失败恢复和取消语义仍由官方 UI 负责。
+
+### 冷切换回滚
+
+每次 `apply-pending.mjs` 应用前会把 `cordis.patch.yml` 复制到：
+
+```
+profile/.guide-manager/backups/cordis.patch.yml.<timestamp>.bak
+```
+
+UI 检测备份后显示：
+
+```
+helper/rollback-guide-manager.cmd
+```
+
+rollback helper 停止 DSH，恢复**最新**一份备份，删除 pending，再重启。它回滚的是最近一次冷切换应用，不是整个历史；多次冷切换需要逐次回滚或直接编辑 patch。
+
+helper 位置：
+
+| 文件 | 作用 |
+|---|---|
+| `restart-guide-manager.cmd` | 应用 pending 后重启 |
+| `reload-guide-manager.cmd` | 只重启，加载本地源码 |
+| `rollback-guide-manager.cmd` | 恢复最新 patch 备份后重启 |
+| `restart-guide-manager.ps1` | 三种模式的实现；只停 `DeepSeek Harness` |
+| `apply-pending.mjs` | 调用官方 `writePluginEnabled` |
+
 ## Pending helper
 
 位置：`guide-manager/helper/restart-guide-manager.cmd`
@@ -123,7 +169,7 @@ POST /guide-manager/api/action  # set-component-enabled
 
 ## 安装与测试
 
-本机 desktop 已安装并验证「指导」tab。Phase 2 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
+本机 desktop 已安装并验证「指导」tab。Phase 3 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
 node guide-manager/test/core.test.mjs
@@ -146,13 +192,18 @@ node guide-manager/test/helper.test.mjs
   - `dsh-subagent`、`cordis`、`goal-round-driver`、`client-modules`、`sidebar-right`、`workspace` 的哈希全部匹配；
   - 缺少 `dsh-better-sidebar` 时记为 `unknown`，`host.artifacts.verified=null`，sidebar 启用被 `component-unsupported` / `sidebar-host-mismatch` 阻断；
   - panel/admission/shield/goal 的启用门禁允许，但带 `host-version-unverified` 警告。
+- Phase 3 更新/回滚实测：
+  - Host 启动后修改 `guide-panel/icon.svg` 的 mtime，state 返回 `update.sourceChanged=true`、`update.mode='source-reload'`；
+  - UI 显示“源码已更新，重启加载后生效”、reload helper 路径和“可回滚上次冷切换 (1)”；
+  - 放置一份 `.guide-manager/backups/*.bak` 后，`state.backups.count=1`，rollback helper 路径出现。
 - 该隔离 profile 没有安装官方 `dsh-better-sidebar` 和 `guide` skill，因此 sidebar 显示 `unsupported/package-unavailable`、skills 显示 `missing`；这是预期的降级。
 
 ## 边界
 
-- Phase 2 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
+- Phase 3 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
 - 操作前门禁只阻断明确不兼容的组合；宿主版本、产物不可用、版本漂移作为警告，不把“未验证”伪称为“不兼容”。
+- 本地 link 的“升级”是源码更新 + reload helper；registry/tarball/git 的安装/升级仍由官方插件页负责。
+- rollback helper 只恢复最新一份 patch 备份，不等同于完整的包版本回滚。
 - UI 不自动运行 helper；helper 需要用户双击，因为它会关闭并重启 DSH。
-- 不复制官方包管理、安装或升级逻辑；这些留给后续阶段。
 - 冷切换写的是 profile patch，不修改 `package.json`、lockfile 或官方包。
 - 不是兼容性证明：`ready` 只表示该组合在已验证 BOM 内；`ready-unverified` 明确表示未验证。

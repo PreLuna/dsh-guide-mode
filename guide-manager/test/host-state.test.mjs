@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -116,11 +116,18 @@ test('host state reports six ready components, edges and the skill', async () =>
     await apply(ctx, { checkArtifacts: false })
     const state = await store.get('guideManager').getState()
     assert.equal(state.readOnly, false)
-    assert.equal(state.actionScope, 'phase-2')
+    assert.equal(state.actionScope, 'phase-3')
     assert.equal(state.manager.mode, 'ready')
     assert.equal(state.manager.action.policy, 'locked')
     assert.equal(state.pending.present, false)
     assert.match(state.pending.helper, /restart-guide-manager\.cmd$/)
+    const panel = state.components.find((item) => item.key === 'panel')
+    assert.equal(panel.update.mode, 'source-reload')
+    assert.match(panel.update.spec, /^link:/)
+    assert.equal(panel.update.sourceChanged, null)
+    assert.equal(state.backups.count, 0)
+    assert.match(state.helper.reload, /reload-guide-manager\.cmd$/)
+    assert.match(state.helper.rollback, /rollback-guide-manager\.cmd$/)
     assert.equal(state.dataSource, 'plugin-manager')
     assert.equal(state.components.length, 6)
     assert.ok(state.components.every((component) => component.status === 'ready'), JSON.stringify(state.components, null, 2))
@@ -274,6 +281,32 @@ test('hot action failures are surfaced without claiming success', async () => {
     assert.equal(result.ok, true)
     assert.equal(result.value.application, 'failed')
     assert.deepEqual(result.value.error, { code: 'operation-error', message: 'boom' })
+  } finally {
+    rmSync(data.root, { recursive: true, force: true })
+  }
+})
+
+test('local link source changes and cold backups are reported', async () => {
+  const data = fixture()
+  try {
+    const source = join(data.root, '@local', 'dsh-guide-panel')
+    mkdirSync(source, { recursive: true })
+    const file = join(source, 'index.js')
+    writeFileSync(file, 'export {}\n')
+    const future = new Date(Date.now() + 3_600_000)
+    utimesSync(file, future, future)
+    const backupDir = join(data.profile, '.guide-manager', 'backups')
+    mkdirSync(backupDir, { recursive: true })
+    writeFileSync(join(backupDir, 'cordis.patch.yml.2026-11-05.bak'), '[]\n')
+
+    const { ctx, store } = makeCtx(data, { services: componentServices })
+    await apply(ctx, { checkArtifacts: false })
+    const state = await store.get('guideManager').getState()
+    const panel = state.components.find((item) => item.key === 'panel')
+    assert.equal(panel.update.mode, 'source-reload')
+    assert.equal(panel.update.sourceChanged, true)
+    assert.equal(state.backups.count, 1)
+    assert.match(state.backups.latest.name, /\.bak$/)
   } finally {
     rmSync(data.root, { recursive: true, force: true })
   }
