@@ -701,8 +701,17 @@ window.__ModuleLoader__.load({
         const t = ctx.locale.bind(NS)
         const openSkills = async () => {
           const label = t('skills')
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
           const findNav = () => [...document.querySelectorAll('[role="dialog"] button')]
             .find((element) => (element.textContent ?? '').trim() === label)
+          const waitForNav = async () => {
+            for (let attempt = 0; attempt < 20; attempt += 1) {
+              const nav = findNav()
+              if (nav !== undefined) return nav
+              await sleep(100)
+            }
+            return undefined
+          }
           const existing = findNav()
           if (existing !== undefined) {
             existing.click()
@@ -711,13 +720,12 @@ window.__ModuleLoader__.load({
           const account = document.querySelector('button[aria-label="账号菜单"], button[aria-label="Account menu"], button[aria-label*="账号"], button[aria-label*="Account"]')
           if (account === null) return false
           account.click()
-          await new Promise((resolve) => setTimeout(resolve, 150))
+          await sleep(200)
           const settingsItem = [...document.querySelectorAll('[role="menuitem"]')]
             .find((element) => /设置|Settings/.test(element.textContent ?? ''))
           if (settingsItem === undefined) return false
           settingsItem.click()
-          await new Promise((resolve) => setTimeout(resolve, 300))
-          const nav = findNav()
+          const nav = await waitForNav()
           if (nav === undefined) return false
           nav.click()
           return true
