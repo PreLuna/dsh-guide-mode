@@ -55,7 +55,10 @@ function mockGitHub(seed, { failUpload = false, redirect = false, badRedirect = 
       return json({ object: { type: annotated ? 'tag' : 'commit', sha: badTag ? 'f'.repeat(40) : annotated ? 'a'.repeat(40) : tags.get(tag) } })
     }
     if (path.startsWith('/git/tags/')) return json({ object: { type: 'commit', sha: tags.values().next().value } })
-    if (path.startsWith('/releases/tags/')) return releases.find((row) => row.tag_name === decodeURIComponent(path.split('/').at(-1))) ? json(releases.find((row) => row.tag_name === decodeURIComponent(path.split('/').at(-1)))) : json({}, 404)
+    if (path.startsWith('/releases/tags/')) {
+      const release = releases.find((row) => row.tag_name === decodeURIComponent(path.split('/').at(-1)) && !row.draft)
+      return release ? json(release) : json({}, 404)
+    }
     if (path === '/releases' && method === 'GET') return json(releases.map(({ assets, ...row }) => row))
     if (path === '/releases' && method === 'POST') {
       const body = JSON.parse(options.body)

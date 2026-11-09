@@ -11,6 +11,24 @@ const encoded = (value) => encodeURIComponent(String(value))
 const identity = (entry) => `${entry.key}@${entry.version}`
 
 export class GitHubReleaseClient extends GitHubSource {
+  async getRelease(tag) {
+    const published = await super.getRelease(tag)
+    if (published) return published
+    // GitHub's by-tag endpoint does not expose drafts. Maintainer credentials
+    // must discover resumable drafts through the authorized release listing.
+    let examined = 0
+    for (let page = 1; page <= 2; page++) {
+      const rows = await this.json(`/releases?per_page=100&page=${page}`)
+      if (!Array.isArray(rows)) throw new Error('invalid-github-releases')
+      examined += rows.length
+      if (examined > MAX_RELEASES) throw new Error('release-history-limit-exceeded')
+      const matches = rows.filter((release) => release.tag_name === tag)
+      if (matches.length > 1) throw new Error('duplicate-release-tag')
+      if (matches.length === 1) return matches[0]
+      if (rows.length < 100) return null
+    }
+    throw new Error('release-history-limit-exceeded')
+  }
   async catalogs() {
     const catalogs = []
     let examined = 0

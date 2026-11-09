@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import winreg
 from datetime import datetime, timezone
 import psutil
 from playwright.async_api import async_playwright
@@ -26,7 +27,15 @@ async def main():
     state_dir = profile / '.guide-manager'
     state_dir.mkdir(exist_ok=True)
     record_path = state_dir / 'launcher.json'
-    token = os.environ.get('DSH_GUIDE_GITHUB_TOKEN') or subprocess.check_output(['gh', 'auth', 'token'], text=True, creationflags=subprocess.CREATE_NO_WINDOW).strip()
+    token = os.environ.get('DSH_GUIDE_GITHUB_TOKEN')
+    if not token:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment') as key:
+                token = winreg.QueryValueEx(key, 'DSH_GUIDE_GITHUB_TOKEN')[0]
+        except FileNotFoundError:
+            pass
+    if not token:
+        raise RuntimeError('dedicated-read-credential-required')
     env = dict(os.environ, DSH_HOME=setup['home'], DSH_GUIDE_GITHUB_TOKEN=token, DEEPSEEK_API_KEY='sk-isolated-acceptance-not-used-for-inference')
     guard = {p.pid: p.create_time() for p in psutil.process_iter(['name']) if p.info['name'] == 'DeepSeek Harness.exe'}
     debug_port, listen_port = port(), port()
