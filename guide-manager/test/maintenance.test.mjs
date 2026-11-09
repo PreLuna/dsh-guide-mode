@@ -12,7 +12,7 @@ import { cancelMaintenance, controlPath, createMaintenancePlan, createManagerRes
 import { applyMaintenance, validateMaintenance } from '../helper/apply-maintenance.mjs'
 
 const managerRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const managerManifest = readJson(join(managerRoot, 'package.json'))
+const managerManifest = { ...readJson(join(managerRoot, 'package.json')), version: '1.1.0' }
 function archive(files) {
   const chunks = []
   for (const [file, content] of Object.entries(files)) {

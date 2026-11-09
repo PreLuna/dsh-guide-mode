@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { apply } from '../index.js'
 import { profileSnapshot, writeJson } from '../install.js'
 import { prepareRemoteRelease } from '../../scripts/lib/release-bundle.mjs'
+import { baselineSource } from './baseline-source.mjs'
 
 function call(route, action, payload = {}, { method = 'POST', raw } = {}) {
   const req = Object.assign(new EventEmitter(), { url: `/guide-manager/api/${action}`, method, destroy() {} })
@@ -31,7 +32,7 @@ test('source HTTP uses async tasks, guarded payloads and the existing offline st
   })
   process.env.DSH_GUIDE_GITHUB_TOKEN = 'fixture-secret-never-render'
   const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-  const bundle = prepareRemoteRelease({ development: true, sourceRoot: workspace, repository: { owner: 'fixture', repo: 'guide' }, tag: 'guide-http-test', output: join(root, 'bundle') })
+  const bundle = prepareRemoteRelease({ development: true, sourceRoot: baselineSource(join(root, 'source'), workspace), repository: { owner: 'fixture', repo: 'guide' }, tag: 'guide-http-test', output: join(root, 'bundle') })
   const catalog = structuredClone(bundle.catalog)
   catalog.release = { tag: 'guide-http-test', commit: 'b'.repeat(40), channel: 'stable', source: 'git-commit' }
   catalog.artifacts.forEach((a) => { a.source.commit = catalog.release.commit })

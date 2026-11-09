@@ -10,13 +10,14 @@ import { artifactInventory } from '../artifacts.js'
 import { validateInstallPlan } from '../helper/apply-install.mjs'
 import { createRemoteManager } from '../remote.js'
 import { prepareRemoteRelease } from '../../scripts/lib/release-bundle.mjs'
+import { baselineSource } from './baseline-source.mjs'
 
 test('consumer query, preparation and offline installer bridge', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'guide-remote-'))
   t.after(() => { assert.ok(!relative(tmpdir(), root).startsWith('..')); rmSync(root, { recursive: true, force: true }) })
   const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
   const host = readJson(join(workspace, 'guide-manager/package.json')).dshGuide.host
-  const bundle = prepareRemoteRelease({ development: true, sourceRoot: workspace, repository: { owner: 'PreLuna', repo: 'dsh-guide-mode' }, tag: 'guide-test', output: join(root, 'bundle') })
+  const bundle = prepareRemoteRelease({ development: true, sourceRoot: baselineSource(join(root, 'source'), workspace), repository: { owner: 'PreLuna', repo: 'dsh-guide-mode' }, tag: 'guide-test', output: join(root, 'bundle') })
   const catalog = structuredClone(bundle.catalog)
   catalog.release = { tag: 'guide-test', commit: 'a'.repeat(40), channel: 'stable', source: 'git-commit' }
   catalog.artifacts.forEach((a) => { a.source.commit = catalog.release.commit })
