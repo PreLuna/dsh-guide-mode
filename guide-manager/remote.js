@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, openSync, closeSync, readFileSync, statSync, unl
 import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { GitHubReleaseClient } from './github-source.js'
+import { PublicGitHubReleaseClient } from './github-public.js'
 import { parseRemoteRelease, RELEASE_FILE, validateSourceConfig } from './release.js'
 import { artifactInventory } from './artifacts.js'
 import { cacheArtifact, cachePath, createInstallPlan, digest, fingerprint, INSTALL_ORDER, profileSnapshot, readCatalog, readJson, selectedKeys, stageInstall, writeJson } from './install.js'
@@ -14,7 +15,11 @@ const alive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { r
 export function createRemoteManager({ profile, sourceConfig, sourcePath, host, managerRoot, fetchImpl, env = process.env }) {
   const root = profile?.dir && isAbsolute(profile.dir) ? join(profile.dir, '.guide-manager', 'remote') : null
   let active = null
-  const config = () => validateSourceConfig(sourceConfig ?? readJson(sourcePath ?? join(profile.dir, '.guide-manager', 'source.json')))
+  const config = () => {
+    if (sourceConfig) return validateSourceConfig(sourceConfig)
+    const path = sourcePath ?? join(profile.dir, '.guide-manager', 'source.json')
+    return validateSourceConfig(existsSync(path) || sourcePath ? readJson(path) : readJson(join(managerRoot, 'package.json')).dshGuide.source)
+  }
   const configHash = () => fingerprint(config())
   const taskPath = (id) => {
     if (!/^[a-f0-9-]{36}$/.test(id ?? '') || !root) throw new Error('source-invalid-task')
@@ -49,7 +54,8 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
     writeJson(join(root, 'latest.json'), { id: task.id })
     const abort = new AbortController()
     let progressSaved = 0
-    const client = new GitHubReleaseClient({ repository: { owner: settings.owner, repo: settings.repo }, token: env[settings.tokenEnv], fetchImpl,
+    const Client = settings.access === 'public' ? PublicGitHubReleaseClient : GitHubReleaseClient
+    const client = new Client({ repository: { owner: settings.owner, repo: settings.repo }, token: env[settings.tokenEnv], fetchImpl,
       signal: abort.signal, onProgress: (bytes) => { task.progress.bytes = bytes; if (Date.now() - progressSaved > 100) { save(task); progressSaved = Date.now() } } })
     const record = { id: task.id, abort, promise: null }
     active = record
@@ -79,6 +85,13 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
     return release
   }
   const check = () => start('check', {}, async (task, client, retry) => {
+    if (client instanceof PublicGitHubReleaseClient) {
+      const catalog = await retry(() => client.latestCatalog())
+      await retry(() => client.verifyTag(catalog.release.tag, catalog.release.commit))
+      const catalogHash = fingerprint(catalog)
+      writeJson(join(root, 'catalogs', `${catalogHash}.json`), { catalog, catalogHash })
+      return { available: true, snapshotId: catalogHash, release: catalog.release, versions: catalog.artifacts.map(({ key, version }) => ({ key, version })) }
+    }
     // Explicit access probe: an auth-hidden 404 is never treated as an empty channel.
     await retry(() => client.json(''))
     let selected, exhausted = false
@@ -223,7 +236,7 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
           versions: saved.catalog.artifacts.map(({ key, version }) => ({ key, version })),
           recommended: saved.catalog.combinations.find((c) => c.id === saved.catalog.recommendedCombination).versions,
           recommendedManager: saved.catalog.recommendedManager } : null
-        return { configured: true, repository: { owner: settings.owner, repo: settings.repo }, task, catalog }
+        return { configured: true, repository: { owner: settings.owner, repo: settings.repo }, access: settings.access ?? 'private', task, catalog }
       } catch { return { configured: false, error: 'source-config-unavailable' } }
     },
   }

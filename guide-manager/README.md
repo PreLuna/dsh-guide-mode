@@ -1,5 +1,7 @@
 # Guide manager（Phase 1–4 与 Phase 5A/5B/5C 本地包路径）
 
+2026-11-09：manager 1.1.2 增加默认公开发布来源。通过官方插件页安装本仓库 manager tgz 后，直接进入“插件 → 指导 → 远端发布来源”检查并下载，无需配置 token 或 source.json。公开模式使用 Release 直链与 Git 智能 HTTP 的 tag/commit 核验，不消耗匿名 REST API 配额；保留包 SHA/tar/契约与现有冷事务门禁。实际整体验收进展见 [5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
+
 2026-11-07：按 [Phase 5 设计](../docs/PHASE-5-ASSESSMENT.md) 实现独立安装入口、本地包升级/恢复、卸载/修复与管理器升级。manager 本身无需安装六个业务组件即可启动；原 Phase 1–4 开关、技能与源码 reload 语义保留。隔离验收与部署状态见 [项目状态](../PROJECT-STATUS.md)；未发布 npm，也未切换 live desktop 的安装来源。
 
 ## Phase 5A：安装入口

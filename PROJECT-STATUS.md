@@ -27,7 +27,7 @@
 | Phase 5D-0/5D-1 发布格式与发布端 | 本地实现与验证通过（2026-11-08） | schema 4/连接配置、固定提交七包、历史组合、草稿上传/回读与显式发布工具、tag/manual workflow；26 个 Node 进程、manager 96 用例通过；真实 GitHub 写入与托管 runner 尚未执行；[说明](docs/PHASE-5D-RELEASE-FORMAT.md) / [证据](evidence/phase5d-2026-11-08/report.md) |
 | Phase 5D-2 消费端后端 | 本地实现与隔离验证通过（2026-11-09） | 异步查询/准备/取消、SHA 缓存、三类本地目录适配、服务接口与持久状态；27 个测试进程通过，网络为模拟传输，真实 tgz/离线计划验证；[说明](docs/PHASE-5D-CONSUMER-BACKEND.md) / [证据](evidence/phase5d-2026-11-09/report.md) |
 | Phase 5D-3 HTTP 接口与管理页 | 本地实现与隔离 Edge 交互通过（2026-11-09） | source 六个 POST 接口、三类操作选择、进度/取消/重试、刷新恢复、计划确认与原助手衔接；28 个测试进程通过，manager 118 用例；HTTP 使用模拟 GitHub、Edge 使用浏览器响应夹具；[说明](docs/PHASE-5D-HTTP-UI.md) / [证据](evidence/phase5d3-2026-11-09/report.md) |
-| Phase 5D-4 真实验收 → 5E link 来源迁移 | 待按顺序实施 | 真实私有 Release/凭据、官方 pnpm、Edge/独立桌面整体链路通过后才进入来源迁移；未发布或切换 live；[施工方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) |
+| Phase 5D-4 真实验收 → 5E link 来源迁移 | 真实验收施工中，5E 未开始 | 已推送正式实现、发布基线及独立升级版本；用户已将仓库公开，现按无 token 来源补验。manager 1.1.2 默认公开来源/直链/tag 核验已实现，真实匿名后端验证通过；官方 pnpm、Edge/独立桌面完整链路待本轮完成；live 未迁移；[说明](docs/PHASE-5D-REAL-ACCEPTANCE.md) |
 | O11 / PT-6 | 暂缓，保留当前设计 | 原生结果卡与测试保留；默认沙箱 failed、无沙箱对照 45/45 passed，不改写为整体通过；[报告](evidence/O11-validation-2026-11-04/pt6/report.md) |
 | O11 / RM-3/5/7 | 按宿主默认机制收口 | 接受 persona／压缩／重试与上下文复制成本；[验收取舍](docs/DECISIONS.md) |
 | O11 / 多 pane、Git 与归档补测 | 主流程通过，边界已接受或划出范围 | 同 child 重复视图残留接受现状；原生编辑关闭保护不列为插件任务；[范围](docs/DECISIONS.md) / [报告](evidence/O11-residual-check-2026-11-04/report.md) |

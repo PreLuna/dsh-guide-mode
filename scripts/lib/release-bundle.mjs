@@ -117,7 +117,8 @@ export function prepareRemoteRelease({ repositoryRoot, commit, sourceRoot, devel
   mkdirSync(join(output, 'artifacts'))
   for (const record of all) copyFileSync(record.file, join(output, 'artifacts', `${record.entry.sha256}.tgz`))
   emit(join(output, RELEASE_FILE), catalog)
-  const config = validateSourceConfig({ schema: 1, provider: 'github', ...repository, channel: 'stable', tokenEnv: 'DSH_GUIDE_GITHUB_TOKEN' })
+  const config = validateSourceConfig({ schema: 1, provider: 'github', ...repository, channel: 'stable', tokenEnv: 'DSH_GUIDE_GITHUB_TOKEN',
+    ...(manager.manifest.dshGuide.source?.access === 'public' ? { access: 'public' } : {}) })
   emit(join(output, 'source-config.example.json'), config)
   const notes = [`# ${tag}`, '', `Source: ${sourceCommit ?? 'DEVELOPMENT SNAPSHOT — NOT PUBLISHABLE'}`, '',
     ...packed.map((entry) => `- ${entry.package}: ${entry.version}`), '',

@@ -21,7 +21,7 @@
 
 没有 `url`/`file`/token 等字段。实际 release/asset ID 在后续访问指定仓库时解析并绑定；由下载器处理临时地址，不把它写回发布契约。完整样例通过工具生成，勿手改哈希或将本地路径粘进远端清单。
 
-`source-config.example.json` 是独立的 schema 1 连接配置：provider=github、owner/repo、channel=stable、tokenEnv=`DSH_GUIDE_GITHUB_TOKEN`。它仅声明变量名，不包含 token。2026-11-09 已接入后端配置与准备服务，界面仍待 5D-3，见 [后端说明](PHASE-5D-CONSUMER-BACKEND.md)。
+`source-config.example.json` 是独立的 schema 1 连接配置：provider=github、owner/repo、channel=stable、tokenEnv=`DSH_GUIDE_GITHUB_TOKEN`，可选 access=public/private。它仅声明变量名，不包含 token；公开模式不读取/发送其值。manager 1.1.2 内置公开来源，生成器也为公开 manager 输出 access=public 示例。5D-3 已接入管理页，见 [后端](PHASE-5D-CONSUMER-BACKEND.md) / [管理页](PHASE-5D-HTTP-UI.md)。
 
 ## 2. 发布产物
 
