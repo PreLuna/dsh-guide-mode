@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-guide-manager",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "description": "Product manager for the DSH guidance mode components with phase-4 skills manager integration",
