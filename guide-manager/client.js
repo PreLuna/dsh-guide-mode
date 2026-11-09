@@ -6,7 +6,9 @@ window.__ModuleLoader__.load({
     const NS = 'guideManager'
 
     const zh = {
-      sourceTitle: '远端发布来源', sourceMissing: '尚未配置发布来源。请在管理器 Host 配置或本 profile 的 source.json 中设置仓库，并在本机配置下载凭据。',
+      sourceTitle: '远端发布来源', sourceMissing: '发布来源不可用，请检查管理器的仓库配置。私有来源另需本机下载凭据。',
+      sourcePublic: '公开来源，无需登录或配置 token',
+      installRemoteHint: '可从上方远端发布来源下载并准备安装。本地区域也支持维护者提供的发布目录。',
       sourceCheck: '检查更新', sourceInstall: '安装缺失组件', sourceUpgrade: '升级已装组件', sourceManager: '升级管理器',
       sourcePrepare: '下载并准备', sourceCancel: '取消下载任务', sourceRetry: '重试任务', sourcePlan: '预览已准备计划', sourceConfirm: '确认准备执行',
       sourceChecking: '正在检查发布版本…', sourceDownloading: '正在下载并校验', sourceReady: '包已准备，尚未安装。请预览计划并确认。',
@@ -181,7 +183,9 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
-      sourceTitle: 'Remote release source', sourceMissing: 'Configure the repository in manager Host settings or this profile source.json, and configure download credentials on this machine.',
+      sourceTitle: 'Remote release source', sourceMissing: 'Release source unavailable. Check manager repository settings. Private sources also require local credentials.',
+      sourcePublic: 'Public source; no sign-in or token required',
+      installRemoteHint: 'Download and prepare from the remote source above. This area also supports maintainer-provided local catalogs.',
       sourceCheck: 'Check for updates', sourceInstall: 'Install missing components', sourceUpgrade: 'Upgrade installed components', sourceManager: 'Upgrade manager',
       sourcePrepare: 'Download and prepare', sourceCancel: 'Cancel download task', sourceRetry: 'Retry task', sourcePlan: 'Preview prepared plan', sourceConfirm: 'Confirm execution preparation',
       sourceChecking: 'Checking releases…', sourceDownloading: 'Downloading and verifying', sourceReady: 'Packages prepared, not installed. Preview and confirm the plan.',
@@ -506,7 +510,7 @@ window.__ModuleLoader__.load({
 
     function sourceError(code, t) {
       if (/http-401|http-403/.test(code ?? '')) return t('sourceAuth')
-      if (/http-404/.test(code ?? '')) return t('sourceNotFound')
+      if (/http-404|public-release-unavailable/.test(code ?? '')) return t('sourceNotFound')
       if (/rate-limited/.test(code ?? '')) return t('sourceRate')
       if (/network|timeout|download-interrupted/.test(code ?? '')) return t('sourceNetwork')
       if (/integrity|cache-invalid|package-mismatch/.test(code ?? '')) return t('sourceIntegrity')
@@ -561,6 +565,7 @@ window.__ModuleLoader__.load({
         h('div', { style: S.card },
           !distribution.configured ? h('div', { style: S.note }, t('sourceMissing')) : h('div', null,
             h('div', { style: S.kv }, `${distribution.repository.owner}/${distribution.repository.repo}`),
+            distribution.access === 'public' ? h('div', { style: S.note }, t('sourcePublic')) : null,
             h('div', { style: S.note }, t('sourceHint')),
             h('button', { style: S.actionButton, disabled: locked, onClick: () => request('check', {}) }, t('sourceCheck')),
             catalog ? h('div', null,
@@ -602,7 +607,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function InstallationCard({ installation, components, t, onChanged }) {
+    function InstallationCard({ installation, components, remoteAvailable, t, onChanged }) {
       const [selected, setSelected] = React.useState(['preset', 'shield', 'admission', 'panel', 'sidebar', 'goal'])
       const [plan, setPlan] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
@@ -631,7 +636,7 @@ window.__ModuleLoader__.load({
         h('h3', { style: S.sectionTitle }, t('installTitle')),
         h('div', { style: S.card },
           h('div', { style: S.note }, t('installHint')),
-          !installation.catalog?.available ? h('div', { style: S.reason }, t('installCatalogMissing')) : null,
+          !installation.catalog?.available ? h('div', { style: S.reason }, t(remoteAvailable ? 'installRemoteHint' : 'installCatalogMissing')) : null,
           installation.catalog?.available && !pending ? h('div', null,
             h('div', { style: S.actionRow }, components.map((component) => h('label', { key: component.key, style: S.note },
               h('input', { type: 'checkbox', checked: selected.includes(component.key), disabled: busy,
@@ -1060,7 +1065,7 @@ window.__ModuleLoader__.load({
           : null,
         state.pending?.error ? h('div', { style: S.banner }, `pending: ${state.pending.error}`) : null,
         h(SourceCard, { distribution: state.distribution, state, t, onChanged: refresh }),
-        h(InstallationCard, { installation: state.installation, components: state.components ?? [], t, onChanged: refresh }),
+        h(InstallationCard, { installation: state.installation, components: state.components ?? [], remoteAvailable: state.distribution?.configured, t, onChanged: refresh }),
         h(PackageCard, { management: state.packageManagement, components: state.components ?? [], t, onChanged: refresh }),
         h(MaintenanceCard, { maintenance: state.maintenance, components: state.components ?? [], t, onChanged: refresh, onOpenSkills }),
         h('div', { style: S.card },

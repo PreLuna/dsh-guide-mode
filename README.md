@@ -14,6 +14,8 @@
 
 2026-11-09：5D-2 后端查询、下载缓存与安装器适配，以及 5D-3 HTTP/管理页均已完成本地隔离验证。管理页支持检查、三类下载选择、取消重试、刷新恢复、计划确认与助手衔接，见 [后端](docs/PHASE-5D-CONSUMER-BACKEND.md) / [管理页](docs/PHASE-5D-HTTP-UI.md)。真实私有远端、官方冷操作和桌面整体验收仍待 5D-4；live 仍保留原来源。
 
+5D-4 当前按用户公开仓库后的方向施工：manager 1.1.2 默认连接本仓库公开 Release，无需 token/source.json；直链下载配合 tag/commit 核验，不使用匿名 REST API。真实匿名后端验证通过，浏览器/桌面整体验收进展见 [5D-4](docs/PHASE-5D-REAL-ACCEPTANCE.md)。
+
 ## 使用
 
 1. 在主会话先发一条消息，使父 agent 在线。

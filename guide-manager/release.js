@@ -33,10 +33,10 @@ function host(value) {
 }
 
 export function validateSourceConfig(value) {
-  fields(value, ['schema', 'provider', 'owner', 'repo', 'channel', 'tokenEnv'])
+  fields(value, ['schema', 'provider', 'owner', 'repo', 'channel', 'tokenEnv'], ['access'])
   validateRepository({ owner: value.owner, repo: value.repo })
   if (value.schema !== 1 || value.provider !== 'github' || value.channel !== 'stable'
-    || !/^DSH_GUIDE_[A-Z0-9_]*TOKEN$/.test(value.tokenEnv ?? '')) throw new Error('invalid-source-config')
+    || !/^DSH_GUIDE_[A-Z0-9_]*TOKEN$/.test(value.tokenEnv ?? '') || value.access !== undefined && !['public', 'private'].includes(value.access)) throw new Error('invalid-source-config')
   return value
 }
 

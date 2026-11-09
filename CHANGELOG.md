@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add manager 1.1.2 public-source support: built-in repository defaults, anonymous Release links and bounded Git HTTP tag verification, no REST API quota or token setup for public installation. Preserve authenticated private sources and all existing package transactions; validate the real public chain in Phase 5D-4.
+
 - Implement Phase 5D-3 source HTTP endpoints and bilingual manager UI for checks, component/manager preparation, progress, cancel/retry, refresh recovery and exact-plan confirmation. Preserve the existing cold helpers and external manager recovery. Validate API boundaries, real tarball staging and isolated Edge rendering using source fixtures; real private Release and desktop acceptance remain Phase 5D-4.
 
 - Implement Phase 5D-2 consumer backend: bounded shared GitHub transport, asynchronous metadata/preparation/cancellation, persistent tasks and source snapshots, verified SHA cache, selective install catalog validation and bridges to existing cold install/upgrade/manager transactions. Expose backend services/state; HTTP/UI and real private-source acceptance remain Phase 5D-3/4.

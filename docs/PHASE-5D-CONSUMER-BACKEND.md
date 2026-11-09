@@ -4,13 +4,15 @@
 
 ## 配置与服务
 
+2026-11-09 公开源补充：manager 1.1.2 内置 `PreLuna/dsh-guide-mode`、`access:public`，未指定配置且无 profile source.json 时使用该默认值。新用户无需 token 或手写来源文件。公开查询使用 latest 附件直链，固定 tag 附件下载配合 Git 智能 HTTP 的 tag/commit 核验，不走 REST API；私有/API 路径保留。
+
 manager Host 配置可提供 `source` 对象或 `sourcePath`；默认读取目标 profile 的 `.guide-manager/source.json`。格式为 5D-0 定义的 schema 1：
 
 ```json
 {"schema":1,"provider":"github","owner":"PreLuna","repo":"dsh-guide-mode","channel":"stable","tokenEnv":"DSH_GUIDE_GITHUB_TOKEN"}
 ```
 
-token 只从后端环境读取。未配置 source 时原本地安装、升级、维护仍工作，state.distribution 显示 configured=false。不会在 GET state 中发起网络请求。环境变量在新进程中是否配置成功，需要真实环境验收，不依赖先前开发终端的临时状态。
+私有来源 token 只从后端环境读取。公开模式不发送凭据。来源配置损坏/显式路径不可用时 state.distribution 显示 configured=false，本地安装、升级、维护仍工作；默认公开来源可用时显示 configured=true。GET state 不发起网络请求。
 
 `guideManager` 增加服务方法，供后续 HTTP/UI 层使用：
 
