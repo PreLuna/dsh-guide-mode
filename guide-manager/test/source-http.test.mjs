@@ -87,6 +87,7 @@ test('source HTTP uses async tasks, guarded payloads and the existing offline st
   await t.test('all source endpoints honor the connection fence before reading or fetching', async () => {
     const f = await fixture({ reject: true }), before = calls.length
     for (const action of ['check', 'prepare', 'task', 'cancel', 'plan', 'stage']) assert.equal((await call(f.route, `source/${action}`)).status, 403)
+    for (const action of ['plan', 'start', 'ack', 'seen']) assert.equal((await call(f.route, `execution/${action}`)).status, 403)
     assert.equal(calls.length, before)
   })
   await t.test('method, route, JSON, size and payload allowlists reject unintended input', async () => {
@@ -94,6 +95,11 @@ test('source HTTP uses async tasks, guarded payloads and the existing offline st
     assert.equal((await call(f.route, 'source/check', {}, { method: 'GET' })).status, 405)
     assert.equal((await call(f.route, 'source/toString')).status, 404)
     assert.equal((await call(f.route, 'source/nested/check')).status, 404)
+    assert.equal((await call(f.route, 'execution/plan', {}, { method: 'GET' })).status, 405)
+    assert.equal((await call(f.route, 'execution/busy')).status, 404)
+    for (const action of ['plan', 'start', 'ack', 'seen']) assert.equal((await call(f.route, `execution/${action}`, { command: 'arbitrary', path: 'elsewhere' })).status, 400)
+    assert.equal((await call(f.route, 'execution/start', { planId: 'unconfirmed' })).body.error.code, 'execution-confirmation-required')
+    assert.equal((await call(f.route, 'execution/ack', { taskId: 'unconfirmed' })).body.error.code, 'execution-confirmation-required')
     for (const raw of ['[1]', 'null', '{broken', JSON.stringify({ ignored: 'x'.repeat(17_000) })]) {
       assert.equal((await call(f.route, 'source/check', {}, { raw })).status, 400)
     }

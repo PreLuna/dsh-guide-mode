@@ -4,15 +4,73 @@ window.__ModuleLoader__.load({
     const React = require('react')
     const h = React.createElement
     const NS = 'guideManager'
+    const EXECUTION_KEY = 'dsh-guide-manager.execution'
+    const loadedAt = Date.now()
+    let reconnectTimer = null, reconnectReading = false
+    function executionProgress(marker) {
+      if (typeof document === 'undefined' || !document.body || typeof document.createElement !== 'function') return
+      let element = document.getElementById('guide-manager-reconnect-progress')
+      if (!marker) { element?.remove(); return }
+      const expired = Date.now() - marker.startedAt > 180000
+      if (!element) {
+        element = document.createElement('div')
+        element.id = 'guide-manager-reconnect-progress'
+        element.setAttribute('role', 'status')
+        element.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:2147483647;max-width:480px;padding:16px;border-radius:10px;background:#1f2937;color:#fff;font:14px/1.6 system-ui;box-shadow:0 4px 20px #0004;white-space:pre-wrap'
+        document.body.appendChild(element)
+      }
+      const zh = /^zh/i.test(window.navigator?.language ?? 'zh')
+      const message = expired ? zh ? '重连耗时较长，请检查本机操作日志和恢复入口：\n' : 'Reconnection is taking longer. Check the local execution log and recovery entry:\n'
+        : zh ? '正在安装并重启 DSH，完成后自动返回指导页…' : 'Installing and restarting DSH. Returning to Guide automatically…'
+      element.textContent = message + (expired ? marker.profile + '/.guide-manager/execution' : '')
+      if (expired) {
+        const button = document.createElement('button')
+        button.textContent = zh ? '重新加载' : 'Reload'
+        button.onclick = () => window.location.reload()
+        element.appendChild(button)
+      }
+    }
+    function reconnectExecution() {
+      if (reconnectTimer !== null || typeof window.setInterval !== 'function') return
+      // The official client may dispose its whole UI while the Host restarts.
+      // Keep this bounded recovery poll outside plugin/React lifecycle cleanup.
+      reconnectTimer = window.setInterval(async () => {
+        const marker = executionMarker()
+        executionProgress(marker)
+        if (!marker) { window.clearInterval(reconnectTimer); reconnectTimer = null; return }
+        if (reconnectReading) return
+        reconnectReading = true
+        try {
+          const value = await fetchState(), task = value.execution?.task
+          if (marker.profile !== value.profile?.dir || !task || (task.id !== marker.taskId && task.pendingId !== marker.pendingId)) return
+          if (['completed', 'failed', 'interrupted'].includes(task.status) && marker.reloadedForTask !== task.id) {
+            rememberExecution({ ...marker, reloadedForTask: task.id, reloadedAt: Date.now() })
+            window.location.reload()
+          }
+        } catch {} finally { reconnectReading = false }
+      }, 1000)
+    }
+    const executionMarker = () => { try { return JSON.parse(window.localStorage?.getItem(EXECUTION_KEY) ?? 'null') } catch { return null } }
+    const rememberExecution = (value) => {
+      try { if (value) window.localStorage?.setItem(EXECUTION_KEY, JSON.stringify(value)); else window.localStorage?.removeItem(EXECUTION_KEY) } catch {}
+      executionProgress(value)
+      if (value) reconnectExecution()
+      if (typeof window.dispatchEvent === 'function') window.dispatchEvent(new Event('guide-manager-execution'))
+    }
+    if (executionMarker()) reconnectExecution()
 
     const zh = {
+      executeConfirm: '确认执行并重启', executeWarning: '将关闭并重启当前 DSH 实例。请先保存工作，确认没有需要继续的任务。',
+      executeTitle: '安装与重启进度', executeStart: '执行并重启', executePreparing: '正在启动独立执行器…', executeConnecting: '正在安装并重启，等待重新连接…',
+      executeComplete: '执行完成，重启后的版本和运行状态已核对。', executeFailed: '自动执行未完成。准备计划和恢复入口已保留，请查看日志或重试。',
+      executeManualTarget: '该管理器版本不支持自动重连，请使用下方手动助手，或选择支持一键执行的版本。', executeFallback: '手动恢复入口',
       sourceTitle: '远端发布来源', sourceMissing: '发布来源不可用，请检查管理器的仓库配置。私有来源另需本机下载凭据。',
       sourcePublic: '公开来源，无需登录或配置 token',
       installRemoteHint: '可从上方远端发布来源下载并准备安装。本地区域也支持维护者提供的发布目录。',
       sourceCheck: '检查更新', sourceInstall: '安装缺失组件', sourceUpgrade: '升级已装组件', sourceManager: '升级管理器',
       sourcePrepare: '下载并准备', sourceCancel: '取消下载任务', sourceRetry: '重试任务', sourcePlan: '预览已准备计划', sourceConfirm: '确认准备执行',
       sourceChecking: '正在检查发布版本…', sourceDownloading: '正在下载并校验', sourceReady: '包已准备，尚未安装。请预览计划并确认。',
-      sourceStaged: '已准备执行。保存工作后运行助手；重启后核对运行状态。', sourceEmpty: '该仓库暂无稳定的指导模式发布。',
+      sourceStaged: '操作已准备，可在上方执行并重启；结束后自动核对运行状态。', sourceEmpty: '该仓库暂无稳定的指导模式发布。',
       sourceHandedOff: '包操作已提交，请查看下方安装或维护结果。',
       sourceCompatible: '所选版本没有匹配当前宿主的兼容组合，请调整目标版本。', sourcePrevious: '发布清单缺少当前已装版本，无法准备可恢复的升级。',
       sourceHostUnverified: '宿主版本或产物尚未完整核实',
@@ -20,7 +78,7 @@ window.__ModuleLoader__.load({
       sourceAuth: '仓库访问未获授权，请检查本机只读下载凭据及仓库权限。', sourceNotFound: '仓库或发布不存在，或当前凭据无权访问。',
       sourceRate: 'GitHub 请求额度已用尽，请稍后重试。', sourceNetwork: '网络连接失败或超时，请重试。', sourceIntegrity: '包完整性校验失败，未进入安装。',
       sourceStale: '配置或安装状态已变化，请重新准备并预览。', sourceBusy: '已有任务或包操作待处理，请先完成或取消。',
-      sourceHint: '下载不会自动安装。确认后使用下方助手执行；开发 link 保持原状。', sourceBlocked: '当前计划无法执行', sourceLink: '当前来源为开发 link 或尚未固定到包缓存，需要先迁移来源。',
+      sourceHint: '下载后预览版本与联动范围，确认执行将自动安装、重启并核对结果。', sourceBlocked: '当前计划无法执行', sourceLink: '当前来源为开发 link 或尚未固定到包缓存，需要先迁移来源。',
       tab: '指导',
       title: '指导模式',
       subtitle: '安装组件、检查兼容性与管理指导模式',
@@ -38,11 +96,12 @@ window.__ModuleLoader__.load({
       maintenanceRecovery: '面板不可用时，在 PowerShell 运行此恢复命令：',
       maintenanceRepairExternal: '组件损坏导致插件页无法启动时，可从 PowerShell 修复（把 panel 换为目标组件）：',
       maintenanceVerified: '维护后运行就绪',
+      maintenanceHistory: '历史维护记录；后续变更见安装或升级结果',
       maintenanceAwaiting: '维护完成，等待重启核对',
       maintenanceFailed: '维护失败，操作前版本和配置已恢复',
       maintenanceWorking: '维护执行中',
       maintenanceInterrupted: '维护中断或依赖恢复失败，请检查回执和备份',
-      installHint: '先预览所需组件，再准备安装。运行安装助手后会关闭并重启目标 DSH 实例。已有组件的升级请使用下方升级区。',
+      installHint: '预览所需组件后确认执行，管理器将安装并重启当前 DSH。已有组件请使用升级区。',
       installHistory: '首次安装记录；后续版本变更见升级与恢复区',
       packageTitle: '组件升级与包版本恢复',
       packageHint: '按兼容组合预览联动升级，保存旧包和配置后冷更新。只支持无数据迁移的本地发布包；开发 link 保持不变。',
@@ -57,6 +116,7 @@ window.__ModuleLoader__.load({
       packagePending: '版本操作已准备，保存工作后运行：',
       packageAwaiting: '包版本已更新，等待重启核对',
       packageVerified: '版本操作后运行就绪',
+      packageHistory: '历史版本操作记录；最近的维护结果见维护区',
       packageFailed: '操作失败，原版本和配置已恢复',
       packageRecovery: '版本恢复需要人工处理，请查看回执和备份',
       packageNoTransactions: '暂无可恢复的升级事务',
@@ -79,7 +139,7 @@ window.__ModuleLoader__.load({
       loading: '正在读取 Host 状态…',
       hostStale: '管理服务未加载：请确认 guide-manager 已在 Host 启动，或重启 DSH。',
       retry: '重试',
-      readOnly: 'panel / sidebar 热切换；admission / shield / goal 先准备，重启 helper 后生效',
+      readOnly: 'panel / sidebar 可即时切换；admission / shield / goal 准备后执行并重启生效',
       updated: '更新时间',
       manager: '管理器',
       managerReady: '就绪',
@@ -183,13 +243,17 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
+      executeConfirm: 'Confirm execution and restart', executeWarning: 'This DSH instance will close and restart. Save your work and finish any tasks you need to keep running.',
+      executeTitle: 'Installation and restart', executeStart: 'Execute and restart', executePreparing: 'Starting the independent controller…', executeConnecting: 'Installing and restarting. Waiting to reconnect…',
+      executeComplete: 'Execution complete. Versions and health verified after restart.', executeFailed: 'Automatic execution did not finish. The plan and recovery entry are retained; inspect the log or retry.',
+      executeManualTarget: 'This manager version cannot reconnect automatically. Use the manual helper below or select a version supporting automatic execution.', executeFallback: 'Manual recovery entry',
       sourceTitle: 'Remote release source', sourceMissing: 'Release source unavailable. Check manager repository settings. Private sources also require local credentials.',
       sourcePublic: 'Public source; no sign-in or token required',
       installRemoteHint: 'Download and prepare from the remote source above. This area also supports maintainer-provided local catalogs.',
       sourceCheck: 'Check for updates', sourceInstall: 'Install missing components', sourceUpgrade: 'Upgrade installed components', sourceManager: 'Upgrade manager',
       sourcePrepare: 'Download and prepare', sourceCancel: 'Cancel download task', sourceRetry: 'Retry task', sourcePlan: 'Preview prepared plan', sourceConfirm: 'Confirm execution preparation',
       sourceChecking: 'Checking releases…', sourceDownloading: 'Downloading and verifying', sourceReady: 'Packages prepared, not installed. Preview and confirm the plan.',
-      sourceStaged: 'Execution prepared. Save your work and run the helper; verify after restart.', sourceEmpty: 'No stable guidance-mode release is available in this repository.',
+      sourceStaged: 'Operation prepared. Execute and restart above; health is verified after restart.', sourceEmpty: 'No stable guidance-mode release is available in this repository.',
       sourceHandedOff: 'Package operation submitted. See the installation or maintenance result below.',
       sourceCompatible: 'No compatible combination matches the selected versions and current host. Adjust target versions.', sourcePrevious: 'The release catalog lacks an installed version required for recoverable upgrades.',
       sourceHostUnverified: 'Host versions or artifacts are not fully verified',
@@ -197,7 +261,7 @@ window.__ModuleLoader__.load({
       sourceAuth: 'Repository access was not authorized. Check local read-only credentials and repository permissions.', sourceNotFound: 'Repository or release is missing, or credentials cannot access it.',
       sourceRate: 'GitHub request limit reached. Retry later.', sourceNetwork: 'Network failure or timeout. Please retry.', sourceIntegrity: 'Package integrity verification failed; installation was not started.',
       sourceStale: 'Configuration or installation changed. Prepare and preview again.', sourceBusy: 'Another task or package operation needs attention first.',
-      sourceHint: 'Downloading does not install packages. Confirm the plan, then run the helper below. Development links remain unchanged.', sourceBlocked: 'This plan cannot execute', sourceLink: 'The current source is a development link or is not pinned to the package cache. Source migration is required.',
+      sourceHint: 'Review versions and dependencies after download. Confirmation installs, restarts and verifies the result automatically.', sourceBlocked: 'This plan cannot execute', sourceLink: 'The current source is a development link or is not pinned to the package cache. Source migration is required.',
       tab: 'Guide',
       title: 'Guidance Mode',
       subtitle: 'Install components, check compatibility and manage guidance mode',
@@ -215,11 +279,12 @@ window.__ModuleLoader__.load({
       maintenanceRecovery: 'If the panel cannot open, run this recovery command in PowerShell:',
       maintenanceRepairExternal: 'If a damaged component prevents the Plugins page from opening, repair from PowerShell (replace panel with the target component):',
       maintenanceVerified: 'Running after maintenance',
+      maintenanceHistory: 'Historical maintenance; see later installation or upgrade results',
       maintenanceAwaiting: 'Maintenance completed; restart verification pending',
       maintenanceFailed: 'Maintenance failed; prior packages and configuration restored',
       maintenanceWorking: 'Maintenance in progress',
       maintenanceInterrupted: 'Maintenance interrupted or dependency recovery failed; inspect receipt and backup',
-      installHint: 'Preview dependencies, then prepare installation. The helper restarts the target DSH instance. Use the section below for existing component upgrades.',
+      installHint: 'Preview components, then confirm execution to install and restart this DSH instance. Use the upgrade section for existing components.',
       installHistory: 'Initial installation history; see package operations for subsequent versions',
       packageTitle: 'Component upgrades and package recovery',
       packageHint: 'Preview the compatible version combination, then cold-update with old packages and configuration backed up. Local releases without data migrations only; development links are retained.',
@@ -234,6 +299,7 @@ window.__ModuleLoader__.load({
       packagePending: 'Package operation prepared. Save your work, then run:',
       packageAwaiting: 'Package files updated; awaiting restart verification',
       packageVerified: 'Package operation verified after restart',
+      packageHistory: 'Historical package operation; see maintenance for the latest result',
       packageFailed: 'Operation failed; previous versions and configuration restored',
       packageRecovery: 'Package recovery needs attention; inspect the receipt and backup',
       packageNoTransactions: 'No restorable upgrade transactions',
@@ -256,7 +322,7 @@ window.__ModuleLoader__.load({
       loading: 'Reading Host state…',
       hostStale: 'Manager service is not loaded: confirm guide-manager started on the Host, or restart DSH.',
       retry: 'Retry',
-      readOnly: 'panel/sidebar switch hot; admission/shield/goal stage a change for the restart helper',
+      readOnly: 'panel/sidebar switch immediately; admission/shield/goal apply through execution and restart',
       updated: 'Updated',
       manager: 'Manager',
       managerReady: 'Ready',
@@ -509,6 +575,8 @@ window.__ModuleLoader__.load({
     }
 
     function sourceError(code, t) {
+      if (/execution-target-manual-only/.test(code ?? '')) return t('executeManualTarget')
+      if (/^execution-/.test(code ?? '')) return t('executeFailed')
       if (/http-401|http-403/.test(code ?? '')) return t('sourceAuth')
       if (/http-404|public-release-unavailable/.test(code ?? '')) return t('sourceNotFound')
       if (/rate-limited/.test(code ?? '')) return t('sourceRate')
@@ -519,6 +587,55 @@ window.__ModuleLoader__.load({
       if (/stale|changed/.test(code ?? '')) return t('sourceStale')
       if (/busy|conflict|operation-refused/.test(code ?? '')) return t('sourceBusy')
       return t('sourceFailed')
+    }
+
+    async function executePrepared(state, value, preview = null) {
+      if (typeof value?.planId !== 'string') throw Error('execution-invalid-stage-response')
+      const plan = preview ?? await installRequest('plan', { pendingId: value.planId }, 'execution')
+      if (plan.blockers?.length) throw Error(plan.blockers[0])
+      rememberExecution({ profile: state.profile.dir, pendingId: plan.pendingId, startedAt: Date.now() })
+      if (executionMarker()?.pendingId !== plan.pendingId) throw Error('execution-ui-storage-unavailable')
+      // A launch query token is disposable; the official persistent cookie reconnects.
+      try { const url = new URL(window.location.href); if (url.searchParams.has('token')) { url.searchParams.delete('token'); window.history.replaceState(null, '', url.href) } } catch {}
+      try {
+        const started = await installRequest('start', { planId: plan.id, confirm: true }, 'execution')
+        rememberExecution({ ...executionMarker(), taskId: started.taskId })
+        await installRequest('ack', { taskId: started.taskId, confirm: true }, 'execution')
+        return started
+      } catch (failure) { if (/^execution-/.test(failure.message ?? '')) rememberExecution(null); throw failure }
+    }
+
+    function ExecutionCard({ state, t, onChanged }) {
+      const [plan, setPlan] = React.useState(null)
+      const [busy, setBusy] = React.useState(false)
+      const [error, setError] = React.useState(null)
+      const execution = state.execution, marker = executionMarker(), task = execution?.task
+      const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.pending?.present
+      if (!execution?.available && !task && !marker) return null
+      const active = execution?.active || Boolean(marker)
+      const act = async (confirm) => {
+        setBusy(true); setError(null)
+        try {
+          if (!confirm) setPlan(await installRequest('plan', {}, 'execution'))
+          else { await executePrepared(state, { planId: plan.pendingId }, plan); setPlan(null); onChanged() }
+        } catch (failure) { setError(sourceError(String(failure.message ?? failure), t)); onChanged() }
+        finally { setBusy(false) }
+      }
+      return h('section', { style: S.section, 'data-guide-execution': true },
+        h('h3', { style: S.sectionTitle }, t('executeTitle')),
+        h('div', { style: S.card },
+          active ? h('div', { style: S.notice, role: 'status' }, t(task?.status === 'waiting-ack' ? 'executePreparing' : 'executeConnecting')) : null,
+          task?.status === 'completed' && !active ? h('div', { style: S.notice, role: 'status' }, t('executeComplete')) : null,
+          ['failed', 'interrupted'].includes(task?.status) && !active ? h('div', { style: S.reason, role: 'alert' }, t('executeFailed')) : null,
+          pending && !active && execution?.available ? h('button', { style: S.actionButton, disabled: busy, onClick: () => act(false) }, t('executeStart')) : null,
+          plan && !active ? h('div', null,
+            h('div', { style: S.reason }, t('executeWarning')),
+            h('ul', null, plan.entries.map((entry) => h('li', { key: entry.key }, `${entry.package ?? entry.key}${entry.version ? '@' + entry.version : ''}`))),
+            plan.blockers?.length ? h('div', { style: S.reason }, sourceError(plan.blockers[0], t)) : null,
+            h('button', { style: S.actionButton, disabled: busy || plan.blockers?.length > 0, onClick: () => act(true) }, t('executeConfirm'))) : null,
+          task?.recoveryCommand ? h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, task.recoveryCommand), task.logPath ? h('div', { style: S.mono }, task.logPath) : null) : null,
+          error ? h('div', { style: S.reason, role: 'alert' }, error) : null,
+        ))
     }
 
     function SourceCard({ distribution, state, t, onChanged }) {
@@ -534,11 +651,12 @@ window.__ModuleLoader__.load({
         if (task?.kind !== 'prepare' || !task.payload) return
         const payload = task.payload
         setKind(payload.kind)
+        if (task.status === 'staged') { setTargets({}); setManagerVersion(''); setPlan(null); return }
         if (Array.isArray(payload.components)) setSelected(payload.components)
         if (Array.isArray(payload.targets)) setTargets(Object.fromEntries(payload.targets.map(({ key, version }) => [key, version])))
         if (typeof payload.version === 'string') setManagerVersion(payload.version)
         setPlan(null)
-      }, [task?.id])
+      }, [task?.id, task?.status])
       if (!distribution) return null
       const running = task?.status === 'running'
       const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.pending?.present
@@ -554,9 +672,10 @@ window.__ModuleLoader__.load({
         setBusy(true); setError(null)
         try {
           const value = await installRequest(action, body, 'source')
+          if (action === 'stage' && state.execution?.available) await executePrepared(state, value)
           setPlan(action === 'plan' ? { ...value, taskId: task.id } : null)
           if (action !== 'plan') onChanged()
-        } catch (failure) { setError(sourceError(String(failure.message ?? failure), t)) }
+        } catch (failure) { setError(sourceError(String(failure.message ?? failure), t)); if (action === 'stage') onChanged() }
         finally { setBusy(false) }
       }
       const helper = state.maintenance?.pending ? state.maintenance.helperCommand : state.packageManagement?.pending ? state.packageManagement.helperCommand : state.installation?.pending ? state.installation.helperCommand : null
@@ -595,11 +714,12 @@ window.__ModuleLoader__.load({
               task.status === 'staged' || pending ? h('div', { style: S.notice }, t(pending ? 'sourceStaged' : 'sourceHandedOff')) : null,
             ) : null,
             plan && plan.taskId === task?.id && !pending ? h('div', null,
+              state.execution?.available ? h('div', { style: S.reason }, t('executeWarning')) : null,
               h('ul', null, plan.entries.map((entry) => h('li', { key: entry.key }, `${entry.package}: ${entry.previous?.version ? `${entry.previous.version} → ` : ''}${entry.version}`))),
               plan.warnings?.length ? h('div', { style: S.note }, `${t('gateWarning')}: ${plan.warnings.map((warning) => warning === 'guide-skill-not-ready' ? t('skillNotReady') : warning === 'host-not-fully-verified' ? t('sourceHostUnverified') : warning).join(', ')}`) : null,
               plan.blockers?.length ? h('div', { style: S.reason, role: 'alert' }, t('sourceBlocked'), ': ', plan.blockers.some((b) => /link|source-not-pinned|managed-tarball/.test(b)) ? t('sourceLink') : plan.blockers.join(', ')) : null,
-              h('button', { style: S.actionButton, disabled: locked || plan.blockers?.length > 0, onClick: () => request('stage', { taskId: plan.taskId, planId: plan.id, confirm: true }) }, t('sourceConfirm'))) : null,
-            helper ? h('div', { style: S.mono }, helper) : null,
+              h('button', { style: S.actionButton, disabled: locked || plan.blockers?.length > 0, onClick: () => request('stage', { taskId: plan.taskId, planId: plan.id, confirm: true }) }, t(state.execution?.available ? 'executeConfirm' : 'sourceConfirm'))) : null,
+            helper ? h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, helper)) : null,
             state.maintenance?.pending?.kind === 'manager-upgrade' && state.maintenance.recoveryCommand ? h('div', null, h('div', { style: S.note }, t('maintenanceRecovery')), h('div', { style: S.mono }, state.maintenance.recoveryCommand)) : null,
           ),
           error ? h('div', { style: S.reason, role: 'alert' }, error) : null,
@@ -607,7 +727,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function InstallationCard({ installation, components, remoteAvailable, t, onChanged }) {
+    function InstallationCard({ installation, components, remoteAvailable, state, t, onChanged }) {
       const [selected, setSelected] = React.useState(['preset', 'shield', 'admission', 'panel', 'sidebar', 'goal'])
       const [plan, setPlan] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
@@ -620,9 +740,10 @@ window.__ModuleLoader__.load({
         setError(null)
         try {
           const value = await installRequest(action, payload)
+          if (action === 'stage' && state?.execution?.available) await executePrepared(state, value)
           if (action === 'plan') setPlan(value)
           else { setPlan(null); onChanged() }
-        } catch (failure) { setError(String(failure.message ?? failure)) }
+        } catch (failure) { setError(String(failure.message ?? failure)); if (action === 'stage') onChanged() }
         finally { setBusy(false) }
       }
       const outcome = installation.verification === 'superseded' ? 'installHistory'
@@ -649,16 +770,17 @@ window.__ModuleLoader__.load({
             ),
           ) : null,
           plan && !pending ? h('div', null,
+            state?.execution?.available ? h('div', { style: S.reason }, t('executeWarning')) : null,
             h('ul', { style: S.warningList }, plan.entries.map((entry) => h('li', { key: entry.key }, `${entry.package}@${entry.version} · ${t(entry.action === 'install' ? 'installAdd' : 'installRetain')}`))),
             plan.blockers?.length ? h('div', { style: S.reason }, `${t('gateBlocked')}: ${plan.blockers.join(', ')}`) : null,
             plan.warnings?.length ? h('div', { style: S.reason }, `${t('gateWarning')}: ${plan.warnings.join(', ')}`) : null,
             h('button', { style: S.actionButton, disabled: busy || plan.blockers?.length > 0 || !plan.entries.some((entry) => entry.action === 'install'),
-              onClick: () => request('stage', { components: plan.requested, planId: plan.id, confirm: true }) }, t('installConfirm')),
+              onClick: () => request('stage', { components: plan.requested, planId: plan.id, confirm: true }) }, t(state?.execution?.available ? 'executeConfirm' : 'installConfirm')),
           ) : null,
           pending ? h('div', null,
-            h('div', { style: S.notice }, t('installPending')),
+            h('div', { style: S.notice }, t(state?.execution?.available ? 'sourceStaged' : 'installPending')),
             h('ul', { style: S.warningList }, (pending.entries ?? []).map((entry) => h('li', { key: entry.key }, `${entry.package}@${entry.version} · ${t(entry.action === 'install' ? 'installAdd' : 'installRetain')}`))),
-            h('div', { style: S.mono }, installation.helperCommand ?? installation.helper),
+            h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, installation.helperCommand ?? installation.helper)),
             h('button', { style: S.actionButton, disabled: busy || result?.status === 'installing', onClick: () => request('cancel', { planId: pending.id, confirm: true }) }, t('installCancel')),
           ) : null,
           result ? h('div', { style: S.note }, `${t('installResult')}: ${t(outcome)}`) : null,
@@ -669,7 +791,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function MaintenanceCard({ maintenance, components, t, onChanged, onOpenSkills }) {
+    function MaintenanceCard({ maintenance, components, state, t, onChanged, onOpenSkills }) {
       const [selected, setSelected] = React.useState([])
       const [version, setVersion] = React.useState('')
       const [plan, setPlan] = React.useState(null)
@@ -681,6 +803,7 @@ window.__ModuleLoader__.load({
         setBusy(true); setError(null)
         try {
           const value = await installRequest(action, payload, 'maintenance')
+          if (action === 'stage' && state?.execution?.available) await executePrepared(state, value)
           if (action === 'plan') setPlan(value)
           else { setPlan(null); onChanged() }
         } catch (failure) { setError(String(failure.message ?? failure)) }
@@ -702,17 +825,18 @@ window.__ModuleLoader__.load({
               h('option', { value: '' }, '—'), ...(maintenance.catalog?.versions ?? []).map((value) => h('option', { key: value, value }, value))),
             h('button', { style: S.actionButton, disabled: busy || !version, onClick: () => request('plan', { kind: 'manager-upgrade', version }) }, t('maintenanceManager')),
             plan ? h('div', null,
+              state?.execution?.available ? h('div', { style: S.reason }, t('executeWarning')) : null,
               h('div', { style: S.notice }, `${t(plan.kind === 'uninstall' ? 'maintenanceUninstall' : plan.kind === 'repair' ? 'maintenanceRepair' : 'maintenanceManager')}${plan.target ? ` → ${plan.target.version}` : ''}`),
               h('ul', { style: S.warningList }, plan.entries.map((entry) => h('li', { key: entry.key }, `${entry.package}@${entry.version}`))),
               plan.blockers.length ? h('div', { style: S.reason, role: 'alert' }, plan.blockers.join(', ')) : null,
-              h('button', { style: S.actionButton, disabled: busy || plan.blockers.length > 0, onClick: () => request('stage', { kind: plan.kind, components: plan.components, version: plan.target?.version, planId: plan.id, confirm: true }) }, t('maintenanceConfirm')),
+              h('button', { style: S.actionButton, disabled: busy || plan.blockers.length > 0, onClick: () => request('stage', { kind: plan.kind, components: plan.components, version: plan.target?.version, planId: plan.id, confirm: true }) }, t(state?.execution?.available ? 'executeConfirm' : 'maintenanceConfirm')),
             ) : null,
           ) : h('div', null,
-            h('div', { style: S.notice }, t('maintenancePending')),
-            h('div', { style: S.mono }, maintenance.helperCommand),
+            h('div', { style: S.notice }, t(state?.execution?.available ? 'sourceStaged' : 'maintenancePending')),
+            h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, maintenance.helperCommand)),
             h('button', { style: S.actionButton, disabled: busy || ['applying', 'recovery-required', 'invalid'].includes(maintenance.result?.status), onClick: () => request('cancel', { planId: pending.id, confirm: true }) }, t('maintenanceCancel')),
           ),
-          maintenance.result ? h('div', { style: S.note, 'data-guide-maintenance-result': true }, t(maintenance.verification === 'verified-running' ? 'maintenanceVerified'
+          maintenance.result ? h('div', { style: S.note, 'data-guide-maintenance-result': true }, t(maintenance.verification === 'superseded' ? 'maintenanceHistory' : maintenance.verification === 'verified-running' ? 'maintenanceVerified'
             : maintenance.verification === 'restart-health-check-failed' ? 'installHealthFailed'
               : maintenance.verification === 'interrupted' || ['invalid', 'recovery-required'].includes(maintenance.result.status) ? 'maintenanceInterrupted'
                 : maintenance.result.status === 'failed-restored' ? 'maintenanceFailed' : maintenance.result.status === 'applying' ? 'maintenanceWorking' : 'maintenanceAwaiting')) : null,
@@ -727,7 +851,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function PackageCard({ management, components, t, onChanged }) {
+    function PackageCard({ management, components, state, t, onChanged }) {
       const [targets, setTargets] = React.useState({})
       const [plan, setPlan] = React.useState(null)
       const [busy, setBusy] = React.useState(false)
@@ -741,13 +865,14 @@ window.__ModuleLoader__.load({
         setError(null)
         try {
           const value = await installRequest(action, payload, 'packages')
+          if (action === 'stage' && state?.execution?.available) await executePrepared(state, value)
           if (action === 'plan' || action === 'restore-plan') setPlan(value)
           else { setPlan(null); setTargets({}); onChanged() }
         } catch (failure) { setError(String(failure.message ?? failure)) }
         finally { setBusy(false) }
       }
       const selected = installed.filter((item) => targets[item.key] && targets[item.key] !== item.version).map((item) => ({ key: item.key, version: targets[item.key] }))
-      const status = management.verification === 'verified-running' ? 'packageVerified'
+      const status = management.verification === 'superseded' ? 'packageHistory' : management.verification === 'verified-running' ? 'packageVerified'
         : management.verification === 'restart-health-check-failed' ? 'installHealthFailed'
           : management.verification === 'interrupted' || result?.status === 'recovery-required' || result?.status === 'invalid' ? 'packageRecovery'
             : result?.status === 'failed-restored' ? 'packageFailed' : 'packageAwaiting'
@@ -770,15 +895,16 @@ window.__ModuleLoader__.load({
             h('button', { style: S.actionButton, disabled: busy || !selected.length, onClick: () => request('plan', { targets: selected }) }, t('packagePreview')),
           ) : null,
           plan && !pending ? h('div', null,
+            state?.execution?.available ? h('div', { style: S.reason }, t('executeWarning')) : null,
             h('div', { style: S.note }, plan.combination ?? plan.transactionId),
             h('ul', { style: S.warningList }, plan.entries.map((entry) => h('li', { key: entry.key }, `${entry.package}: ${entry.previous?.version ?? ''}${entry.previous ? ' → ' : ''}${entry.version} · ${t(entry.action === 'retain' ? 'installRetain' : entry.action === 'restore' ? 'packageRestore' : 'packageUpgrade')}`))),
             plan.blockers?.length ? h('div', { style: S.reason }, `${t('gateBlocked')}: ${plan.blockers.join(', ')}`) : null,
-            h('button', { style: S.actionButton, disabled: busy || plan.blockers?.length > 0, onClick: () => request('stage', { kind: plan.kind, targets: plan.targets, transactionId: plan.transactionId, planId: plan.id, confirm: true }) }, t(plan.kind === 'package-restore' ? 'packageRestoreConfirm' : 'packageConfirm')),
+            h('button', { style: S.actionButton, disabled: busy || plan.blockers?.length > 0, onClick: () => request('stage', { kind: plan.kind, targets: plan.targets, transactionId: plan.transactionId, planId: plan.id, confirm: true }) }, t(state?.execution?.available ? 'executeConfirm' : plan.kind === 'package-restore' ? 'packageRestoreConfirm' : 'packageConfirm')),
           ) : null,
           pending ? h('div', null,
-            h('div', { style: S.notice }, t('packagePending')),
+            h('div', { style: S.notice }, t(state?.execution?.available ? 'sourceStaged' : 'packagePending')),
             h('ul', { style: S.warningList }, pending.entries.map((entry) => h('li', { key: entry.key }, `${entry.package}@${entry.version}`))),
-            h('div', { style: S.mono }, management.helperCommand),
+            h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, management.helperCommand)),
             h('button', { style: S.actionButton, disabled: busy || ['upgrading', 'restoring'].includes(result?.status), onClick: () => request('cancel', { planId: pending.id, confirm: true }) }, t('packageCancel')),
           ) : null,
           !pending ? (management.transactions?.length
@@ -963,19 +1089,39 @@ window.__ModuleLoader__.load({
         let timer = 0
         let interval = 10_000
         let reading = false
+        let terminalVisibleSince = 0
         async function run() {
           if (reading) return
           reading = true
           try {
             const value = await fetchState()
             if (stopped) return
+            const marker = executionMarker(), task = value.execution?.task
+            let reconnectExpired = false
+            const matches = marker && marker.profile === value.profile?.dir && task && (task.id === marker.taskId || task.pendingId === marker.pendingId)
+            const visible = typeof document !== 'undefined' && [...document.querySelectorAll('[data-guide-execution]')].some((node) => node.getClientRects().length > 0)
+            const terminal = matches && ['completed', 'failed', 'interrupted'].includes(task.status) && marker.reloadedForTask === task.id && loadedAt >= marker.reloadedAt && visible
+            if (terminal && !terminalVisibleSince) terminalVisibleSince = Date.now()
+            if (!terminal) terminalVisibleSince = 0
+            if (marker?.profile && marker.profile !== value.profile?.dir) rememberExecution(null)
+            else if (terminal && Date.now() - terminalVisibleSince > 2000) {
+              await installRequest('seen', { taskId: task.id, confirm: true }, 'execution')
+              rememberExecution(null)
+            }
+            else if (matches && task.status === 'waiting-ack' && Date.now() - (marker.ackRequestedAt ?? marker.startedAt) > 5_000) {
+              rememberExecution({ ...marker, taskId: task.id, ackRequestedAt: Date.now() })
+              void installRequest('ack', { taskId: task.id, confirm: true }, 'execution').catch(() => {})
+            } else if (marker && Date.now() - marker.startedAt > 180_000 && !matches) {
+              rememberExecution(null)
+              reconnectExpired = true
+            }
             setState(value)
-            setError(null)
-            const nextInterval = value.distribution?.task?.status === 'running' ? 1_000 : 10_000
+            setError(reconnectExpired ? t('executeFailed') : null)
+            const nextInterval = executionMarker() || value.execution?.active || value.distribution?.task?.status === 'running' ? 1_000 : 10_000
             if (nextInterval !== interval) { interval = nextInterval; window.clearInterval(timer); timer = window.setInterval(run, interval) }
           } catch (failure) {
             if (stopped) return
-            setError(String(failure?.message ?? failure) === 'host-stale' ? t('hostStale') : String(failure?.message ?? failure))
+            setError(executionMarker() ? null : String(failure?.message ?? failure) === 'host-stale' ? t('hostStale') : String(failure?.message ?? failure))
           } finally {
             reading = false
             if (!stopped) setLoading(false)
@@ -983,9 +1129,12 @@ window.__ModuleLoader__.load({
         }
         run()
         timer = window.setInterval(run, 10_000)
+        const changed = () => setNonce((value) => value + 1)
+        window.addEventListener?.('guide-manager-execution', changed)
         return () => {
           stopped = true
           if (timer !== 0) window.clearInterval(timer)
+          window.removeEventListener?.('guide-manager-execution', changed)
         }
       }, [nonce, t])
 
@@ -1025,7 +1174,7 @@ window.__ModuleLoader__.load({
       }
 
       if (state === null && loading) {
-        return h('div', { style: S.page }, h('div', { style: S.subtitle }, t('loading')))
+        return h('div', { style: S.page }, h('div', { style: S.subtitle }, t(executionMarker() ? 'executeConnecting' : 'loading')))
       }
       if (state === null) {
         return h('div', { style: S.page },
@@ -1056,18 +1205,20 @@ window.__ModuleLoader__.load({
           h('button', { style: S.button, onClick: refresh }, loading ? t('loading') : t('refresh')),
         ),
         error ? h('div', { style: S.banner }, error) : null,
+        h(ExecutionCard, { state, t, onChanged: refresh }),
+        h('fieldset', { disabled: state.execution?.active || Boolean(executionMarker()), style: { border: 0, padding: 0, margin: 0, minWidth: 0 } },
         notice ? h('div', { style: { ...S.notice, ...(noticeError ? S.noticeError : {}) } }, notice) : null,
         state.pending?.present
           ? h('div', { style: S.notice },
-            h('div', null, t('pendingBanner')),
-            h('div', { style: S.mono }, state.pending.helper ?? t('none')),
+            h('div', null, t(state.execution?.available ? 'sourceStaged' : 'pendingBanner')),
+            h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, state.pending.helper ?? t('none'))),
           )
           : null,
         state.pending?.error ? h('div', { style: S.banner }, `pending: ${state.pending.error}`) : null,
         h(SourceCard, { distribution: state.distribution, state, t, onChanged: refresh }),
-        h(InstallationCard, { installation: state.installation, components: state.components ?? [], remoteAvailable: state.distribution?.configured, t, onChanged: refresh }),
-        h(PackageCard, { management: state.packageManagement, components: state.components ?? [], t, onChanged: refresh }),
-        h(MaintenanceCard, { maintenance: state.maintenance, components: state.components ?? [], t, onChanged: refresh, onOpenSkills }),
+        h(InstallationCard, { installation: state.installation, components: state.components ?? [], remoteAvailable: state.distribution?.configured, state, t, onChanged: refresh }),
+        h(PackageCard, { management: state.packageManagement, components: state.components ?? [], state, t, onChanged: refresh }),
+        h(MaintenanceCard, { maintenance: state.maintenance, components: state.components ?? [], state, t, onChanged: refresh, onOpenSkills }),
         h('div', { style: S.card },
           h('div', { style: S.cardHead },
             h('strong', null, t('manager')),
@@ -1130,6 +1281,7 @@ window.__ModuleLoader__.load({
           )
           : null,
         h('div', { style: S.footer }, `${t('updated')}: ${new Date(state.generatedAt).toLocaleString()} · ${t('readOnly')}`),
+        ),
       )
     }
 
@@ -1177,7 +1329,36 @@ window.__ModuleLoader__.load({
           label: () => t('tab'),
           locale: NS,
         }, (owner = {}) => h(ManagerTab, { ...owner, t, onOpenSkills: openSkills })))
+        let returning = false
+        const restoreExecution = async () => {
+          if (typeof document === 'undefined') return
+          try {
+            const value = await fetchState(), task = value.execution?.task
+            const marker = executionMarker()
+            if ((!marker || marker.taskId !== task?.id) && task?.returnToManager && Date.now() - Date.parse(task.createdAt) < 600000) {
+              rememberExecution({ profile: value.profile.dir, taskId: task.id, pendingId: task.pendingId, startedAt: Date.parse(task.createdAt), reloadedForTask: task.id, reloadedAt: loadedAt - 1 })
+            } else if (marker?.taskId === task?.id && task?.returnToManager === false) rememberExecution(null)
+          } catch {}
+        }
+        void restoreExecution()
+        const returnToManager = async () => {
+          if (returning || !executionMarker() || typeof document === 'undefined') return
+          returning = true
+          try {
+            const value = await fetchState()
+            if (value.profile?.dir !== executionMarker()?.profile) { rememberExecution(null); return }
+            const task = value.execution?.task
+            if (!task || !['completed', 'failed', 'interrupted'].includes(task.status) || executionMarker()?.reloadedForTask !== task.id || loadedAt < executionMarker()?.reloadedAt || [...document.querySelectorAll('[data-guide-execution]')].some((node) => node.getClientRects().length > 0)) return
+            const buttons = [...document.querySelectorAll('button, [role="tab"]')]
+            const tab = [...document.querySelectorAll('button, [role="tab"], span, div')].find((node) => node.getClientRects().length > 0 && node.childElementCount === 0 && (node.textContent ?? '').trim() === t('tab'))
+            if (tab) { tab.click(); return }
+            const plugins = buttons.find((node) => /^(插件|Plugins)$/.test((node.textContent ?? '').trim()))
+            plugins?.click()
+          } catch {} finally { returning = false }
+        }
+        const returnTimer = typeof window.setInterval === 'function' ? window.setInterval(returnToManager, 500) : null
         ctx.effect(() => () => {
+          if (returnTimer !== null) window.clearInterval(returnTimer)
           try {
             offSlot?.()
           } catch {}

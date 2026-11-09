@@ -28,6 +28,7 @@
 | Phase 5D-2 消费端后端 | 本地实现与隔离验证通过（2026-11-09） | 异步查询/准备/取消、SHA 缓存、三类本地目录适配、服务接口与持久状态；27 个测试进程通过，网络为模拟传输，真实 tgz/离线计划验证；[说明](docs/PHASE-5D-CONSUMER-BACKEND.md) / [证据](evidence/phase5d-2026-11-09/report.md) |
 | Phase 5D-3 HTTP 接口与管理页 | 本地实现与隔离 Edge 交互通过（2026-11-09） | source 六个 POST 接口、三类操作选择、进度/取消/重试、刷新恢复、计划确认与原助手衔接；28 个测试进程通过，manager 118 用例；HTTP 使用模拟 GitHub、Edge 使用浏览器响应夹具；[说明](docs/PHASE-5D-HTTP-UI.md) / [证据](evidence/phase5d3-2026-11-09/report.md) |
 | Phase 5D-4 公开远端整体验收 | 完成（2026-11-09） | manager 1.1.2 默认公开来源，免 token/source.json；29 个测试进程、manager 120 用例；实际 Edge/独立桌面均通过匿名六包安装、独立/联动升级、来源不可用时恢复、manager 1.1.3 升级及外部恢复。12 组真实 UI 断言、各关键终态 verified-running；[说明](docs/PHASE-5D-REAL-ACCEPTANCE.md) / [证据](evidence/phase5d4-2026-11-09/report.md) |
+| Phase 5 面板内自动执行 | 实现与真实两端验收完成（2026-11-09） | manager 1.2.0；31 个默认测试进程、manager 135 用例；Edge/独立桌面各 8 次面板自动执行全部 completed，重启后返回可见指导页并核对，0 page error。六组件来自真实公开源，manager 自升级用明确本地测试目标 1.2.1；原生 PowerShell 5.1 外部恢复亦通过；[说明](docs/PHASE-5-PANEL-EXECUTION.md) / [证据](evidence/one-click-2026-11-09/report.md) |
 | Phase 5E link 来源迁移 | 未开始 | 日常七个自有包仍是工作区 link；差异预览、源码备份和停机切换待按原计划另行施工。5D 验收完成不等于日常环境已迁移；[方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) |
 | O11 / PT-6 | 暂缓，保留当前设计 | 原生结果卡与测试保留；默认沙箱 failed、无沙箱对照 45/45 passed，不改写为整体通过；[报告](evidence/O11-validation-2026-11-04/pt6/report.md) |
 | O11 / RM-3/5/7 | 按宿主默认机制收口 | 接受 persona／压缩／重试与上下文复制成本；[验收取舍](docs/DECISIONS.md) |

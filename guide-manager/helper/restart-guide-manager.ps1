@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 5.1
 <#
   Guide-manager restart helper.
 
@@ -23,6 +23,7 @@ param(
   [switch]$Maintenance,
   [string]$LaunchRecord = '',
   [switch]$NoRestart,
+  [switch]$GracefulOnly,
   [int]$StopTimeoutSeconds = 30
 )
 
@@ -42,7 +43,7 @@ $logPath = Join-Path $stateDir "helper-$stamp.log"
 $resultPath = Join-Path $stateDir 'helper-result.json'
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
 $launchPath = if ($LaunchRecord) { [IO.Path]::GetFullPath($LaunchRecord) } else { Join-Path $stateDir 'launcher.json' }
-$launchSpec = if (Test-Path -LiteralPath $launchPath) { Get-Content -LiteralPath $launchPath -Raw | ConvertFrom-Json -AsHashtable } else { $null }
+$launchSpec = if (Test-Path -LiteralPath $launchPath) { Get-Content -LiteralPath $launchPath -Raw -Encoding utf8 | ConvertFrom-Json } else { $null }
 $dshHomeDir = Split-Path -Parent (Split-Path -Parent $profileDir)
 $profileName = Split-Path -Leaf $profileDir
 if ((Split-Path -Leaf (Split-Path -Parent $profileDir)) -ne 'profiles') { throw 'Profile must be under a DSH home/profiles directory' }
@@ -51,7 +52,8 @@ if ($launchSpec) {
       [IO.Path]::GetFullPath([string]$launchSpec.profile) -ne $profileDir -or
       [IO.Path]::GetFullPath([string]$launchSpec.home) -ne $dshHomeDir -or
       [IO.Path]::GetFullPath([string]$launchSpec.executable) -ne [IO.Path]::GetFullPath($DshExe)) { throw 'Invalid launcher identity or profile' }
-  if ($launchSpec.kind -eq 'desktop' -and ($profileName -ne 'desktop' -or -not [IO.Path]::IsPathFullyQualified([string]$launchSpec.userData))) { throw 'Desktop launcher needs its own absolute userData directory' }
+  $defaultDesktop = $launchSpec.defaultDesktop -eq $true -and $profileDir -eq [IO.Path]::GetFullPath((Join-Path $env:USERPROFILE '.dsh/profiles/desktop'))
+  if ($launchSpec.kind -eq 'desktop' -and ($profileName -ne 'desktop' -or (-not $defaultDesktop -and [string]$launchSpec.userData -notmatch '^(?:[a-zA-Z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)'))) { throw 'Desktop launcher needs its own absolute userData directory' }
   if ($launchSpec.kind -eq 'web' -and ([int]$launchSpec.port -lt 1024 -or [int]$launchSpec.port -gt 65535)) { throw 'Web launcher needs a concrete unprivileged port' }
 } elseif ($profileDir -ne [IO.Path]::GetFullPath((Join-Path $env:USERPROFILE '.dsh/profiles/desktop'))) {
   throw 'A non-default profile requires .guide-manager/launcher.json; no processes were stopped'
@@ -90,7 +92,10 @@ function Get-DshProcesses {
         throw "Launcher PID identity changed; refusing to stop it. PID=$($root[0].ProcessId); executable=$($root[0].ExecutablePath); recorded=$($expectedStart.ToString('o')); observed=$($root[0].CreationDate.ToUniversalTime().ToString('o'))"
       }
       $marker = if ($launchSpec.kind -eq 'desktop') { [string]$launchSpec.userData } else { '--profile ' + $profileName }
-      if (-not $root[0].CommandLine.Contains($marker)) { throw 'Launcher command does not identify the target instance' }
+      if ($defaultDesktop) {
+        $pattern = '^\s*"?' + [regex]::Escape($DshExe) + '"?\s*(--updated)?\s*$'
+        if ($root[0].CommandLine -notmatch $pattern) { throw 'Default desktop launcher identity changed' }
+      } elseif ([string]::IsNullOrEmpty($marker) -or -not $root[0].CommandLine.Contains($marker)) { throw 'Launcher command does not identify the target instance' }
     } else {
       $pattern = '^\s*"?' + [regex]::Escape($DshExe) + '"?\s*(--updated)?\s*$'
       $root = @($rows | Where-Object { $_.ExecutablePath -eq $DshExe -and $_.CommandLine -match $pattern })
@@ -123,6 +128,15 @@ function Stop-Dsh {
   for ($attempt = 1; $attempt -le 3; $attempt++) {
     $processes = Get-DshProcesses
     if ($processes.Count -eq 0) { return $stopped }
+    if ($GracefulOnly -and $launchSpec.kind -eq 'desktop') {
+      foreach ($process in $processes) { try { $null = $process.CloseMainWindow() } catch {} }
+      $deadline = (Get-Date).AddSeconds($StopTimeoutSeconds)
+      while ((Get-Date) -lt $deadline) {
+        if ((Get-DshProcesses).Count -eq 0) { return $true }
+        Start-Sleep -Milliseconds 500
+      }
+      throw 'Desktop close was cancelled or timed out; no package files were changed'
+    }
     $stopped = $true
     Write-Log ("stopping DSH attempt {0}: PID {1}" -f $attempt, (($processes | ForEach-Object { $_.Id }) -join ','))
     foreach ($process in $processes) {
@@ -170,7 +184,7 @@ function Start-Dsh {
     } else {
       Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
       if ($launchSpec) {
-        $arguments = @('--user-data-dir=' + ('"' + [string]$launchSpec.userData + '"'))
+        if (-not $defaultDesktop) { $arguments = @('--user-data-dir=' + ('"' + [string]$launchSpec.userData + '"')) }
         if ($launchSpec.debugPort) { $arguments += '--remote-debugging-port=' + [int]$launchSpec.debugPort }
       }
     }
@@ -252,7 +266,7 @@ if (-not (Test-Path -LiteralPath $pendingPath)) {
 }
 if (-not (Test-Path -LiteralPath $applyScript)) { throw "apply-pending.mjs not found: $applyScript" }
 
-$pendingDocument = Get-Content -LiteralPath $pendingPath -Raw | ConvertFrom-Json -AsHashtable
+$pendingDocument = Get-Content -LiteralPath $pendingPath -Raw -Encoding utf8 | ConvertFrom-Json
 $intentProfile = if ($Install -or $PackageChange -or $Maintenance) { [string]$pendingDocument.profile.dir } else { [string]$pendingDocument.profile }
 if ([IO.Path]::GetFullPath($intentProfile) -ne $profileDir) {
   throw "Pending intent belongs to another profile: $($pendingDocument.profile)"
@@ -269,14 +283,14 @@ try {
   if ((Get-DshProcesses).Count -gt 0) { throw 'DSH is still running; refusing to patch a live profile.' }
   $env:ELECTRON_RUN_AS_NODE = '1'
   Write-Log "running $applyScript"
-  & $DshExe --expose-internals $applyScript $pendingPath 2>&1 | Tee-Object -FilePath $logPath -Append
+  & $DshExe --expose-internals $applyScript $pendingPath 2>&1 | ForEach-Object { Add-Content -LiteralPath $logPath -Value $_ -Encoding utf8; Write-Output $_ }
   $applyExit = $LASTEXITCODE
   if ($Install -or $PackageChange -or $Maintenance) {
     $receiptName = if ($Maintenance) { 'maintenance-result.json' } elseif ($PackageChange) { 'package-result.json' } else { 'install-result.json' }
     $installResultPath = Join-Path $stateDir $receiptName
     if (Test-Path -LiteralPath $installResultPath) {
       try {
-        $installReceipt = Get-Content -LiteralPath $installResultPath -Raw | ConvertFrom-Json -AsHashtable
+        $installReceipt = Get-Content -LiteralPath $installResultPath -Raw -Encoding utf8 | ConvertFrom-Json
       } catch {
         $status = 'recovery-required'
         throw 'Installation receipt is unreadable; DSH will remain stopped until the profile is checked.'

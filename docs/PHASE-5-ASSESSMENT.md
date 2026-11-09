@@ -4,6 +4,8 @@
 
 ## 1. 已定方向
 
+2026-11-09 补充：按用户要求补齐 [面板内完成安装与重启](PHASE-5-PANEL-EXECUTION.md)。manager 1.2.0 从“准备后手动运行助手”改为“确认后自动执行、重启、返回管理页并核对结果”；此项不替代尚未开始的 5E。
+
 用户先安装 `guide-manager`，从官方插件页的「指导」管理页安装推荐组件或选择可选组件，随后逐组件管理、升级和修复。保留六个独立运行包及独立 manager，不新增 suite 作为强制依赖入口，不合并运行代码。
 
 `guide-manager` 是安装入口；`guide-panel` 是依赖 preset/admission/shield 的业务面板，不能承担首次安装。manager 不导入运行组件，也不通过 dependencies/peerDependencies 强制安装全部组件。组件分别作为当前 profile 的直接依赖与 bundle 登记，避免 suite 的间接依赖与独立升级产生两份版本。

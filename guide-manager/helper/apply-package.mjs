@@ -37,6 +37,8 @@ function validate(plan, path) {
   return plan
 }
 
+export { validate as validatePackage }
+
 function saveBackup(profile, plan, previousEntries) {
   const id = `${Date.now()}-${plan.id.slice(0, 12)}`
   const directory = transactionPath(profile, id)

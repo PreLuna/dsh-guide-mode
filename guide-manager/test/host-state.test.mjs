@@ -109,6 +109,24 @@ const componentServices = {
   guideSidebarHost: { getState: () => ({ supported: true, version: '0.28.2' }) },
 }
 
+test('new installation after uninstall gets its own health check despite older package and maintenance receipts', async () => {
+  const data = fixture()
+  try {
+    const { ctx, store } = makeCtx(data, { services: componentServices })
+    const root = join(data.profile, '.guide-manager')
+    writeJson(join(root, 'package-result.json'), { schema: 1, status: 'upgraded-awaiting-restart', startedAt: '2020-01-01T00:00:00Z', finishedAt: '2020-01-01T00:00:01Z', entries: [] })
+    writeJson(join(root, 'maintenance-result.json'), { schema: 1, kind: 'uninstall', status: 'uninstall-awaiting-restart', startedAt: '2020-01-02T00:00:00Z', finishedAt: '2020-01-02T00:00:01Z', entries: [] })
+    writeJson(join(root, 'install-result.json'), { schema: 1, planId: 'new-reinstallation', status: 'installed-awaiting-restart', startedAt: '2020-01-03T00:00:00Z', finishedAt: '2020-01-03T00:00:01Z', entries: [{ key: 'preset', version: '1.1.0' }] })
+    await apply(ctx, { checkArtifacts: false })
+    const state = await store.get('guideManager').getState()
+    // This fixture intentionally omits official artifacts. A current failed check
+    // must be reported, rather than hiding the current operation as historical.
+    assert.equal(state.installation.verification, 'restart-health-check-failed')
+    assert.equal(state.packageManagement.verification, 'superseded')
+    assert.equal(state.maintenance.verification, 'superseded')
+  } finally { rmSync(data.root, { recursive: true, force: true }) }
+})
+
 test('host state reports six ready components, edges and the skill', async () => {
   const data = fixture()
   try {

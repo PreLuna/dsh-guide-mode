@@ -8,6 +8,7 @@ let frames = new Map()
 let snapshot
 let component
 const requests = []
+const storage = new Map()
 const react = {
   createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat() }),
   useState(initial) {
@@ -20,6 +21,7 @@ const react = {
   useEffect() {},
 }
 globalThis.window = {
+  localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
   document: { baseURI: 'http://isolated/' },
   __ModuleLoader__: { load({ factory }) {
     const plugin = factory(() => react)
@@ -54,6 +56,7 @@ const button = (label) => nodes(tree()).find((node) => node.type === 'button' &&
 function reset({ available = true } = {}) {
   frames = new Map()
   requests.length = 0
+  storage.clear()
   snapshot = {
     manager: { mode: 'ready' }, host: {},
     components: COMPONENTS.map((item) => ({ ...item, status: 'missing', version: null })),
@@ -239,4 +242,67 @@ test('source errors are localized, retries retain original options and link bloc
   await button('sourcePlan').props.onClick()
   assert.equal(button('sourceConfirm').props.disabled, true)
   assert.match(text(tree()), /sourceLink/)
+})
+
+test('one-click confirmation binds stage, execution plan, detached start and acknowledgement', async () => {
+  sourceSnapshot({ id: 'prepared', kind: 'prepare', status: 'ready' })
+  snapshot.profile = { dir: 'isolated-profile' }
+  snapshot.execution = { available: true, active: false, task: null }
+  globalThis.fetch = async (url, options) => {
+    const payload = JSON.parse(options.body)
+    requests.push({ url, payload })
+    const value = url.endsWith('/source/plan') ? { id: 'package-plan', entries: [], blockers: [] }
+      : url.endsWith('/source/stage') ? { planId: 'package-plan', application: 'pending-restart' }
+        : url.endsWith('/execution/plan') ? { id: 'execution-fingerprint', pendingId: 'package-plan', blockers: [], entries: [] }
+          : url.endsWith('/execution/start') ? { taskId: 'independent-worker' } : { application: 'restarting' }
+    return { ok: true, json: async () => ({ ok: true, value }) }
+  }
+  await button('sourcePlan').props.onClick()
+  assert.match(text(tree()), /executeWarning/)
+  assert.equal(requests.length, 1)
+  await button('executeConfirm').props.onClick()
+  assert.deepEqual(requests.slice(1).map((r) => [r.url.split('/').slice(-2).join('/'), r.payload]), [
+    ['source/stage', { taskId: 'prepared', planId: 'package-plan', confirm: true }],
+    ['execution/plan', { pendingId: 'package-plan' }],
+    ['execution/start', { planId: 'execution-fingerprint', confirm: true }],
+    ['execution/ack', { taskId: 'independent-worker', confirm: true }],
+  ])
+  assert.equal(JSON.parse(storage.get('dsh-guide-manager.execution')).taskId, 'independent-worker')
+  assert.match(text(tree()), /executeConnecting/)
+  assert.ok(nodes(tree()).some((n) => n.type === 'fieldset' && n.props.disabled))
+})
+
+test('execution refusal leaves a staged plan without an automatic retry on render', async () => {
+  sourceSnapshot({ id: 'prepared', kind: 'prepare', status: 'ready' })
+  snapshot.profile = { dir: 'isolated-profile' }
+  snapshot.execution = { available: true, active: false, task: null }
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, payload: JSON.parse(options.body) })
+    if (url.endsWith('/execution/start')) return { ok: false, json: async () => ({ ok: false, error: { message: 'execution-launch-failed' } }) }
+    const value = url.endsWith('/source/plan') ? { id: 'plan', entries: [], blockers: [] } : url.endsWith('/source/stage') ? { planId: 'plan' } : { id: 'execute-plan', pendingId: 'plan', entries: [], blockers: [] }
+    return { ok: true, json: async () => ({ ok: true, value }) }
+  }
+  await button('sourcePlan').props.onClick()
+  await button('executeConfirm').props.onClick()
+  assert.equal(storage.size, 0)
+  assert.match(text(tree()), /executeFailed/)
+  assert.ok(!requests.some((r) => r.url.endsWith('/execution/ack')))
+  const count = requests.length
+  tree(); tree()
+  assert.equal(requests.length, count)
+})
+
+test('pending-operation execution confirms the previewed execution fingerprint', async () => {
+  reset()
+  snapshot.profile = { dir: 'isolated-profile' }
+  snapshot.execution = { available: true, active: false, task: null }
+  snapshot.installation.pending = { id: 'existing-pending' }
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, payload: JSON.parse(options.body) })
+    return { ok: true, json: async () => ({ ok: true, value: url.endsWith('/plan') ? { id: 'previewed', pendingId: 'existing-pending', entries: [], blockers: [] } : { taskId: 'worker' } }) }
+  }
+  await button('executeStart').props.onClick()
+  await button('executeConfirm').props.onClick()
+  assert.equal(requests.filter((r) => r.url.endsWith('/plan')).length, 1)
+  assert.deepEqual(requests[1].payload, { planId: 'previewed', confirm: true })
 })

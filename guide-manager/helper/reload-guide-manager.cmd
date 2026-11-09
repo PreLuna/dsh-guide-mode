@@ -1,16 +1,16 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-where pwsh >nul 2>nul
+where powershell.exe >nul 2>nul
 if errorlevel 1 (
-  echo PowerShell 7 ^(pwsh^) was not found on PATH.
+  echo Windows PowerShell was not found on PATH.
   pause
   exit /b 1
 )
 echo This stops and reopens DeepSeek Harness so changed local link sources load.
 echo The current chat window will disconnect briefly.
 echo.
-pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0restart-guide-manager.ps1" -Reload
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0restart-guide-manager.ps1" -Reload
 echo.
 if errorlevel 1 (
   echo FAILED. See the newest .guide-manager\helper-*.log and helper-result.json

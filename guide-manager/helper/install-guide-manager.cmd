@@ -1,3 +1,3 @@
 @echo off
-pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0restart-guide-manager.ps1" -Install %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0restart-guide-manager.ps1" -Install %*
 pause

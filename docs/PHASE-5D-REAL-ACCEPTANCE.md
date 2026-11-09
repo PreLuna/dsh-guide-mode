@@ -2,7 +2,7 @@
 
 更新：2026-11-09，**公开源首版实现与隔离整体验收完成**。实际 Edge/独立桌面各 6 组断言通过，关键安装/升级/恢复终态均 verified-running，0 page error。结果与边界见 [项目状态](../PROJECT-STATUS.md) / [完整报告](../evidence/phase5d4-2026-11-09/report.md)。5E 未开始。
 
-新用户从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，在官方插件页安装，进入“指导 → 远端发布来源”检查并选择安装/升级，预览确认后运行外部助手。当前 guide-v1.2.2 为正式发布，manager 1.1.3 为已通过独立升级/恢复验证的版本；manager 1.1.2 是公开源功能起始版本。
+本页记录 guide-v1.2.2 / manager 1.1.3 的历史真实远端验收，manager 1.1.2 是公开源功能起始版本，当时确认准备后仍需手动运行助手。后续 manager 1.2.0 增加面板自动执行与重启返回，当前方式见 [面板执行说明](PHASE-5-PANEL-EXECUTION.md)。新用户从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，在官方插件页安装后进入“指导 → 远端发布来源”。
 
 用户已将仓库改为公开。本轮当前目标为无 token 公开分发：manager 1.1.2 默认内置本仓库公开来源，读取 Release latest/固定 tag 附件，通过匿名 Git 智能 HTTP 的 refs 广告核对 tag 对应提交；不使用 REST API 查询，避免其匿名配额成为安装门槛。配置仍可显式选回私有/API 来源。公开模式的源码依据为 [GitHub Release 直链](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases) 与 [Git HTTP 协议](https://git-scm.com/docs/http-protocol)。
 

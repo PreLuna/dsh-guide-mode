@@ -1,4 +1,6 @@
-# Guide manager（Phase 1–4 与 Phase 5A/5B/5C 本地包路径）
+# Guide manager
+
+manager 1.2.0：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
 
 2026-11-09：manager 1.1.2 增加默认公开发布来源。通过官方插件页安装本仓库 manager tgz 后，直接进入“插件 → 指导 → 远端发布来源”检查并下载，无需配置 token 或 source.json。公开模式使用 Release 直链与 Git 智能 HTTP 的 tag/commit 核验，不消耗匿名 REST API 配额；保留包 SHA/tar/契约与现有冷事务门禁。实际整体验收进展见 [5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 

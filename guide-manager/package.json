@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-guide-manager",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Product manager for the DSH guidance mode components with phase-4 skills manager integration",
@@ -20,6 +20,7 @@
     "github-source.js",
     "github-public.js",
     "remote.js",
+    "execution.js",
     "client.js",
     "cordis.patch.yml",
     "README.md",
@@ -27,6 +28,8 @@
     "helper/apply-install.mjs",
     "helper/apply-package.mjs",
     "helper/apply-maintenance.mjs",
+    "helper/start-execution.ps1",
+    "helper/run-execution.ps1",
     "helper/maintain-guide-manager.cmd",
     "helper/recover-manager.ps1",
     "helper/repair-components.ps1",
@@ -54,6 +57,7 @@
     }
   },
   "dshGuide": {
+    "executionSchema": 1,
     "source": { "schema": 1, "provider": "github", "owner": "PreLuna", "repo": "dsh-guide-mode", "channel": "stable", "tokenEnv": "DSH_GUIDE_GITHUB_TOKEN", "access": "public" },
     "controlSchema": 1,
     "dataSchema": 1,

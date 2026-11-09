@@ -21,7 +21,9 @@ import { catalogView, createInstallPlan, installView, readCatalog, stageInstall 
 import { createRestorePlan, createUpgradePlan, packageView, readUpgradeCatalog, stagePackagePlan, upgradeCatalogView } from './upgrade.js'
 import { cancelMaintenance, createMaintenancePlan, maintenanceView, managerCatalogView, stageMaintenance } from './maintenance.js'
 import { createRemoteManager } from './remote.js'
+import { createExecutionController } from './execution.js'
 const remoteManagers = new WeakMap()
+const executionManagers = new WeakMap()
 
 /**
  * Host state, component switches and Phase 5A cold installation planning.
@@ -598,11 +600,12 @@ async function collectState(ctx, config = {}) {
       { key: 'better-sidebar', owner: 'official-plugins', installed: host.betterSidebar?.actual != null, version: host.betterSidebar?.actual ?? null },
     ],
   }
-  if (maintenanceReceipt?.startedAt && Date.parse(maintenanceReceipt.startedAt) > Date.parse(packageReceipt?.finishedAt ?? receipt?.finishedAt ?? '')) {
-    state.installation.verification = 'superseded'
-    state.packageManagement.verification = 'superseded'
-  }
+  const supersededBy = (own, others) => own?.finishedAt && others.some((other) => Date.parse(other?.startedAt ?? '') > Date.parse(own.finishedAt))
+  if (supersededBy(receipt, [packageReceipt, maintenanceReceipt])) state.installation.verification = 'superseded'
+  if (supersededBy(packageReceipt, [receipt, maintenanceReceipt])) state.packageManagement.verification = 'superseded'
+  if (supersededBy(maintenanceReceipt, [receipt, packageReceipt])) state.maintenance.verification = 'superseded'
   state.distribution = remoteManagers.get(ctx)?.view() ?? { configured: false }
+  state.execution = executionManagers.get(ctx)?.view(state) ?? { available: false, active: false }
   state.warnings = buildWarnings(state)
   return state
 }
@@ -808,7 +811,7 @@ function cancelInstallation(ctx, payload) {
   return { application: 'pending-cleared' }
 }
 
-async function handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, req, res) {
+async function handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, executionActions, req, res) {
   const connection = serviceOf(injected, 'connection')
   const rejection = typeof connection?.requestRejection === 'function' ? connection.requestRejection(req) : undefined
   if (rejection !== undefined) {
@@ -816,6 +819,27 @@ async function handle(injected, getState, setEnabled, installActions, packageAct
     return
   }
   const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
+  if (pathname.startsWith(`${ROUTE_PREFIX}/execution/`)) {
+    if (req.method !== 'POST') { writeJson(res, 405, { ok: false, error: { message: 'method not allowed' } }); return }
+    const action = pathname.slice(`${ROUTE_PREFIX}/execution/`.length)
+    if (!['plan', 'start', 'ack', 'seen'].includes(action)) { writeJson(res, 404, { ok: false, error: { message: 'not found' } }); return }
+    try {
+      const value = await executionActions[action](await readJsonBody(req))
+      if (action === 'ack') {
+        if (typeof res.once === 'function') res.once('finish', () => { try { value() } catch {} })
+        writeJson(res, 200, { ok: true, value: { application: 'restarting' } })
+        if (typeof res.once !== 'function') value()
+      } else writeJson(res, 200, { ok: true, value })
+    } catch (error) {
+      const code = /^execution-[a-z-]+$/.test(error.message) ? error.message : 'execution-refused'
+      writeJson(res, code === 'execution-invalid-request' ? 400 : 409, { ok: false, error: { code, message: code } })
+    }
+    return
+  }
+  if (req.method === 'POST' && executionActions.busy()) {
+    writeJson(res, 409, { ok: false, error: { code: 'execution-busy', message: 'execution-busy' } })
+    return
+  }
   if (pathname.startsWith(`${ROUTE_PREFIX}/source/`)) {
     if (req.method !== 'POST') { writeJson(res, 405, { ok: false, error: { code: 'method-not-allowed', message: 'method not allowed' } }); return }
     const action = pathname.slice(`${ROUTE_PREFIX}/source/`.length)
@@ -913,9 +937,21 @@ export async function apply(ctx, config = {}) {
   const remote = createRemoteManager({ profile: serviceOf(ctx, 'profileContext'), sourceConfig: config.source, sourcePath: config.sourcePath,
     host: readBom().guide.host, managerRoot: PACKAGE_DIR })
   remoteManagers.set(ctx, remote)
-  if (typeof ctx.effect === 'function') ctx.effect(() => () => { remote.dispose(); remoteManagers.delete(ctx) })
+  const execution = createExecutionController({ profile: serviceOf(ctx, 'profileContext'), managerRoot: PACKAGE_DIR })
+  executionManagers.set(ctx, execution)
+  if (typeof ctx.effect === 'function') ctx.effect(() => () => { remote.dispose(); remoteManagers.delete(ctx); executionManagers.delete(ctx) })
   const getState = () => collectState(ctx, config)
-  const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled, config)
+  const setEnabled = async (key, enabled) => (await getState()).execution.active ? { ok: false, code: 'execution-busy', message: 'execution-busy' } : setComponentEnabled(ctx, key, enabled, config)
+  const executionPayload = (p, keys) => {
+    if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).some((key) => !keys.includes(key))) throw Error('execution-invalid-request')
+  }
+  const executionActions = {
+    plan: async (p) => { executionPayload(p, ['pendingId']); return execution.plan(await getState(), p.pendingId) },
+    start: async (p) => { executionPayload(p, ['planId', 'confirm']); if (p.confirm !== true) throw Error('execution-confirmation-required'); return execution.start(await getState(), p.planId) },
+    ack: async (p) => { executionPayload(p, ['taskId', 'confirm']); if (p.confirm !== true) throw Error('execution-confirmation-required'); return execution.acknowledge(await getState(), p.taskId) },
+    seen: async (p) => { executionPayload(p, ['taskId', 'confirm']); if (p.confirm !== true) throw Error('execution-confirmation-required'); return execution.seen(p.taskId) },
+    busy: () => execution.busy(),
+  }
   const installActions = {
     plan: (payload) => planInstallation(ctx, config, payload.components),
     stage: (payload) => prepareInstallation(ctx, config, payload),
@@ -955,6 +991,7 @@ export async function apply(ctx, config = {}) {
     },
   }
   ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, planInstallation: installActions.plan, prepareInstallation: installActions.stage, cancelInstallation: installActions.cancel,
+    planExecution: executionActions.plan, startExecution: executionActions.start, acknowledgeExecution: executionActions.ack,
     checkSource: remote.check, prepareSource: async (payload) => remote.prepare(payload, await getState()),
     sourceTask: remote.wait, cancelSourceTask: remote.cancel,
     planPreparedSource: async (id) => remote.plan(id, await getState()),
@@ -970,7 +1007,7 @@ export async function apply(ctx, config = {}) {
       kind: 'prefix',
       path: ROUTE_PREFIX,
       handler: (req, res) => {
-        void handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, req, res)
+        void handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, executionActions, req, res)
       },
     }), 'guide-manager: status and phase-4 action route')
   })
