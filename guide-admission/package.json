@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-guide-admission",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,7 +13,7 @@
     "README.md"
   ],
   "peerDependencies": {
-    "@local/dsh-guide-shield": "1.1.0",
+    "@local/dsh-guide-shield": "1.1.1",
     "@deepseek-ai/cordis": "4.0.5",
     "@deepseek-ai/dsh-subagent": "0.2.1-rc.3"
   },
