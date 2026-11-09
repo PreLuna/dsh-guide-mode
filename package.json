@@ -13,6 +13,10 @@
     "doctor": "node scripts/workspace.mjs doctor",
     "repo:check": "node scripts/check-repository.mjs",
     "pack:local": "node scripts/package-local.mjs",
+    "manager:release": "node scripts/prepare-manager-release.mjs",
+    "manager:upgrade-catalog": "node scripts/prepare-upgrade-catalog.mjs",
+    "manager:remote-release": "node scripts/prepare-remote-release.mjs",
+    "manager:github-release": "node scripts/github-release.mjs",
     "profile:prepare": "node scripts/workspace.mjs prepare"
   }
 }

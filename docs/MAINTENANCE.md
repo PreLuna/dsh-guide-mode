@@ -1,10 +1,10 @@
 # 工程维护手册
 
-更新：2026-11-05（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 1–4，整体验收完成）、`private:true`、`UNLICENSED` 的私有维护期。Phase 5 暂缓，见 [评估](PHASE-5-ASSESSMENT.md)。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-07（Asia/Shanghai）。适用于本机六个运行组件 + `guide-manager` 1.1.0（Phase 1–4，整体验收完成）、`private:true`、`UNLICENSED` 的私有维护期。Phase 5 已按独立管理器安装入口启动，见 [设计](PHASE-5-ASSESSMENT.md)；下面的七 link 部署仍是原基线维护路径。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与待办见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 1. 版本、基线与 CI
 
-一个工作区 Git 仓库管理七个自有包（六个运行组件 + manager）、当前文档与测试。七个包同版本；内部 peer 锁定同版本。
+一个工作区 Git 仓库管理七个自有包（六个运行组件 + manager）、当前文档与测试。当前生产元数据仍为 1.1.0，工程检查已允许独立版本；兼容性由 peer、契约及维护者声明的精确版本组合约束，不再用“版本齐平”代替兼容性检查。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。peer 范围收窄到该基线，不表示其他版本一定有缺陷。
 
@@ -52,6 +52,8 @@
 完整卸载后已有指导日志仍保留，但其 guide preset/provider 不再可用；不把卸载当作删除对话。
 
 ## 4. 升级必须重验的边界
+
+Phase 5 的本地包安装/升级/恢复与 launcher 实例约束见 [manager 使用说明](../guide-manager/README.md) 和 [5B 事务设计](PHASE-5B-PACKAGE-TRANSACTIONS.md)。原有七 link 路径继续用于开发；5B 不自动覆盖 link 或把旧式非缓存安装隐式迁移为发行包。包版本恢复与旧 Phase 3 的 patch-only 回滚是两个不同入口。
 
 - **admission**：dsh-subagent/Cordis 产物、materialize 函数、manager/resident/rootPools/slots、同步 reserve 与原生取消/closing。
 - **goal**：原 driver 产物、waitForChildren/join 函数与独占调度入口。
@@ -114,6 +116,8 @@ tgz 从 Git ZIP 解出的提交字节生成，避免 Windows 工作树换行转�
 2026-11-04 清理记录：删除 `dist/.npm-cache/`（18 文件）与全部 `evidence/*/isolated-home/`（57 目录、4927 文件、64.45 MB、660 个内部链接），`evidence/` 从 6754 文件 / 136.6 MB 降为 1827 文件 / 72.1 MB。
 
 ## 7. 常用命令
+
+Phase 5 本地 tarball 的组件卸载/修复和 manager 自升级使用管理页 5C 区；保留 preset 和会话数据，与第 3 节开发环境“完整卸载”不同。页面在升级前给出 profile 自有目录下的外部恢复脚本；组件损坏使桌面插件页打不开时，使用 manager 包内 `helper/repair-components.ps1`。先保留可信包缓存及事务备份，不能把它们当普通可删缓存。详见 [5C](PHASE-5C-MAINTENANCE.md) 和 [功能测试清单](FUNCTIONAL-TEST-MATRIX.md)。
 
 ```powershell
 npm test                 # 无需安装 DSH 的回归

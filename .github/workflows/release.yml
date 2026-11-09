@@ -1,0 +1,97 @@
+name: private-guide-release
+on:
+  push:
+    tags: ['guide-*']
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Source ref to check and package
+        required: true
+        default: master
+        type: string
+      release_tag:
+        description: Release tag (guide-vX.Y.Z)
+        required: true
+        type: string
+      operation:
+        description: Prepare locally, upload verified draft, or explicitly publish
+        default: prepare
+        type: choice
+        options: [prepare, draft, publish]
+      channel:
+        default: stable
+        type: choice
+        options: [stable, prerelease]
+permissions:
+  contents: read
+concurrency:
+  group: guide-release-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: windows-latest
+    outputs:
+      commit: ${{ steps.bundle.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+      - run: npm run repo:check
+      - run: npm test
+      - run: npm run build:check
+      - name: Read verified published history
+        env:
+          DSH_GUIDE_RELEASE_TOKEN: ${{ github.token }}
+        run: node scripts/github-release.mjs history --repository "$env:GITHUB_REPOSITORY" --output dist/remote-history
+      - name: Build committed release artifacts
+        id: bundle
+        env:
+          GUIDE_RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+          GUIDE_RELEASE_CHANNEL: ${{ inputs.channel || 'stable' }}
+        run: |
+          $sourceCommit = (git rev-parse HEAD).Trim()
+          npm run manager:remote-release -- --repository "$env:GITHUB_REPOSITORY" --commit $sourceCommit --tag "$env:GUIDE_RELEASE_TAG" --channel "$env:GUIDE_RELEASE_CHANNEL" --history-if-present dist/remote-history --output dist/remote-release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "commit=$sourceCommit" >> $env:GITHUB_OUTPUT
+      - run: node scripts/github-release.mjs verify --bundle dist/remote-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: guide-remote-release
+          if-no-files-found: error
+          path: |
+            dist/remote-release/*.json
+            dist/remote-release/*.tgz
+            dist/remote-release/*.md
+            dist/remote-release/SHA256SUMS.txt
+            dist/remote-release/artifacts/*.tgz
+  upload:
+    needs: prepare
+    if: github.event_name == 'push' || inputs.operation != 'prepare'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+      - uses: actions/download-artifact@v4
+        with:
+          name: guide-remote-release
+          path: dist/remote-release
+      - name: Upload and read back every draft asset
+        env:
+          DSH_GUIDE_RELEASE_TOKEN: ${{ github.token }}
+        run: node scripts/github-release.mjs draft --bundle dist/remote-release --execute
+      - name: Publish only on explicit manual selection
+        if: github.event_name == 'workflow_dispatch' && inputs.operation == 'publish'
+        env:
+          DSH_GUIDE_RELEASE_TOKEN: ${{ github.token }}
+        run: node scripts/github-release.mjs publish --bundle dist/remote-release --execute

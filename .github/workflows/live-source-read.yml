@@ -1,0 +1,23 @@
+name: private-source-read-acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  download:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+      - name: Check real private source with a read-only job token
+        env:
+          DSH_GUIDE_GITHUB_TOKEN: ${{ github.token }}
+        run: node guide-manager/test/remote-live.mjs dist/live-source-read
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-source-read-evidence
+          path: dist/live-source-read/result.json
+          if-no-files-found: error

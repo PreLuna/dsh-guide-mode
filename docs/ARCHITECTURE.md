@@ -52,11 +52,17 @@ panel 的 state 返回同源 admission/poolsBySession；旧跨根 catalog/label 
 
 核心服务采用冷更新，panel HMR 不卸载它；服务自身卸载/重载不承诺连续执法。未知源码/函数/形状或方法所有权变化报告 unsupported，不能声称所有原生入口仍受策略保护。生产隔离验收与实际 desktop 冷部署通过，见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
 
-## guide-manager（Phase 4）
+## guide-manager（Phase 4 与 Phase 5A/5B）
+
+Phase 5 采用独立 manager + 六个独立包，方向与分期见 [设计](PHASE-5-ASSESSMENT.md)。5A 新增 `install.js`：可信本机 tarball 目录、依赖闭包、精确版本与 profile 快照绑定计划。Host 的 `/install/plan|stage|cancel` 只预览或写自有安装 intent；`helper/apply-install.mjs` 在停机后持有官方 profile 写锁，调用共享包操作，一次安装新增依赖、复核宿主与组件、最后启用并配对 goal。失败恢复原文件和依赖图；管理页读取持久回执，重启后再核实运行状态。已有组件升级、版本恢复与自升级属于 5B/5C，不借首次安装覆盖开发 link。
+
+5B 的 `upgrade.js` 读取有限兼容组合，选择最少联动，绑定 profile 四文件、安装 manifest 与产物哈希；`/packages/plan|restore-plan|stage|cancel` 不直接变更依赖。`helper/apply-package.mjs` 在同一官方 profile 写锁下执行升级/恢复，稳定缓存和事务内的旧 tgz 确保旧锁可重装；升级保留启停配置，恢复拒绝覆盖后续 profile 编辑。`packageManagement` 提供落盘回执、可恢复事务和新进程健康结果。生产 PowerShell 助手通过 launcher 的 PID/创建时间/实例标记限定进程树，并恢复原 home/profile/启动类型。详见 [5B](PHASE-5B-PACKAGE-TRANSACTIONS.md)。
 
 [guide-manager](../guide-manager/README.md) 是独立 Host + client bundle，不 import 六个组件。Host 半边从官方 `pluginManager.listPlugins()`/`listBundles()`（不可用时降级读 profile 清单）、组件自己的可选 state 服务、`pluginPackages` 解析的实际产物哈希和 `$DSH_HOME` 下的 skill 文件聚合状态，经 `/guide-manager/api/state` 暴露；client 半边在官方插件页注册 `plugins.tab`「指导」标签页。每个组件带 `action.gate.enable/disable`：契约、必需产物、依赖、组件 unsupported/failed 是硬阻断；宿主版本/构建、产物未知、版本漂移、skill 未就绪是警告；停用始终允许用于恢复。`/guide-manager/api/action` 只有门禁通过才执行：panel/sidebar 转调官方 `pluginManager.setPluginEnabled` 热生效；admission/shield/goal 只写 `profile/.guide-manager/pending.json`，由 `helper/restart-guide-manager.cmd` 在 Host 停止时调用官方 `writePluginEnabled` 应用并重启。goal 的 intent 同时包含 adapter 和原 driver，保持成对；preset/manager 为 `locked`。Phase 3 读取 profile dependency spec，把本地 `link:` 包映射为 `source-reload`：比较包内最新 mtime 与 Host 启动时间，UI 用 `reload-guide-manager.cmd` 重启加载；registry/tarball/git 包标记为 `package-manager`，仍由官方插件页执行 remove/install。冷切换的 patch 备份由 `rollback-guide-manager.cmd` 恢复最新一份。Phase 4 检测 `@michengai/dsh-skills-manager`，将 `guide` skill 状态和 skills manager 版本显示在 SkillsCard；按钮通过官方设置 UI 的“技能”section 做 best-effort 深链，不复制安装/禁用逻辑。状态区分 `ready`、`ready-unverified`、`degraded`、`unsupported`、`failed`、`disabled`、`missing`、`unknown`，并把 version/contract/host 漂移显示为未验证而不是不兼容。
 
 ## O21 契约与维护边界
+
+5C 的 `maintenance.js` 与只读 `artifacts.js` 绑定当前 SHA 固定来源，计划按依赖拒绝不完整卸载，修复识别不依赖组件 manifest。`apply-maintenance.mjs` 在独立控制器副本中持官方锁执行卸载/修复/manager 升级，清理自有 YAML 行并配对恢复原 driver。manager 恢复脚本不依赖新版本 API；桌面合并客户端无法启动时另有独立组件修复入口。详见 [5C](PHASE-5C-MAINTENANCE.md)。
 
 1.1.0 先核对官方 subagent/Cordis 及右栏/workspace 客户端产物，Host 检查必需服务/方法，客户端检查原生注册、保存 tab inventory 和主视图 selection。`/guide/api/state` 暴露 panelCompat，未知或缺失时只读/不可用并拒绝创建和自动归档；不挂半套 provider/tab。shield 独立预检，不支持时不声称 inject 防护 active。官方同步身份读取已 deprecated，当前按固定产物受控使用并公开诊断；升级与核心重载遵循冷更新，见 [维护手册](MAINTENANCE.md)。
 

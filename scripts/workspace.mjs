@@ -16,7 +16,7 @@ if(command==='doctor'){
   const skillRoot=option('--skills')??join(process.env.DSH_HOME??join(userHome,'.dsh'),'skills')
   const skill=existsSync(join(skillRoot,'guide/SKILL.md'))
   const results=packages.map(directory=>{const manifest=JSON.parse(readFileSync(join(root,directory,'package.json'),'utf8'));return{directory,name:manifest.name,version:manifest.version,private:manifest.private,license:manifest.license}})
-  if(results.some(item=>item.version!=='1.1.0'||item.private!==true||item.license!=='UNLICENSED'))throw Error('Inconsistent local release metadata')
+  if(results.some(item=>!/^\d+\.\d+\.\d+$/.test(item.version)||item.private!==true||item.license!=='UNLICENSED'))throw Error('Unsupported local release metadata')
   console.log(JSON.stringify({status:'passed',distribution:'private-github',packages:results,guideSkill:{available:skill,fallback:'explicit unavailable note and general advice'},profile},null,2))
 }else if(command==='prepare'){
   const outputArg=option('--output');if(!outputArg)throw Error('--output is required; use a new evidence directory for every operation')

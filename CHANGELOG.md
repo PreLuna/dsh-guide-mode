@@ -2,13 +2,26 @@
 
 ## Unreleased
 
+- Implement Phase 5D-3 source HTTP endpoints and bilingual manager UI for checks, component/manager preparation, progress, cancel/retry, refresh recovery and exact-plan confirmation. Preserve the existing cold helpers and external manager recovery. Validate API boundaries, real tarball staging and isolated Edge rendering using source fixtures; real private Release and desktop acceptance remain Phase 5D-4.
+
+- Implement Phase 5D-2 consumer backend: bounded shared GitHub transport, asynchronous metadata/preparation/cancellation, persistent tasks and source snapshots, verified SHA cache, selective install catalog validation and bridges to existing cold install/upgrade/manager transactions. Expose backend services/state; HTTP/UI and real private-source acceptance remain Phase 5D-3/4.
+
+- Implement Phase 5D-0/1: portable schema 4 release/source contracts, shared offline package verification, fixed-commit remote bundles with historical versions and manager install baseline, explicit GitHub draft upload/readback and publication tools, and a tag/manual-only workflow. Development snapshots cannot publish. Local build/API-simulation checks remain separate from real hosted release and consumer UI acceptance.
+
+- Implement Phase 5C dependency-aware uninstall, protected preset, native goal driver restoration, original-version file repair, and local manager updates through a copied external controller. Add independent manager recovery and component repair scripts for a broken UI, persistent receipts, profile locking, backups, bilingual UI, and functional-test/remaining-work documentation. Registry distribution, source migration and arbitrary data migration remain separate work.
+
+- Complete isolated Phase 5A browser/desktop acceptance, fixing the PowerShell Pending type collision, Node-mode restart inheritance, process targeting and admission's packed peer import.
+- Implement Phase 5B local package upgrades and recovery: finite compatible combinations, minimal linked upgrades, profile-owned immutable package cache, exact prior lock/config/tgz backups, failure repair, explicit history recovery and fresh-Host version/health verification. Real Edge/Electron workflows cover independent and coupled updates plus recovery without original releases. Production versions and live profile remain unchanged; registry discovery, migrations, uninstall and manager self-upgrade remain outside this phase.
+
+- Begin Phase 5A: add trusted local tarball catalogs, dependency-closure previews and confirmed cold-install intents to the independent manager. A locked helper installs missing packages in one official pnpm operation, verifies host artifacts and the goal pair, activates only a complete set, and restores the previous dependency graph on failure. Add persistent receipts, install UI and `npm run manager:release`; registry discovery, existing-package upgrades and manager self-updates remain later stages.
+
 - Add a `guide-manager` bundle and an official-Plugins-page “指导” tab that reports the six components, host BOM, dependency edges, and `guide` skill state.
 - Phase 1A adds confirmed `guide-panel` / `guide-sidebar-adapter` hot switches through the official `pluginManager`; admission/shield remain restart-required, goal is paired, preset/manager locked, and the manager never writes the profile directly.
 - Phase 1B stages admission/shield and the goal adapter/driver pair as `pending.json` intents. The restart helper stops DSH, applies the patch through the official `writePluginEnabled`, restores the patch on failure, and restarts; the UI never claims a cold change applied before that restart.
 - Phase 2 adds per-component `enable`/`disable` gates and host artifact SHA-256 checks. Contract, required-artifact, dependency and unsupported/failed states block enabling; host-version, unknown-artifact and version drift are warnings; disabling stays available for recovery.
 - Phase 3 detects local `link:` source changes by comparing package mtime with Host start, offers a restart-only `reload-guide-manager.cmd`, and adds `rollback-guide-manager.cmd` for the newest cold-patch backup. Registry/tarball/git updates stay on the official Plugins page rather than duplicating its remove/install transaction.
 - Phase 4 reports `@michengai/dsh-skills-manager` presence/version and links to the official Settings → Skills section without copying its install/disable logic. A non-ready `guide` skill becomes a compatibility-gate warning, never a hard block.
-- Mark Phases 1–4 accepted after the 2026-11-05 live smoke (guide page, build artifacts, skills page). Phase 5 is feasible but deferred pending a distribution/version-coupling decision; see `docs/PHASE-5-ASSESSMENT.md`.
+- Mark Phases 1–4 accepted after the 2026-11-05 live smoke (guide page, build artifacts, skills page). On 2026-11-07, replace the deferred suite proposal with an independent manager installation entry and six separately managed component packages; begin Phase 5A. See `docs/PHASE-5-ASSESSMENT.md`.
 - Prepare a private GitHub repository and commit-based local snapshots; public and marketplace distribution remain deferred, with private metadata unchanged.
 - Summarize retired fork, duplicate archive documents, deferred research plans and one-off deployment scripts in `docs/HISTORY-AND-MAINTENANCE-NOTES.md`, then remove those obsolete files while preserving active tests and recovery dependencies.
 

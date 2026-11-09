@@ -6,9 +6,13 @@
 
 截至 2026-11-05，`guide-manager` 已在工作区实现并登记到本机 desktop：官方插件页提供「指导」标签页，聚合六个组件、依赖边、宿主 BOM 和 `guide` skill 状态。Phase 2 在切换前跑兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚；Phase 4 接入 `@michengai/dsh-skills-manager` 的状态与“设置 → 技能”深链。Registry/tarball 升级仍由官方插件页负责。
 
-**2026-11-05：Phase 1–4 整体验收完成。** 20 个 Node 进程、manager 30 用例、隔离端到端（热切换、pending 准备/取消、skills 深链）及 live 三项冒烟均通过。Phase 5 技术上可进入，但当前建议暂缓；评估与进入条件见 [Phase 5 评估](docs/PHASE-5-ASSESSMENT.md)。
+**2026-11-05：Phase 1–4 整体验收完成。** 20 个 Node 进程、manager 30 用例、隔离端到端及 live 冒烟通过。**2026-11-07：5A/5B 本地包路径完成隔离整体验收**：先装 manager，再从管理页安装组件；按兼容组合单独或联动升级，保存旧包与依赖锁并可恢复。5C 继续补齐依赖卸载、原版本修复与管理器自升级/外部恢复，另提供插件页无法启动时的外部组件修复入口。未切换 live 安装或发布 npm。设计见 [Phase 5](docs/PHASE-5-ASSESSMENT.md)、[5B](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)、[5C](docs/PHASE-5C-MAINTENANCE.md)，交付进度见 [项目状态](PROJECT-STATUS.md)，剩余功能与测试方法见 [检查表](docs/FUNCTIONAL-TEST-MATRIX.md)。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。工作区在 1.1.0 基线上另有未发布的本地改动：自动归档默认关闭、专区改为混合分组，见 [CHANGELOG](CHANGELOG.md) 的 Unreleased。
+
+2026-11-08 按已定顺序完成 5D-0/1 的本地施工：远端发布格式、固定提交七包、草稿核对/显式发布工具和 tag/manual workflow，见 [发布端说明](docs/PHASE-5D-RELEASE-FORMAT.md)。消费端查询/下载/UI（5D-2/3）、真实远端验收及当前 link 来源迁移（5E）仍按 [施工方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) 后续推进；尚未真实发布或切换 live。
+
+2026-11-09：5D-2 后端查询、下载缓存与安装器适配，以及 5D-3 HTTP/管理页均已完成本地隔离验证。管理页支持检查、三类下载选择、取消重试、刷新恢复、计划确认与助手衔接，见 [后端](docs/PHASE-5D-CONSUMER-BACKEND.md) / [管理页](docs/PHASE-5D-HTTP-UI.md)。真实私有远端、官方冷操作和桌面整体验收仍待 5D-4；live 仍保留原来源。
 
 ## 使用
 
@@ -55,7 +59,7 @@
 | 归档 | 阻止模型执行；其他原生 UI 可能仍允许点开/输入，用户已接受；自动归档默认关闭 |
 | 嵌套指导 | v1 不专门支持，保留默认 depth 限制 |
 | 版本变化 | 未知 driver/join/sidebar/tool 来源回退明确状态；完整面板预检见 O21 |
-| 管理页 | Phase 4：兼容门禁；panel/sidebar 热切换；admission/shield/goal pending 冷切换；本地 link 源码变更检测 + reload；冷切换 patch 回滚；skills manager 状态/深链；registry/tarball 升级走官方插件页 |
+| 管理页 | 保留 Phase 1–4 启停/技能/源码 reload；5A 本地包首次安装；5B 兼容组合升级、旧包/依赖锁备份与恢复、重启健康核对；开发 link 受保护，目录外的包走官方插件页 |
 
 ## 配置
 
@@ -106,7 +110,7 @@ node guide-sidebar-adapter/scripts/prepare-official.mjs
 本机基线（无需安装 DSH）：
 
 ```powershell
-npm test          # 20 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter + 4 manager
+npm test          # 24 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter + 8 manager
 npm run build:check
 npm run doctor    # 版本、私有许可、用户级 guide skill
 npm run repo:check # 仓库文件边界与当前文档链接

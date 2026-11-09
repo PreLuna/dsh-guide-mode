@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto'
-import { classifySession } from '../guide-shield/identity.js'
+// Resolve the published peer when installed as an npm package. The sibling
+// fallback is only for this repository's dependency-free development tests.
+const { classifySession } = await import('@local/dsh-guide-shield/identity').catch(error => {
+  if (error.code !== 'ERR_MODULE_NOT_FOUND' || !error.message.includes("'@local/dsh-guide-shield'")) throw error
+  return import('../guide-shield/identity.js')
+})
 
 export const name = 'guide-admission'
 export const inject = ['subagents', 'agents']

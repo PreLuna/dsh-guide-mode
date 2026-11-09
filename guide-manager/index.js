@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   COMPONENTS,
+  ARTIFACT_REQUIREMENTS,
   MANAGER_ACTION,
   actionForComponent,
   buildEdges,
@@ -16,15 +17,21 @@ import {
   sourceChangedSince,
   updateModeFor,
 } from './core.js'
+import { catalogView, createInstallPlan, installView, readCatalog, stageInstall } from './install.js'
+import { createRestorePlan, createUpgradePlan, packageView, readUpgradeCatalog, stagePackagePlan, upgradeCatalogView } from './upgrade.js'
+import { cancelMaintenance, createMaintenancePlan, maintenanceView, managerCatalogView, stageMaintenance } from './maintenance.js'
+import { createRemoteManager } from './remote.js'
+const remoteManagers = new WeakMap()
 
 /**
- * Read-only Host half of the guidance manager.
+ * Host state, component switches and Phase 5A cold installation planning.
  *
  * It deliberately imports none of the components it reports on: a disabled or
  * broken panel must not take the manager down with it. The only package facts
  * it trusts are the installed manifests, the official `pluginManager` snapshot,
  * the components' own optional state services, and the user-level skill files.
- * No method in this file writes a profile, a package, or a skill.
+ * Only manager-owned intents are written here. Package/profile mutations run
+ * in the independent cold helper with the official profile write lock.
  */
 
 const ROUTE_PREFIX = '/guide-manager/api'
@@ -35,6 +42,8 @@ const HELPER_PS1 = join(PACKAGE_DIR, 'helper', 'restart-guide-manager.ps1')
 const HELPER_APPLY = join(PACKAGE_DIR, 'helper', 'apply-pending.mjs')
 const HELPER_RELOAD = join(PACKAGE_DIR, 'helper', 'reload-guide-manager.cmd')
 const HELPER_ROLLBACK = join(PACKAGE_DIR, 'helper', 'rollback-guide-manager.cmd')
+const HELPER_INSTALL = join(PACKAGE_DIR, 'helper', 'install-guide-manager.cmd')
+const HELPER_PACKAGE = join(PACKAGE_DIR, 'helper', 'update-guide-manager.cmd')
 const PENDING_VERSION = 1
 const HOST_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
@@ -526,6 +535,74 @@ async function collectState(ctx, config = {}) {
     dataError: pluginData.error,
     generatedAt: new Date().toISOString(),
   }
+  const installation = installView(profileContext?.dir)
+  const receipt = installation.result
+  const restarted = receipt?.finishedAt && HOST_STARTED_AT > Date.parse(receipt.finishedAt)
+  const running = Array.isArray(receipt?.entries) && receipt.entries.length > 0 && receipt.entries.every((entry) => {
+    const component = components.find((item) => item.key === entry.key)
+    return component?.version === entry.version && component?.enabled === true && ['ready', 'ready-unverified'].includes(component?.status)
+  }) && host.dsh.match === true && host.cordis.match === true
+    && [...new Set(receipt.entries.flatMap((entry) => ARTIFACT_REQUIREMENTS[entry.key] ?? []))].every((name) => host.artifacts.items?.some((item) => item.name === name && item.match === true))
+    && !edges.some((edge) => receipt.entries.some((entry) => entry.key === edge.from) && ['blocked', 'conflict'].includes(edge.status))
+  state.installation = {
+    phase: 'phase-5a',
+    catalog: catalogView(catalogPathOf(ctx, config)),
+    ...installation,
+    verification: receipt?.status === 'installed-awaiting-restart'
+      ? restarted ? running ? 'verified-running' : 'restart-health-check-failed' : 'awaiting-restart'
+      : receipt?.status === 'installing' && HOST_STARTED_AT > Date.parse(receipt.startedAt) ? 'interrupted' : null,
+    helper: HELPER_INSTALL,
+    helperCommand: profileContext?.dir ? `& '${HELPER_INSTALL.replaceAll("'", "''")}' -Profile '${profileContext.dir.replaceAll("'", "''")}'` : null,
+  }
+  const packages = packageView(profileContext?.dir)
+  const packageReceipt = packages.result
+  const packageRestarted = packageReceipt?.finishedAt && HOST_STARTED_AT > Date.parse(packageReceipt.finishedAt)
+  const packageRunning = Array.isArray(packageReceipt?.entries) && packageReceipt.entries.length > 0 && packageReceipt.entries.every((entry) => {
+    const component = components.find((item) => item.key === entry?.key)
+    return component?.version === entry.version && component?.contract === entry.contract && component?.enabled === (entry.enabled !== false)
+      && (entry.enabled === false ? component?.status === 'disabled' : ['ready', 'ready-unverified'].includes(component?.status))
+  }) && host.dsh.match === true && host.cordis.match === true
+    && [...new Set(packageReceipt.entries.flatMap((entry) => ARTIFACT_REQUIREMENTS[entry.key] ?? []))].every((name) => host.artifacts.items?.some((item) => item.name === name && item.match === true))
+    && !edges.some((edge) => packageReceipt.entries.some((entry) => entry.key === edge.from) && ['blocked', 'conflict'].includes(edge.status))
+  state.packageManagement = {
+    phase: 'phase-5b', ...packages,
+    catalog: upgradeCatalogView(upgradePathOf(ctx, config)),
+    verification: ['upgraded-awaiting-restart', 'restored-awaiting-restart'].includes(packageReceipt?.status)
+      ? packageRestarted ? packageRunning ? 'verified-running' : 'restart-health-check-failed' : 'awaiting-restart'
+      : ['upgrading', 'restoring'].includes(packageReceipt?.status) && HOST_STARTED_AT > Date.parse(packageReceipt.startedAt) ? 'interrupted' : null,
+    helperCommand: profileContext?.dir ? `& '${HELPER_PACKAGE.replaceAll("'", "''")}' -Profile '${profileContext.dir.replaceAll("'", "''")}'` : null,
+  }
+  if (packageReceipt?.startedAt && Date.parse(packageReceipt.startedAt) > Date.parse(receipt?.finishedAt ?? '')) state.installation.verification = 'superseded'
+  const maintenance = profileContext?.dir ? maintenanceView(profileContext.dir) : { pending: null, result: null }
+  const maintenanceReceipt = maintenance.result
+  const maintenanceRestarted = maintenanceReceipt?.finishedAt && HOST_STARTED_AT > Date.parse(maintenanceReceipt.finishedAt)
+  const maintenanceHealthy = maintenanceReceipt?.entries?.every((entry) => {
+    if (entry.key === 'manager') return state.manager.version === entry.version && state.manager.mode === 'ready'
+    const component = components.find((item) => item.key === entry.key)
+    if (maintenanceReceipt.kind === 'uninstall') return component?.installed === false
+    return component?.version === entry.version && component?.enabled === entry.enabled && (entry.enabled ? ['ready', 'ready-unverified'].includes(component?.status) : component?.status === 'disabled')
+  }) && host.dsh.match && host.cordis.match
+  const quote = (value) => `'${value.replaceAll("'", "''")}'`
+  state.maintenance = { phase: 'phase-5c', ...maintenance,
+    catalog: managerCatalogView(managerCatalogPathOf(ctx, config), bom.guide.host),
+    helperCommand: maintenance.helper ? `& ${quote(maintenance.helper)} -Profile ${quote(profileContext.dir)}` : null,
+    externalRepairCommand: profileContext?.dir ? `& ${quote(join(PACKAGE_DIR, 'helper', 'repair-components.ps1'))} -Profile ${quote(profileContext.dir)} -Components panel` : null,
+    recoveryCommand: maintenance.recovery && (maintenance.pending?.kind === 'manager-upgrade' || maintenanceReceipt?.kind === 'manager-upgrade')
+      ? `& ${quote(maintenance.recovery)} -Profile ${quote(profileContext.dir)}${maintenance.pending ? '' : ` -TransactionId ${quote(maintenanceReceipt.transactionId)}`}` : null,
+    verification: maintenanceReceipt?.status?.endsWith('-awaiting-restart')
+      ? maintenanceRestarted ? maintenanceHealthy ? 'verified-running' : 'restart-health-check-failed' : 'awaiting-restart'
+      : maintenanceReceipt?.status === 'applying' && HOST_STARTED_AT > Date.parse(maintenanceReceipt.startedAt) ? 'interrupted' : null,
+    external: [
+      { key: 'guide-skill', owner: 'skills-manager', installed: skills.status !== 'missing', route: '/settings/skills' },
+      { key: 'skills-manager', owner: 'official-plugins', installed: skills.manager?.installed === true },
+      { key: 'better-sidebar', owner: 'official-plugins', installed: host.betterSidebar?.actual != null, version: host.betterSidebar?.actual ?? null },
+    ],
+  }
+  if (maintenanceReceipt?.startedAt && Date.parse(maintenanceReceipt.startedAt) > Date.parse(packageReceipt?.finishedAt ?? receipt?.finishedAt ?? '')) {
+    state.installation.verification = 'superseded'
+    state.packageManagement.verification = 'superseded'
+  }
+  state.distribution = remoteManagers.get(ctx)?.view() ?? { configured: false }
   state.warnings = buildWarnings(state)
   return state
 }
@@ -565,6 +642,10 @@ async function stageCold(ctx, key, enabled, component) {
  * never edits the profile itself.
  */
 async function setComponentEnabled(ctx, key, enabled, config = {}) {
+  const maintenance = maintenanceView(serviceOf(ctx, 'profileContext')?.dir)
+  if (maintenance.pending || ['applying', 'recovery-required', 'invalid'].includes(maintenance.result?.status)) return { ok: false, code: 'maintenance-operation-pending', message: 'apply or cancel maintenance before switching components' }
+  if (packageView(serviceOf(ctx, 'profileContext')?.dir).pending) return { ok: false, code: 'package-operation-pending', message: 'cancel or apply the prepared package operation first' }
+  if (installView(serviceOf(ctx, 'profileContext')?.dir).pending) return { ok: false, code: 'install-pending', message: 'cancel or apply the prepared installation before toggling components' }
   if (key === 'manager') return { ok: false, code: 'locked', message: 'the manager is protected and has no switch' }
   const definition = COMPONENTS.find((item) => item.key === key)
   if (definition === undefined) return { ok: false, code: 'unknown-component', message: `Unknown component: ${key}` }
@@ -666,7 +747,68 @@ function writeJson(res, status, body) {
   res.end(payload)
 }
 
-async function handle(injected, getState, setEnabled, req, res) {
+function catalogPathOf(ctx, config) {
+  const profile = serviceOf(ctx, 'profileContext')
+  return config.catalogPath ?? (profile?.dir ? join(profile.dir, '.guide-manager', 'release-catalog.json') : null)
+}
+
+function upgradePathOf(ctx, config) {
+  const profile = serviceOf(ctx, 'profileContext')
+  return config.upgradeCatalogPath ?? (profile?.dir ? join(profile.dir, '.guide-manager', 'upgrade-catalog.json') : null)
+}
+
+function managerCatalogPathOf(ctx, config) {
+  const profile = serviceOf(ctx, 'profileContext')
+  return config.managerCatalogPath ?? (profile?.dir ? join(profile.dir, '.guide-manager', 'manager-catalog.json') : null)
+}
+
+async function maintenancePlan(ctx, config, payload) {
+  return createMaintenancePlan(await collectState(ctx, config), payload, PACKAGE_DIR, managerCatalogPathOf(ctx, config), readBom().guide.host)
+}
+
+async function packagePlan(ctx, config, payload) {
+  const state = await collectState(ctx, config)
+  if (payload.kind === 'package-restore') return createRestorePlan(state, payload.transactionId)
+  return createUpgradePlan(state, readUpgradeCatalog(upgradePathOf(ctx, config)), payload.targets, readBom().guide.host)
+}
+
+async function preparePackage(ctx, config, payload) {
+  if (payload.confirm !== true) throw new Error('confirmation-required')
+  const result = stagePackagePlan(await packagePlan(ctx, config, payload), payload.planId)
+  return { ...result, helperPath: HELPER_PACKAGE }
+}
+
+function cancelPackage(ctx, payload) {
+  if (payload.confirm !== true) throw new Error('confirmation-required')
+  const profile = serviceOf(ctx, 'profileContext')
+  const view = packageView(profile?.dir)
+  if (!view.pending || view.pending.id !== payload.planId || ['upgrading', 'restoring'].includes(view.result?.status)) throw new Error('package-operation-not-cancellable')
+  unlinkSync(join(profile.dir, '.guide-manager', 'package-pending.json'))
+  return { application: 'pending-cleared' }
+}
+
+async function planInstallation(ctx, config, requested) {
+  const state = await collectState(ctx, config)
+  return createInstallPlan(state, readCatalog(catalogPathOf(ctx, config)), requested)
+}
+
+async function prepareInstallation(ctx, config, payload) {
+  if (payload.confirm !== true) throw new Error('confirmation-required')
+  const state = await collectState(ctx, config)
+  const value = stageInstall(state, readCatalog(catalogPathOf(ctx, config)), payload.components, payload.planId)
+  return { ...value, helperPath: HELPER_INSTALL }
+}
+
+function cancelInstallation(ctx, payload) {
+  if (payload.confirm !== true) throw new Error('confirmation-required')
+  const profile = serviceOf(ctx, 'profileContext')
+  const view = installView(profile?.dir)
+  if (!view.pending || view.pending.id !== payload.planId || view.result?.status === 'installing') throw new Error('install-not-cancellable')
+  unlinkSync(join(profile.dir, '.guide-manager', 'install-pending.json'))
+  return { application: 'pending-cleared' }
+}
+
+async function handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, req, res) {
   const connection = serviceOf(injected, 'connection')
   const rejection = typeof connection?.requestRejection === 'function' ? connection.requestRejection(req) : undefined
   if (rejection !== undefined) {
@@ -674,6 +816,41 @@ async function handle(injected, getState, setEnabled, req, res) {
     return
   }
   const pathname = new URL(req.url ?? '/', 'http://dsh.internal').pathname
+  if (pathname.startsWith(`${ROUTE_PREFIX}/source/`)) {
+    if (req.method !== 'POST') { writeJson(res, 405, { ok: false, error: { code: 'method-not-allowed', message: 'method not allowed' } }); return }
+    const action = pathname.slice(`${ROUTE_PREFIX}/source/`.length)
+    if (!Object.hasOwn(sourceActions, action)) { writeJson(res, 404, { ok: false, error: { code: 'not-found', message: 'not found' } }); return }
+    try {
+      const value = await sourceActions[action](await readJsonBody(req))
+      writeJson(res, 200, { ok: true, value })
+    } catch (error) {
+      const message = String(error.message ?? '')
+      const code = /^(source-[a-z-]+|github-[a-z0-9-]+|confirmation-required)$/.test(message) ? message
+        : /request body/.test(message) ? 'source-invalid-request' : 'source-operation-refused'
+      writeJson(res, code === 'source-invalid-request' ? 400 : 409, { ok: false, error: { code, message: code } })
+    }
+    return
+  }
+  if (pathname.startsWith(`${ROUTE_PREFIX}/install/`) || pathname.startsWith(`${ROUTE_PREFIX}/packages/`) || pathname.startsWith(`${ROUTE_PREFIX}/maintenance/`)) {
+    if (req.method !== 'POST') {
+      writeJson(res, 405, { ok: false, error: { message: 'method not allowed' } })
+      return
+    }
+    try {
+      const payload = await readJsonBody(req)
+      const actions = pathname.startsWith(`${ROUTE_PREFIX}/install/`) ? installActions : pathname.startsWith(`${ROUTE_PREFIX}/packages/`) ? packageActions : maintenanceActions
+      const action = pathname.slice(pathname.lastIndexOf('/') + 1)
+      if (!Object.hasOwn(actions, action)) {
+        writeJson(res, 404, { ok: false, error: { message: 'not found' } })
+        return
+      }
+      const value = await actions[action](payload)
+      writeJson(res, 200, { ok: true, value })
+    } catch (error) {
+      writeJson(res, 409, { ok: false, error: { code: 'install-refused', message: String(error.message ?? error) } })
+    }
+    return
+  }
   if (pathname === `${ROUTE_PREFIX}/action`) {
     if (req.method !== 'POST') {
       writeJson(res, 405, { ok: false, error: { message: 'method not allowed' } })
@@ -733,9 +910,58 @@ async function handle(injected, getState, setEnabled, req, res) {
 export const name = 'guide-manager'
 
 export async function apply(ctx, config = {}) {
+  const remote = createRemoteManager({ profile: serviceOf(ctx, 'profileContext'), sourceConfig: config.source, sourcePath: config.sourcePath,
+    host: readBom().guide.host, managerRoot: PACKAGE_DIR })
+  remoteManagers.set(ctx, remote)
+  if (typeof ctx.effect === 'function') ctx.effect(() => () => { remote.dispose(); remoteManagers.delete(ctx) })
   const getState = () => collectState(ctx, config)
   const setEnabled = (key, enabled) => setComponentEnabled(ctx, key, enabled, config)
-  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, readOnly: false, actionScope: 'phase-4' })
+  const installActions = {
+    plan: (payload) => planInstallation(ctx, config, payload.components),
+    stage: (payload) => prepareInstallation(ctx, config, payload),
+    cancel: (payload) => cancelInstallation(ctx, payload),
+  }
+  const packageActions = {
+    plan: (payload) => packagePlan(ctx, config, { ...payload, kind: 'package-upgrade' }),
+    'restore-plan': (payload) => packagePlan(ctx, config, { ...payload, kind: 'package-restore' }),
+    stage: (payload) => preparePackage(ctx, config, payload),
+    cancel: (payload) => cancelPackage(ctx, payload),
+  }
+  const maintenanceActions = {
+    plan: (payload) => maintenancePlan(ctx, config, payload),
+    stage: async (payload) => {
+      if (payload.confirm !== true) throw new Error('confirmation-required')
+      return stageMaintenance(await maintenancePlan(ctx, config, payload), payload.planId, PACKAGE_DIR)
+    },
+    cancel: (payload) => {
+      if (payload.confirm !== true) throw new Error('confirmation-required')
+      return cancelMaintenance(serviceOf(ctx, 'profileContext')?.dir, payload.planId)
+    },
+  }
+  const sourcePayload = (payload, keys) => {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).some((key) => !keys.includes(key))) throw new Error('source-invalid-request')
+    return payload
+  }
+  const sourceActions = {
+    check: (p) => { sourcePayload(p, []); return remote.check() },
+    prepare: async (p) => { sourcePayload(p, ['kind', 'snapshotId', 'components', 'targets', 'version']); return remote.prepare(p, await getState()) },
+    task: (p) => { sourcePayload(p, ['taskId']); return remote.task(p.taskId) },
+    cancel: (p) => { sourcePayload(p, ['taskId']); return remote.cancel(p.taskId) },
+    plan: async (p) => { sourcePayload(p, ['taskId']); return remote.plan(p.taskId, await getState()) },
+    stage: async (p) => {
+      sourcePayload(p, ['taskId', 'planId', 'confirm'])
+      if (p.confirm !== true) throw new Error('confirmation-required')
+      return remote.stage(p.taskId, p.planId, await getState())
+    },
+  }
+  ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, planInstallation: installActions.plan, prepareInstallation: installActions.stage, cancelInstallation: installActions.cancel,
+    checkSource: remote.check, prepareSource: async (payload) => remote.prepare(payload, await getState()),
+    sourceTask: remote.wait, cancelSourceTask: remote.cancel,
+    planPreparedSource: async (id) => remote.plan(id, await getState()),
+    stagePreparedSource: async (payload) => { if (payload.confirm !== true) throw new Error('confirmation-required'); return remote.stage(payload.taskId, payload.planId, await getState()) },
+    planUpgrade: packageActions.plan, planPackageRestore: packageActions['restore-plan'], preparePackageChange: packageActions.stage, cancelPackageChange: packageActions.cancel,
+    planMaintenance: maintenanceActions.plan, prepareMaintenance: maintenanceActions.stage, cancelMaintenance: maintenanceActions.cancel,
+    readOnly: false, actionScope: 'phase-4', packageActionScope: 'phase-5b' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
     const connection = serviceOf(injected, 'connection')
@@ -744,7 +970,7 @@ export async function apply(ctx, config = {}) {
       kind: 'prefix',
       path: ROUTE_PREFIX,
       handler: (req, res) => {
-        void handle(injected, getState, setEnabled, req, res)
+        void handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, req, res)
       },
     }), 'guide-manager: status and phase-4 action route')
   })
