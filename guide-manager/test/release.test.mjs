@@ -9,6 +9,7 @@ import { digest, fingerprint, readJson, writeJson } from '../install.js'
 import { RELEASE_KEYS, RELEASE_PACKAGES, validateRemoteRelease, validateSourceConfig } from '../release.js'
 import { prepareRemoteRelease, verifyReleaseBundle } from '../../scripts/lib/release-bundle.mjs'
 import { exportLatestHistory, GitHubReleaseClient, publishGitHubDraft, stageGitHubDraft } from '../../scripts/lib/github-release.mjs'
+import { baselineSource } from './baseline-source.mjs'
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const repository = { owner: 'PreLuna', repo: 'dsh-guide-mode' }
@@ -93,13 +94,7 @@ test('remote release contract, fixed-commit build and explicit GitHub draft life
     assert.ok(within && !within.startsWith('..') && basename(root).startsWith('guide-release-'))
     rmSync(root, { recursive: true, force: true })
   })
-  const source = join(root, 'repository')
-  mkdirSync(source)
-  for (const key of RELEASE_KEYS) {
-    const directory = RELEASE_PACKAGES[key].slice('@local/dsh-'.length)
-    cpSync(join(workspace, directory), join(source, directory), { recursive: true,
-      filter: (path) => !path.split(sep).some((part) => ['node_modules', 'test', 'scripts', '.git'].includes(part)) })
-  }
+  const source = baselineSource(join(root, 'repository'), workspace)
   writeFileSync(join(source, '.gitattributes'), '* text=auto eol=lf\n')
   writeFileSync(join(source, '.gitignore'), 'dist/\n')
   cpSync(join(workspace, 'package.json'), join(source, 'package.json'))
