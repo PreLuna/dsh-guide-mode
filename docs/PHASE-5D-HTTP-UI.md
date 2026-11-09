@@ -1,6 +1,6 @@
 # Phase 5D-3：HTTP 接口与管理页
 
-更新：2026-11-09。HTTP/UI 已实现，通过默认回归与真实隔离 Edge 渲染测试。远端响应使用测试夹具；真实私有 Release、官方冷安装/升级及桌面整体链路仍须按 5D-4 验收。当前进度见 [项目状态](../PROJECT-STATUS.md)，本轮结果见 [验证报告](../evidence/phase5d3-2026-11-09/report.md)。
+更新：2026-11-09。HTTP/UI 已实现；5D-3 的夹具验证记录见 [原报告](../evidence/phase5d3-2026-11-09/report.md)，5D-4 已补真实公开 Release、官方冷操作与 Edge/独立桌面整体验收，见 [真实报告](../evidence/phase5d4-2026-11-09/report.md)。当前进度见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 使用流程
 
@@ -37,4 +37,4 @@ targets 为 `[{key,version}]`。source 路由仅支持 POST；未知动作 404�
 
 可选真实 Edge 页面测试：先用 `setup-acceptance.mjs` 在新的证据目录创建隔离 profile，再执行 `python guide-manager/test/source-ui.py <目录>`。它在官方 Host 中加载实际 manager/React，拦截浏览器 source/state 响应以测试页面渲染、轮询、取消重试、刷新与确认；不代替 HTTP 测试或真实 GitHub 验收。只关闭记录 PID/创建时间的自有测试进程，并核对页面操作前后的四文件与既有 DSH 进程。
 
-下一阶段为 5D-4 的 D-01～D-07：形成真实来源提交和可访问 Release，在真实凭据环境中完成下载、官方 pnpm、Edge/独立桌面重启、升级与断网恢复。通过之后才进入 5E。此轮没有发布 Release、切换 live 来源或实施迁移。
+5D-4 的 D-01～D-07 已按公开源方向分层验收；实际发布与两端操作不再只依赖夹具。来源不可用通过隔离来源故障注入验证，不称为物理断网。5E 未开始，日常 link 来源未切换。

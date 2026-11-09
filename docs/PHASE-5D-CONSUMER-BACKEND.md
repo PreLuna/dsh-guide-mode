@@ -1,6 +1,6 @@
 # Phase 5D-2：消费端后端
 
-更新：2026-11-09。已完成后端代码与本地隔离验证；5D-3 已接入 [HTTP 与管理页](PHASE-5D-HTTP-UI.md)。真实私有仓库/官方冷操作/桌面整体验收（5D-4）尚未执行。进度见 [项目状态](../PROJECT-STATUS.md)，依据见 [施工方案](PHASE-5D-5E-IMPLEMENTATION-PLAN.md)。
+更新：2026-11-09。后端与 5D-3 HTTP/UI 已完成；5D-4 已补真实公开源、官方冷操作与 Edge/独立桌面整体验收，见 [报告](../evidence/phase5d4-2026-11-09/report.md)。进度见 [项目状态](../PROJECT-STATUS.md)，依据见 [施工方案](PHASE-5D-5E-IMPLEMENTATION-PLAN.md)。
 
 ## 配置与服务
 
@@ -54,4 +54,4 @@ state.distribution 返回配置仓库与最近任务的状态/进度/结果；�
 
 本地测试使用真实离线 tgz、Node Response 和注入传输，覆盖查询不全量下载、单包/闭包、缓存、错 SHA、取消、重试、限流/鉴权、漂移拒绝、三类目录及离线冷安装计划验证；发布工具继续使用抽出的共享传输并保留回归。证据见 [本轮报告](../evidence/phase5d-2026-11-09/report.md)。
 
-5D-3 已增加受 connection 围栏保护的异步 HTTP 接口和管理页交互；5D-4 接着执行真实私有仓库、官方 pnpm、Edge/Electron 验收。当前没有创建远端 Release、切换 live 来源或启动模型任务。
+5D-4 已实际发布并验证公开源、官方 pnpm 与 Edge/Electron 安装/升级/恢复；无 token/source.json 的默认引导通过。没有实施 live 来源迁移或模型推理；后续为独立的 5E。

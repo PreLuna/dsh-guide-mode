@@ -1,6 +1,8 @@
-# Private release history
+# Release history
 
 ## Unreleased
+
+- Complete Phase 5D public-source acceptance: real GitHub fixed-commit releases and attachment readback, anonymous downloads, official pnpm, Edge/Electron installs, independent/coupled upgrades, unavailable-source recovery, and manager update/external recovery. Record 29 passing test processes, 120 manager tests, and 12 real UI assertion groups. Daily link migration remains Phase 5E.
 
 - Add manager 1.1.2 public-source support: built-in repository defaults, anonymous Release links and bounded Git HTTP tag verification, no REST API quota or token setup for public installation. Preserve authenticated private sources and all existing package transactions; validate the real public chain in Phase 5D-4.
 

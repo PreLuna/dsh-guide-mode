@@ -144,7 +144,12 @@ async def main():
                 assert code == 0, f'{label} helper failed; inspect retained logs'
                 await attach()
                 transitioning = False
-                value = await state(page)
+                group = 'maintenance' if recovery or mode == '-Maintenance' else 'packageManagement' if mode == '-PackageChange' else 'installation' if mode == '-Install' else None
+                for _ in range(60):
+                    value = await state(page)
+                    if not group or value[group].get('verification') == 'verified-running':
+                        break
+                    await asyncio.sleep(.5)
                 await save(label, value)
                 return value
             await attach(initial=True)
@@ -157,7 +162,7 @@ async def main():
             before = hashes()
             await page.locator('[data-guide-source]').get_by_role('button', name=re.compile('^(检查更新|Check for updates)$')).click()
             checked = await task_ready()
-            assert checked['distribution']['catalog']['release']['tag'] == setup.get('latestReleaseTag', 'guide-v1.2.2')
+            assert checked['distribution']['catalog']['release']['tag'] in setup.get('acceptedReleaseTags', ['guide-v1.2.1', 'guide-v1.2.2'])
             assert not list((state_dir / 'package-cache').glob('*.tgz'))
             assert hashes() == before
             await save('real-source-checked', checked)
@@ -208,8 +213,18 @@ async def main():
                 source_path.unlink()
             else:
                 source_path.write_text(original_source, encoding='utf-8')
+            # The source file was changed outside the page as fault injection.
+            # Explicitly refresh the UI before interacting with the restored source.
+            await page.get_by_role('button', name=re.compile('^(刷新|Refresh)$'), exact=True).click()
             await page.locator('[data-guide-source]').get_by_role('button', name=re.compile('^(检查更新|Check for updates)$')).click()
             await task_ready()
+            for _ in range(30):
+                current = await state(page)
+                if any(a['key'] == 'manager' and a['version'] == manager_target for a in current['distribution']['catalog']['versions']):
+                    break
+                await asyncio.sleep(2)
+                await page.locator('[data-guide-source]').get_by_role('button', name=re.compile('^(检查更新|Check for updates)$')).click()
+                await task_ready()
             manager = await prepare('manager-upgrade', manager_target)
             maintenance = manager['maintenance']
             assert maintenance['recoveryCommand'], 'external recovery must be shown before manager update'

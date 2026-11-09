@@ -17,7 +17,8 @@ if(command==='doctor'){
   const skill=existsSync(join(skillRoot,'guide/SKILL.md'))
   const results=packages.map(directory=>{const manifest=JSON.parse(readFileSync(join(root,directory,'package.json'),'utf8'));return{directory,name:manifest.name,version:manifest.version,private:manifest.private,license:manifest.license}})
   if(results.some(item=>!/^\d+\.\d+\.\d+$/.test(item.version)||item.private!==true||item.license!=='UNLICENSED'))throw Error('Unsupported local release metadata')
-  console.log(JSON.stringify({status:'passed',distribution:'private-github',packages:results,guideSkill:{available:skill,fallback:'explicit unavailable note and general advice'},profile},null,2))
+  const source=JSON.parse(readFileSync(join(root,'guide-manager/package.json'),'utf8')).dshGuide?.source
+  console.log(JSON.stringify({status:'passed',distribution:source?.access==='public'?'public-github-releases':'private-github-releases',packages:results,guideSkill:{available:skill,fallback:'explicit unavailable note and general advice'},profile},null,2))
 }else if(command==='prepare'){
   const outputArg=option('--output');if(!outputArg)throw Error('--output is required; use a new evidence directory for every operation')
   const output=resolve(outputArg),mode=option('--mode')??'install'

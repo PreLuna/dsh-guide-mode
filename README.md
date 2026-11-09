@@ -2,7 +2,7 @@
 
 在主会话旁边打开继承上下文的指导对话，用独立 `guide` preset 提供建议或按要求执行修改。指导可使用写工具，并可与主会话 goal 并行。
 
-截至 2026-11-04，两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。当前版本 `1.1.0`，先以私有 GitHub 仓库维护，市场／公开源码发布待稳定后另行决定。当前保留 `private:true`、`UNLICENSED`。
+两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。2026-11-09 用户已将仓库公开，使用 GitHub Releases 分发独立 tgz；六组件源码基线 `1.1.0`，manager 公开源实现为 `1.1.2`。npm 元数据保留 `private:true`、`UNLICENSED`，未发布 npm/市场。
 
 截至 2026-11-05，`guide-manager` 已在工作区实现并登记到本机 desktop：官方插件页提供「指导」标签页，聚合六个组件、依赖边、宿主 BOM 和 `guide` skill 状态。Phase 2 在切换前跑兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚；Phase 4 接入 `@michengai/dsh-skills-manager` 的状态与“设置 → 技能”深链。Registry/tarball 升级仍由官方插件页负责。
 
@@ -12,9 +12,9 @@
 
 2026-11-08 按已定顺序完成 5D-0/1 的本地施工：远端发布格式、固定提交七包、草稿核对/显式发布工具和 tag/manual workflow，见 [发布端说明](docs/PHASE-5D-RELEASE-FORMAT.md)。消费端查询/下载/UI（5D-2/3）、真实远端验收及当前 link 来源迁移（5E）仍按 [施工方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) 后续推进；尚未真实发布或切换 live。
 
-2026-11-09：5D-2 后端查询、下载缓存与安装器适配，以及 5D-3 HTTP/管理页均已完成本地隔离验证。管理页支持检查、三类下载选择、取消重试、刷新恢复、计划确认与助手衔接，见 [后端](docs/PHASE-5D-CONSUMER-BACKEND.md) / [管理页](docs/PHASE-5D-HTTP-UI.md)。真实私有远端、官方冷操作和桌面整体验收仍待 5D-4；live 仍保留原来源。
+2026-11-09：5D 公开远端整体验收完成。新装 manager 后默认连接公开来源，无需 token/source.json；实际 Edge/独立桌面均通过匿名六包安装、官方冷重启、单包与联动升级、来源不可用时恢复、manager 升级及外部恢复。见 [后端](docs/PHASE-5D-CONSUMER-BACKEND.md) / [管理页](docs/PHASE-5D-HTTP-UI.md) / [真实验收](evidence/phase5d4-2026-11-09/report.md)。日常 link 来源尚未迁移，5E 未开始。
 
-5D-4 当前按用户公开仓库后的方向施工：manager 1.1.2 默认连接本仓库公开 Release，无需 token/source.json；直链下载配合 tag/commit 核验，不使用匿名 REST API。真实匿名后端验证通过，浏览器/桌面整体验收进展见 [5D-4](docs/PHASE-5D-REAL-ACCEPTANCE.md)。
+从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，通过官方插件页安装，再到“插件 → 指导”检查并准备组件。确认后仍需保存工作、运行外部助手并重启；better-sidebar、guide skill/skills manager 按各自入口管理。版本/宿主与恢复边界见 [5D-4](docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 
 ## 使用
 
@@ -89,7 +89,7 @@ archive:
 
 ## 安装、更新与恢复
 
-私有仓库：[PreLuna/dsh-guide-mode](https://github.com/PreLuna/dsh-guide-mode)。有权限的账号可 clone 后运行 `npm run repo:check`、`npm test` 和 `npm run doctor`。六个运行组件加 `guide-manager` 仍依赖上述固定 DSH／官方 sidebar 基线；本仓库不会安装或替换整个宿主。
+公开仓库：[PreLuna/dsh-guide-mode](https://github.com/PreLuna/dsh-guide-mode)。可 clone 后运行 `npm run repo:check`、`npm test` 和 `npm run doctor`。六个运行组件加 `guide-manager` 仍依赖上述固定 DSH／官方 sidebar 基线；本仓库不会安装或替换整个宿主。
 
 统一安装、升级、完整卸载与回退见 [维护手册](docs/MAINTENANCE.md)。入口是 [scripts/workspace.mjs](scripts/workspace.mjs) 的 `prepare` 与 [scripts/apply-profile.ps1](scripts/apply-profile.ps1)，原则是先在隔离副本验证、停 Host、生成计划、审阅后应用，并保存文件级恢复记录。准入核心与 shield 核心采用冷更新；panel 客户端变更需要硬刷新。Windows 上 `.ps1` 维护脚本要求 PowerShell 7（`pwsh`），Windows PowerShell 5.1 不支持 `ConvertFrom-Json -AsHashtable` 和覆盖式 `[IO.File]::Move`。
 

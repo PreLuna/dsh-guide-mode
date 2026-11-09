@@ -24,10 +24,11 @@
 | Phase 5A 独立管理器安装入口 | 隔离整体验收通过（2026-11-07） | 真实 Edge 与独立 Electron 桌面从 manager-only 安装六组件，生产助手限定实例停机/重启，全部 ready、健康核对通过；修复打包 peer 路径、PowerShell 参数冲突与重启环境；[验收](evidence/phase5-acceptance-2026-11-07/report.md) |
 | Phase 5B 独立升级与包版本恢复 | 实现与隔离整体验收通过（2026-11-07） | 可信本地兼容目录、最小联动、稳定包缓存、精确旧锁/配置/tgz 备份、失败修复与显式恢复；真实 Edge/Electron 验证单组件升级、三组件联动与连续恢复（原发布包/旧缓存缺失也恢复）；24 个 Node 进程、manager 60 用例；未切换 live、未发布 npm；[设计](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md) / [证据](evidence/phase5b-2026-11-07/report.md) |
 | Phase 5C 卸载、修复与管理器升级 | 实现与隔离功能验收通过（2026-11-07） | 依赖卸载/preset 保护、goal 原生恢复、SHA 原包修复、独立控制器自升级及外部恢复；桌面无法启动时另有外部组件修复；25 个 Node 进程、manager 75 用例、真实 pnpm 4 项、Edge 10 项/桌面 11 项通过（Edge 保留停机诊断）；[设计](docs/PHASE-5C-MAINTENANCE.md) / [证据](evidence/phase5c-2026-11-07/report.md) / [功能测试清单](docs/FUNCTIONAL-TEST-MATRIX.md) |
-| Phase 5D-0/5D-1 发布格式与发布端 | 本地实现与验证通过（2026-11-08） | schema 4/连接配置、固定提交七包、历史组合、草稿上传/回读与显式发布工具、tag/manual workflow；26 个 Node 进程、manager 96 用例通过；真实 GitHub 写入与托管 runner 尚未执行；[说明](docs/PHASE-5D-RELEASE-FORMAT.md) / [证据](evidence/phase5d-2026-11-08/report.md) |
+| Phase 5D-0/5D-1 发布格式与发布端 | 本地及真实托管发布验证通过 | 固定提交七包、历史组合、草稿附件回读、显式正式发布与 tag/manual workflow；实际 GitHub runner 和正式 Release 已通过，草稿按 tag 查询差异已修复；[说明](docs/PHASE-5D-RELEASE-FORMAT.md) / [真实证据](evidence/phase5d4-2026-11-09/report.md) |
 | Phase 5D-2 消费端后端 | 本地实现与隔离验证通过（2026-11-09） | 异步查询/准备/取消、SHA 缓存、三类本地目录适配、服务接口与持久状态；27 个测试进程通过，网络为模拟传输，真实 tgz/离线计划验证；[说明](docs/PHASE-5D-CONSUMER-BACKEND.md) / [证据](evidence/phase5d-2026-11-09/report.md) |
 | Phase 5D-3 HTTP 接口与管理页 | 本地实现与隔离 Edge 交互通过（2026-11-09） | source 六个 POST 接口、三类操作选择、进度/取消/重试、刷新恢复、计划确认与原助手衔接；28 个测试进程通过，manager 118 用例；HTTP 使用模拟 GitHub、Edge 使用浏览器响应夹具；[说明](docs/PHASE-5D-HTTP-UI.md) / [证据](evidence/phase5d3-2026-11-09/report.md) |
-| Phase 5D-4 真实验收 → 5E link 来源迁移 | 真实验收施工中，5E 未开始 | 已推送正式实现、发布基线及独立升级版本；用户已将仓库公开，现按无 token 来源补验。manager 1.1.2 默认公开来源/直链/tag 核验已实现，真实匿名后端验证通过；官方 pnpm、Edge/独立桌面完整链路待本轮完成；live 未迁移；[说明](docs/PHASE-5D-REAL-ACCEPTANCE.md) |
+| Phase 5D-4 公开远端整体验收 | 完成（2026-11-09） | manager 1.1.2 默认公开来源，免 token/source.json；29 个测试进程、manager 120 用例；实际 Edge/独立桌面均通过匿名六包安装、独立/联动升级、来源不可用时恢复、manager 1.1.3 升级及外部恢复。12 组真实 UI 断言、各关键终态 verified-running；[说明](docs/PHASE-5D-REAL-ACCEPTANCE.md) / [证据](evidence/phase5d4-2026-11-09/report.md) |
+| Phase 5E link 来源迁移 | 未开始 | 日常七个自有包仍是工作区 link；差异预览、源码备份和停机切换待按原计划另行施工。5D 验收完成不等于日常环境已迁移；[方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) |
 | O11 / PT-6 | 暂缓，保留当前设计 | 原生结果卡与测试保留；默认沙箱 failed、无沙箱对照 45/45 passed，不改写为整体通过；[报告](evidence/O11-validation-2026-11-04/pt6/report.md) |
 | O11 / RM-3/5/7 | 按宿主默认机制收口 | 接受 persona／压缩／重试与上下文复制成本；[验收取舍](docs/DECISIONS.md) |
 | O11 / 多 pane、Git 与归档补测 | 主流程通过，边界已接受或划出范围 | 同 child 重复视图残留接受现状；原生编辑关闭保护不列为插件任务；[范围](docs/DECISIONS.md) / [报告](evidence/O11-residual-check-2026-11-04/report.md) |
@@ -72,9 +73,10 @@
 | D28 | Q7：专区采用本会话 + 根会话混合分组 | 已实现；面板仍按当前 seat |
 | D29 | Q4：核心会话行转圈保持现状 | 沿用宿主显示，不调整 UI |
 | D30 | 原生组件职责与已接受边界不反复列为强制整改 | 见 [已定边界](docs/DECISIONS.md) |
-| D31 | 先维护私有 GitHub 仓库，再决定公开或市场发布 | [PreLuna/dsh-guide-mode](https://github.com/PreLuna/dsh-guide-mode) 为 PRIVATE；无市场发布／正式 tag |
+| D31 | 先维护私有 GitHub 仓库，再决定公开或市场发布 | 初始策略；2026-11-09 用户自行公开仓库，当前按 D34 执行；未发布 npm/市场 |
 | D32 | Phase 5 使用独立 manager 安装入口 + 六个独立组件包；推荐组合安装、按需独立升级 | 5A/5B/5C 本地包路径已实现；发布、来源迁移、数据迁移另行推进；不做强制 suite 依赖入口 |
-| D33 | 先接通现有 GitHub Releases 的发布清单/下载并验收，再实施当前 link 环境的一次性切换 | 2026-11-08 用户同意；5D-0～3 已本地实现，真实发布/整体验收与迁移仍待实施；registry 来源通用迁移、跨 schema 迁移不并入首版 |
+| D33 | 先接通现有 GitHub Releases 的发布清单/下载并验收，再实施当前 link 环境的一次性切换 | 2026-11-08 用户同意；5D 已完成公开首版及真实整体验收，5E 未开始；registry 来源通用迁移、跨 schema 迁移不并入首版 |
+| D34 | 用户公开仓库后采用免 token 的默认公开来源 | 2026-11-09 用户自行将仓库设为 PUBLIC；manager 内置公开来源，Release 直链 + tag/commit 核验，不使用匿名 REST API。原私有/API 配置保留，npm 包仍 private/UNLICENSED |
 
 其他已保留方向：模型不可见投影（O6）要做；指导结算 inject 拦截（O8）要做；seed 成本接受（O13）；归档平台可见性接受（O15）；运行中占一个槽、闲置不占的语义接受。
 
@@ -114,7 +116,7 @@ O2/R6 已覆盖真实 scoped closing 与 panel HMR；整个 Host graceful shutdo
 
 2026-11-08 已定后续顺序为 **5D 远端分发/查询/下载 → 隔离验收 → 5E link 来源迁移 → 隔离验收 → live 具体部署准备**。5D-0/5D-1 的格式校验、固定提交产物、草稿/正式发布工具及 workflow 已完成本地实现。截至 2026-11-08 未新增消费端下载/UI，也未真实上传、创建远端 tag/Release 或迁移；代码的默认完整回归与发布工具测试不等于 GitHub 托管 runner/私有仓库链路验收。生产元数据仍 1.1.0；工作区含未提交实现，真实发布需先形成包含这些实现的正式来源提交，不能把本地临时 Git 夹具提交当成真实仓库提交。详见 [发布端说明](docs/PHASE-5D-RELEASE-FORMAT.md) 和 [证据](evidence/phase5d-2026-11-08/report.md)。首版使用现有仓库私有策略与 GitHub Releases，不新增服务器；外部凭据与真实远端访问在对应验收项记录，不能用 mock 结果替代。
 
-2026-11-09：5D-2 后端消费链路与 5D-3 HTTP/UI 已实现并通过本地隔离测试；Edge 实际页面确认取消重试、刷新恢复与计划确认，远端仍使用测试夹具。5D-4 真实私有远端/官方冷操作/桌面整体验收及 5E 仍待实施。见 [后端说明](docs/PHASE-5D-CONSUMER-BACKEND.md) / [HTTP 与管理页](docs/PHASE-5D-HTTP-UI.md)。
+2026-11-09：5D 公开源首版已完成真实整体验收。新用户安装公开 manager tgz 后，无需 token/source.json，即可检查、下载并确认计划；实际官方 pnpm、Edge/桌面冷重启、组件与 manager 升级/恢复均通过。执行仍需外部助手，日常环境来源迁移属未开始的 5E。证据和分层边界见 [报告](evidence/phase5d4-2026-11-09/report.md)；历史事务显示文案等可选收口见 [功能清单](docs/FUNCTIONAL-TEST-MATRIX.md)。
 
 ## 4. 验证索引
 
