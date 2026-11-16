@@ -34,8 +34,8 @@ try {
   foreach ($property in $requestData.files.PSObject.Properties) { Assert-Hash (Join-Path $requestData.controller $property.Name) $property.Value }
   Save-Status 'executing'
   $helper = Join-Path $requestData.controller 'helper/restart-guide-manager.ps1'
-  $mode = @{ install = 'Install'; package = 'PackageChange'; maintenance = 'Maintenance'; toggle = $null }[[string]$requestData.plan.kind]
-  if ($requestData.plan.kind -notin @('install', 'package', 'maintenance', 'toggle')) { throw 'Invalid operation' }
+  $mode = @{ install = 'Install'; package = 'PackageChange'; maintenance = 'Maintenance'; migration = 'Migration'; toggle = $null }[[string]$requestData.plan.kind]
+  if ($requestData.plan.kind -notin @('install', 'package', 'maintenance', 'migration', 'toggle')) { throw 'Invalid operation' }
   $arguments = @{ Profile = $profile; DshExe = [string]$requestData.executable; LaunchRecord = (Join-Path $profile '.guide-manager/launcher.json') }
   if ($mode) { $arguments[$mode] = $true }
   & $helper @arguments *>&1 | Out-File -LiteralPath (Join-Path $directory 'execution.log') -Encoding utf8

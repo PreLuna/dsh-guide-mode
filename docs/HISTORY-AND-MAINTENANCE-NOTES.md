@@ -1,6 +1,6 @@
 # 历史设计与维护经验摘要
 
-整理：2026-11-04（Asia/Shanghai）。本文件提炼已完成或已放弃方案中的参考价值，替代旧 fork、重复台账、旧任务全文及一次性部署脚本。当前行为以 [架构](ARCHITECTURE.md)、[已定边界](DECISIONS.md) 和 [项目状态](../PROJECT-STATUS.md) 为准。
+整理：2026-11-04，2026-11-10 复核（Asia/Shanghai）。本文件提炼已完成或已放弃方案中的参考价值，替代旧 fork、重复台账、旧任务全文及一次性部署脚本；历史结论不替代当前实现。当前行为以 [架构](ARCHITECTURE.md)、[已定边界](DECISIONS.md) 和 [项目状态](../PROJECT-STATUS.md) 为准。
 
 ## 1. 去 fork 与 goal 等待根因
 

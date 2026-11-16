@@ -1,6 +1,6 @@
 # Phase 5B：独立升级与包版本恢复
 
-更新：2026-11-07。5A 真实 Edge 与独立 Electron 桌面验收通过后启动，见 [验收](../evidence/phase5-acceptance-2026-11-07/report.md)。当前进度统一见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-10。5A 真实 Edge 与独立 Electron 桌面验收通过后启动，见 [验收](../evidence/phase5-acceptance-2026-11-07/report.md)。5B 的实现与隔离验收已完成，后续 5C 补齐卸载/修复/自升级，5D 接入公开源，manager 1.2.0 增加面板自动执行；当前进度统一见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 设计
 
@@ -14,7 +14,7 @@
 
 ## 边界
 
-首版只支持可信本地 tgz，契约 1、数据 schema 1、无升级数据迁移；包安装禁止构建脚本。不承诺逆转任意包启动代码对用户数据的副作用。registry 最新版本发现、manager 自升级、卸载和任意跨 schema 迁移不属于本轮实现。
+首版只支持可信本地 tgz，契约 1、数据 schema 1、无升级数据迁移；包安装禁止构建脚本。不承诺逆转任意包启动代码对用户数据的副作用。5B 本轮不包括 registry 最新版本发现、manager 自升级、卸载和任意跨 schema 迁移；其中 manager 自升级与卸载已由 5C 补齐，5D 另接入公开源检查/下载，跨 schema 迁移仍未实现。
 
 ## 验收
 

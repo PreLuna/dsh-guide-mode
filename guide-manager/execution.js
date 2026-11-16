@@ -6,13 +6,14 @@ import { spawn } from 'node:child_process'
 import { digest, fingerprint, profileSnapshot, readJson, writeJson } from './install.js'
 import { controlInventory, controlPath, verifyControl } from './maintenance.js'
 import { validateInstallPlan } from './helper/apply-install.mjs'
+import { validateMigration } from './helper/apply-migration.mjs'
 import { validatePackage } from './helper/apply-package.mjs'
 import { validateMaintenance } from './helper/apply-maintenance.mjs'
 import { validatePending } from './helper/apply-pending.mjs'
 import { coldIntent } from './core.js'
 import { artifactInventory } from './artifacts.js'
 
-const FILES = { install: 'install-pending.json', package: 'package-pending.json', maintenance: 'maintenance-pending.json', toggle: 'pending.json' }
+const FILES = { install: 'install-pending.json', package: 'package-pending.json', maintenance: 'maintenance-pending.json', migration: 'migration-pending.json', toggle: 'pending.json' }
 const ACTIVE = new Set(['waiting-ack', 'executing', 'awaiting-verification'])
 const alive = (pid) => { try { process.kill(pid, 0); return true } catch (error) { return error.code !== 'ESRCH' } }
 const startedAt = new Date(Date.now() - process.uptime() * 1000).toISOString()
@@ -43,6 +44,7 @@ export function createExecutionController({ profile, managerRoot, host = { pid: 
     if (kind === 'install') validateInstallPlan(data, path)
     if (kind === 'package') validatePackage(data, path)
     if (kind === 'maintenance') validateMaintenance(data, path, managerRoot)
+    if (kind === 'migration') validateMigration(data, path)
     if (kind === 'toggle') {
       validatePending(data)
       for (const intent of data.intents) if (fingerprint(coldIntent(intent.component, intent.enabled)?.patches) !== fingerprint(intent.patches)) throw Error('execution-invalid-toggle')
@@ -63,7 +65,7 @@ export function createExecutionController({ profile, managerRoot, host = { pid: 
     }
     const entries = current.kind === 'toggle' ? current.data.intents.map((i) => ({ key: i.component, enabled: i.enabled }))
       : current.data.kind === 'manager-upgrade' ? [{ key: 'manager', package: current.data.target.package, version: current.data.target.version }]
-        : current.data.entries.map(({ key, package: name, version, action }) => ({ key, package: name, version, action }))
+        : current.data.entries.map(({ key, package: name, version, target, action }) => ({ key, package: name, version: target?.version ?? version, action }))
     const body = { schema: 1, kind: current.kind, pendingId, profile: { dir: profile.dir, name: profile.name }, pendingPath: current.path,
       pendingHash: current.hash, before: profileSnapshot(profile.dir), controllerHash, host, entries, blockers }
     return { ...body, id: fingerprint(body) }
@@ -93,7 +95,7 @@ export function createExecutionController({ profile, managerRoot, host = { pid: 
         for (const name of Object.keys(files)) { const target = join(controller, name); mkdirSync(dirname(target), { recursive: true }); copyFileSync(join(managerRoot, name), target) }
         verifyControl(profile.dir, current.controllerHash)
         const quote = (value) => `'${value.replaceAll("'", "''")}'`
-        const mode = { install: '-Install', package: '-PackageChange', maintenance: '-Maintenance', toggle: '' }[current.kind]
+        const mode = { install: '-Install', package: '-PackageChange', maintenance: '-Maintenance', migration: '-Migration', toggle: '' }[current.kind]
         const recoveryScript = pending().data.kind === 'manager-upgrade' ? 'recover-manager.ps1' : 'restart-guide-manager.ps1'
         const recoveryCommand = `& ${quote(powershell)} -NoProfile -ExecutionPolicy Bypass -File ${quote(join(controller, 'helper', recoveryScript))} -Profile ${quote(profile.dir)}${recoveryScript === 'restart-guide-manager.ps1' && mode ? ' ' + mode : ''}`
         const request = { schema: 1, id, plan: current, files, controller, executable: host.executable, path: join(taskRoot(id), 'request.json'), recoveryCommand, createdAt: new Date().toISOString() }
@@ -137,7 +139,7 @@ export function createExecutionController({ profile, managerRoot, host = { pid: 
         if (task?.status === 'awaiting-verification') {
           const request = readJson(join(taskRoot(id), 'request.json'))
           if (Date.parse(host.startedAt) > Date.parse(request.createdAt)) {
-            const group = state[request.plan.kind === 'install' ? 'installation' : request.plan.kind === 'package' ? 'packageManagement' : 'maintenance']
+            const group = state[request.plan.kind === 'install' ? 'installation' : request.plan.kind === 'package' ? 'packageManagement' : request.plan.kind === 'migration' ? 'migration' : 'maintenance']
             const verification = existsSync(request.plan.pendingPath) ? null : request.plan.kind === 'toggle'
               ? request.plan.entries.every((i) => state.components.some((c) => c.key === i.key && c.enabled === i.enabled && (i.enabled ? ['ready', 'ready-unverified'].includes(c.status) : c.status === 'disabled'))) ? 'verified-running' : 'restart-health-check-failed'
               : group?.result?.planId === request.plan.pendingId ? group.verification : null

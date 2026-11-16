@@ -1,6 +1,8 @@
 # Phase 5D / 5E：远端分发与 link 来源迁移施工方案
 
-更新：2026-11-09（Asia/Shanghai）。用户已同意顺序：先接通远端发布、下载与既有安装器，再实施一次性 link 来源切换。**5D 公开源首版及真实隔离整体验收已完成，5E 未开始。** 实际托管发布、匿名下载、官方 pnpm 与两端结果见 [5D-4](PHASE-5D-REAL-ACCEPTANCE.md) / [报告](../evidence/phase5d4-2026-11-09/report.md)；当前实施进度归口 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-16（Asia/Shanghai）。5D 的发布端、消费端、管理页与真实公开源验收均已完成。**5E-0/1/2 已在工作区实现并通过默认/隔离测试：迁移清点与内容差异、`migration-pending` 计划、停机执行器、源码快照、失败回源、独立恢复、`/migration` API 与 MigrationCard；隔离 profile 已用真实官方 pnpm 完成七包迁移。** 尚未生成新 Release、未部署到 live，真实 Edge/独立桌面 E-07 验收未运行。本机 desktop 的 2026-11-10 切换是维护者一次性运维操作，不是 E-07。实际托管发布、匿名下载、官方 pnpm 与两端结果见 [5D-4](PHASE-5D-REAL-ACCEPTANCE.md) / [报告](../evidence/phase5d4-2026-11-09/report.md) / [本机安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md)；当前实施进度归口 [项目状态](../PROJECT-STATUS.md)。
+
+> 阅读方式：§3～§7 记录已实现的 5D；§8～§10 记录已实现但尚待真实两端验收与发布的 5E。5E 文件均已在工作区存在；本文保留原始设计顺序，新增的验收缺口见 §10 与 [项目状态](../PROJECT-STATUS.md)。
 
 依据：[Phase 5 总计划](PHASE-5-ASSESSMENT.md)、[5B 事务](PHASE-5B-PACKAGE-TRANSACTIONS.md)、[5C 维护](PHASE-5C-MAINTENANCE.md)、[功能核对清单](FUNCTIONAL-TEST-MATRIX.md)。5A/5B/5C 已完成的本地包路径和历史验收继续有效。
 
@@ -8,7 +10,7 @@
 
 新用户流程：手动安装一次公开源 manager → 检查默认公开仓库版本 → 选择组件 → 下载准备 → 预览并确认 → 自动停机安装、重启并返回管理页核对结果。manager 1.2.0 增加的自动执行衔接见 [面板执行说明](PHASE-5-PANEL-EXECUTION.md)；旧版与故障恢复继续保留手动助手。无需 token/source.json；其他或私有来源仍可显式配置。
 
-当前开发环境流程：5D 隔离验收通过 → 预览 link 来源切换 → 备份源码与配置 → 停机切换已安装包 → 重启核对 → 后续使用普通包升级。
+当前环境状态：workspace 仍保留开发 link/源码，并已加入 5E-0/1/2 管理页与执行器；本机 desktop 已于 2026-11-10 按“预览/备份/停机切换/重启核对”手工完成一次来源切换，之后走普通包升级。5E 代码尚未进入 live 发布包；真实 Edge/独立桌面验收与新 Release 是后续门禁，不把这次手工操作当作 E-07 已完成。
 
 用户于 2026-11-09 自行公开 `PreLuna/dsh-guide-mode`，当前使用匿名 Release 直链与 Git tag/commit 核验，保留七个独立包、独立版本和现有包名/private 元数据。无需另建下载服务器或 npm publish。私有/API 连接兼容保留，不能从 git remote 或浏览器登录状态推定访问成功。
 
@@ -19,24 +21,24 @@
 | 5D-2 | 后端查询、鉴权、下载、缓存与本地目录适配 | 5D-3 |
 | 5D-3 | 管理页连接/检查/准备/重试与既有操作衔接 | 5D-4 |
 | 5D-4 | 故障测试、真实公开远端与干净 profile UI 验收（已完成） | 5E-0 |
-| 5E-0 | link 来源清点、内容比较与迁移计划 | 5E-1 |
-| 5E-1 | 独立冷迁移执行器、备份及外部恢复 | 5E-2 |
-| 5E-2 | 迁移 UI、故障注入、隔离桌面/浏览器验收 | live 迁移的具体部署准备 |
+| 5E-0 | link 来源清点、内容比较与迁移计划（工作区实现，默认测试通过） | 5E-1 |
+| 5E-1 | 独立冷迁移执行器、备份及外部恢复（工作区实现，默认/隔离测试通过） | 5E-2 |
+| 5E-2 | 迁移 UI、故障注入、隔离桌面/浏览器验收（UI 与默认测试完成；真实两端 E-07 待补） | 新 Release 与 live 迁移的具体部署准备 |
 
-代码施工按 5D-0/5D-1 → 5D-2/3/4 → 5E 推进；各项结果分别记录“未开始／实施中／代码验证通过／隔离整体验收通过／实际部署”，不以文档完成替代代码完成。已实现的工具不等于已真实发布，本地格式验证不替代 5D-4 私有仓库/桌面验收。
+代码施工按 5D-0/5D-1 → 5D-2/3/4 → 5E 推进；各项结果分别记录“未开始／实施中／代码验证通过／隔离整体验收通过／实际部署”，不以文档完成替代代码完成。5D 的工具已真实发布并完成公开源 Edge/独立桌面验收；5E 已完成工作区代码与默认/隔离测试，但尚未完成真实两端验收、新 Release 或 live 部署。
 
-## 2. 复用点与必须补的接口
+## 2. 复用点与当前实现
 
-| 现有部分 | 复用方式 | 需要补齐 |
+| 部分 | 复用方式 | 当前状态 |
 |---|---|---|
-| `scripts/prepare-manager-release.mjs` | 七包产物、包名/元数据检查、包文件清单 | 保留开发快照用途；正式发布另接固定提交字节与远端清单生成 |
-| `scripts/package-local.mjs` | 固定提交、提交字节打包、源码与 tgz 哈希核对 | 提取共享产物逻辑，避免正式发布从未提交工作树取包 |
-| `scripts/prepare-upgrade-catalog.mjs`、`prepare-manager-catalog.mjs` | 精确版本、peer、兼容组合与同版本不同字节拒绝 | 编译无本机绝对路径的发布格式，保留旧版本产物引用 |
-| `guide-manager/install.js`、`upgrade.js`、`maintenance.js` | 依赖计划、最终校验、确认指纹与原包管理事务 | 分离元数据校验与已下载包校验；网络失败不得变成“组件未安装” |
-| `guide-manager/helper/*` | 官方 pnpm、profile 锁、限定实例停机、独立控制器和恢复 | 5D 继续离线执行；5E 增加来源迁移及其独立恢复入口 |
-| `guide-manager/index.js`、`client.js` | connection 围栏、管理页、持久状态与重启核对 | 新增远端准备状态、连接诊断和迁移入口 |
+| `scripts/prepare-manager-release.mjs` | 七包产物、包名/元数据检查、包文件清单 | 保留开发快照用途；`prepare-remote-release.mjs` 另接固定提交字节与远端清单 |
+| `scripts/package-local.mjs` | 固定提交、提交字节打包、源码与 tgz 哈希核对 | 已抽出 `scripts/lib/package-artifacts.mjs` 共享产物逻辑 |
+| `scripts/prepare-upgrade-catalog.mjs`、`prepare-manager-catalog.mjs` | 精确版本、peer、兼容组合与同版本不同字节拒绝 | 已实现可移植发布格式与旧版本产物引用 |
+| `guide-manager/install.js`、`upgrade.js`、`maintenance.js` | 依赖计划、最终校验、确认指纹与原包管理事务 | 已分离元数据校验与已下载包校验；网络失败不会变成“组件未安装” |
+| `guide-manager/helper/*` | 官方 pnpm、profile 锁、限定实例停机、独立控制器和恢复 | 5D 已离线执行；5E 的 `apply-migration.mjs`、`recover-migration.mjs` 与控制器恢复已实现 |
+| `guide-manager/index.js`、`client.js` | connection 围栏、管理页、持久状态与重启核对 | 已实现远端准备状态、连接诊断、自动执行、`/migration` 接口与 MigrationCard |
 
-当前目录读取器会检查目录内的所有包文件；不能只把 `file` 改成 URL。远端适配要让“查询可用版本”只检查完整元数据，按所选依赖/兼容闭包准备所需文件，再生成本地目录并执行严格校验。现有本地调用保持原有默认验证行为，不能为远端功能全局关闭完整性检查。
+当前目录读取器会检查目录内的所有包文件；不能只把 `file` 改成 URL。远端适配让“查询可用版本”只检查完整元数据，按所选依赖/兼容闭包准备所需文件，再生成本地目录并执行严格校验。现有本地调用保持原有默认验证行为，不能为远端功能全局关闭完整性检查。
 
 ## 3. 5D-0：发布格式与规则
 
@@ -64,7 +66,7 @@
 
 ### 3.3 连接与鉴权
 
-Host 配置指定 owner/repo、稳定候选策略和凭据环境变量名；首版后端读取本机 `DSH_GUIDE_GITHUB_TOKEN`。配置和状态中只保存变量名与连接结果，不保存 token 内容。重启后凭据是否仍可读取须进入验收，不能依赖开发终端的临时环境恰好存在。
+Host 配置可指定 owner/repo、稳定候选策略和凭据环境变量名；未显式配置且 profile 无 `source.json` 时使用内置公开源 `PreLuna/dsh-guide-mode`（`access:public`）。私有/API 模式读取本机 `DSH_GUIDE_GITHUB_TOKEN`。配置和状态中只保存变量名与连接结果，不保存 token 内容。公开模式不发送 Authorization；重启后凭据是否仍可读取只在私有/API 验收中要求，不能依赖开发终端的临时环境恰好存在。
 
 私有仓库使用该仓库 Contents 只读权限；公开资源可无需凭据。发布凭据与客户端只读下载凭据分开。浏览器不持有 token；token、Authorization 头及临时签名地址不进入日志、state、计划、launcher 或备份。
 
@@ -74,19 +76,19 @@ GitHub 附件下载可能返回文件或重定向；后端处理二者。凭据�
 
 ## 4. 5D-1：发布端施工
 
-拟新增 `scripts/prepare-remote-release.mjs`，输出新目录下的七包/所需历史引用、远端清单、哈希清单和发布摘要。复用固定提交归档流程，从提交字节打包；开发夹具可使用明确标记的工作树模式，但不能被正式发布入口误用。
+已实现 `scripts/prepare-remote-release.mjs`，输出新目录下的七包/所需历史引用、远端清单、哈希清单和发布摘要。复用固定提交归档流程，从提交字节打包；开发夹具使用明确标记的工作树模式，不能被正式发布入口误用。
 
 流程：固定已审阅提交 → 工程检查 → 打包与归档内容核对 → 编译兼容组合/远端清单 → 生成可审阅发布摘要 → 上传完整草稿产物 → 核对附件名称/数量/字节/hash → 将完整发布提供给稳定查询。
 
 先实现本地生成及草稿上传工具；上传、正式发布作为独立可见动作，不由普通本地打包顺带触发。首批发布与远端真机验收使用具体可审阅的产物。现有未提交改动不自动视为正式发布提交；不阻止先开展本地代码和夹具验证。
 
-拟新增 `.github/workflows/release.yml`，使用明确 tag/手动触发，复用现有 Windows 工程检查，发布 job 使用必要的 Contents 写权限；现有 `.github/workflows/test.yml` 保持只读。发布流程失败则不提供半成品稳定 Release。最初可先用同一发布工具手动完成流程，再接自动化，二者使用相同产物格式。
+已实现 `.github/workflows/release.yml`，使用明确 tag/手动触发，复用现有 Windows 工程检查，发布 job 使用必要的 Contents 写权限；现有 `.github/workflows/test.yml` 保持只读。发布流程失败则不提供半成品稳定 Release。正式 Release 已按同一产物格式实际发布。
 
 验收：从指定提交在独立目录重建产物；同版本不同字节冲突被拒；缺包/错误元数据不产生可用发布；普通 push/test 不上传或发布安装包。
 
 ## 5. 5D-2：查询、下载与本地目录适配
 
-拟新增 `guide-manager/remote.js`（远端元数据/任务/目录适配）和 `guide-manager/github-source.js`（GitHub API、鉴权和下载传输）。HTTP 请求通过 Host 执行，使用内置网络能力，不要求用户另装 git/gh，也不依赖浏览器跨域请求。
+已实现 `guide-manager/remote.js`（远端元数据/任务/目录适配）、`guide-manager/github-source.js` 与 `github-public.js`（GitHub API/公开源、鉴权和下载传输）。HTTP 请求通过 Host 执行，使用内置网络能力，不要求用户另装 git/gh，也不依赖浏览器跨域请求。
 
 下载准备流程：
 
@@ -128,23 +130,25 @@ GitHub 附件下载可能返回文件或重定向；后端处理二者。凭据�
 | D-06 | 新用户 UI | 干净 profile 只装 manager，从真实配置仓库下载并安装；Edge 与独立桌面重启后实际就绪 |
 | D-07 | 升级/恢复 | 单包与必要联动、manager 升级通过；断开远端后依然可用旧事务恢复 |
 
-确定性默认测试使用注入传输/本地测试服务，不需要 GitHub token 或模型调用。真实私有 Release/API、真实官方 pnpm 和 UI 验收单独运行，清楚记录依赖的发布与环境，不能用 mock 替代实际接通结果。
+确定性默认测试使用注入传输/本地测试服务，不需要 GitHub token 或模型调用。真实公开 Release/API、真实官方 pnpm 和 UI 验收单独运行，清楚记录依赖的发布与环境，不能用 mock 替代实际接通结果；私有/API 路径保留为可选配置。
 
-只有 D-01～D-07 在对应层级通过，并记录新证据目录，才开始 5E 代码施工。发布访问凭据尚未具备时可完成不依赖它的本地实现，但真实远端项须明确记录未验/blocked，不记通过。
+D-01～D-07 已在公开源层级通过并记录证据；5E-0/1/2 已进入工作区实现并通过默认/隔离测试，真实 Edge/独立桌面 E-07 仍待运行。若以后改用私有/API 来源，发布访问凭据不具备时可完成不依赖它的本地实现，但真实远端项须明确记录未验/blocked，不记通过。
 
 ## 8. 5E-0：来源清点、差异与迁移计划
 
-拟新增 `guide-manager/migration.js`。首版自动切换范围只含当前 profile 已安装、直接依赖为 `link:` 的七个自有包；manager 一并清点。已是稳定缓存来源的包保留，缺失组件不顺带安装。registry、git、workspace 或未知来源先明确拒绝迁移，不在本轮隐式扩展支持。
+已实现 `guide-manager/migration.js`。首版自动切换范围只含当前 profile 已安装、直接依赖为 `link:` 的七个自有包；manager 一并清点。已是稳定缓存来源的包保留，缺失组件不顺带安装。registry、git、workspace 或未知来源明确拒绝迁移，不在本轮隐式扩展支持。
 
 预检并展示：原 spec/源码真实路径、实际版本、源码随包文件清单和哈希、目标 Release/包 SHA、实际代码差异、原启停配置、宿主基线、四文件快照、待执行任务及恢复入口。
 
-不能只比较版本号：当前 1.1.0 link 含未发布改动。先冻结所选源码，比较发布内容；若目标确实改变代码，页面必须标明“切换来源并更新代码”。首次迁移优先选择与审阅源码一致的发布基线，再独立验证后续版本升级。Host 内存代码与磁盘源码可能不一致，需记录源变更诊断；存在漂移时先冷重载核对，不把磁盘快照称为内存代码快照。
+不能只比较版本号：开发 link 的工作区源码可能含未发布改动。先冻结所选源码，比较发布内容；若目标确实改变代码，页面必须标明“切换来源并更新代码”。首次迁移优先选择与审阅源码一致的发布基线，再独立验证后续版本升级。Host 内存代码与磁盘源码可能不一致，需记录源变更诊断；存在漂移时先冷重载核对，不把磁盘快照称为内存代码快照。
 
 迁移计划绑定源码内容指纹、原 spec、已下载产物、四文件、loader 启停与独立控制器内容。确认前/停机执行前再次检查；源码编辑、目标变化、配置变化、其他 pending 或未恢复事务均拒绝过期计划。
 
+若迁移包含 manager，目标 manager 必须包含 `migration.js`、`helper/apply-migration.mjs` 与 `helper/recover-migration.mjs`；缺少这些文件的目标会把计划标记为 `manager-target-lacks-migration`，避免迁移后丢失 5E 能力。当前正式 Release manager 1.2.0 不包含这些文件，因此新 5E Release 是 manager 迁移的前置条件；只迁移六个组件且 manager 不是 link 时不受此限。
+
 ## 9. 5E-1：独立停机切换与恢复
 
-拟新增 `helper/apply-migration.mjs`、迁移/恢复入口及独立事务目录，复用 5C 控制器复制、目标进程定位、官方 profile 写锁和 pnpm。manager 也可能被替换，因此执行和恢复必须从 profile 自有控制器目录运行。
+已实现 `helper/apply-migration.mjs`、`helper/recover-migration.mjs` 及独立事务目录，复用 5C 控制器复制、目标进程定位、官方 profile 写锁和 pnpm。manager 也可能被替换，因此执行和恢复从 profile 自有控制器目录运行。
 
 事务顺序：
 
@@ -172,24 +176,26 @@ GitHub 附件下载可能返回文件或重定向；后端处理二者。凭据�
 | E-06 | 后续更新 | 迁移后走远端单包升级、必要联动、修复及版本恢复，未重复触发来源迁移 |
 | E-07 | 平台 | 真实 Edge、独立 Electron 桌面、官方写锁争用和限定实例进程保护通过；live 四文件在隔离测试期间不变 |
 
-5E 隔离验收完成后，才形成针对当前 live 的具体来源切换计划和备份清单。方案和隔离代码施工不等于已切换 live；当前仍保留 link 部署事实。
+当前默认/隔离测试覆盖 E-01～E-05 的代码路径：清点、内容差异、源码漂移拒绝、精确计划、成功迁移、失败回源、源码目录缺失时的快照恢复、外部恢复与 execution/Host API 预览。隔离 profile 已用真实官方 pnpm 和真实 tgz 完成七包迁移，结果见 [隔离证据](../evidence/migration-acceptance-2026-11-16/report.md)。E-06 需要在迁移后继续升级的独立夹具或真实远端中复验；E-07 的真实 Edge/独立桌面、写锁争用和 live 文件保护尚未运行。
+
+5E 工作区代码与默认/隔离测试已完成，但真实 Edge/独立桌面 E-07、新 Release 和 live 部署尚未执行；只有这些门禁通过后，才能把“管理页通用迁移”作为已发布产品能力。本机 live 仍为 2026-11-10 的发布包；后续若再切来源仍须重新制定计划、备份和外部恢复入口。
 
 ## 11. 文件交付与验证记录
 
-| 交付 | 拟新增/主要修改位置 |
+| 交付 | 当前实现位置 |
 |---|---|
 | 正式发布 | `scripts/prepare-remote-release.mjs`、共享打包逻辑、`.github/workflows/release.yml` |
 | 查询/下载/准备 | `guide-manager/remote.js`、`github-source.js`、三类本地目录校验与适配 |
-| 来源迁移 | `guide-manager/migration.js`、`helper/apply-migration.mjs` 与外部切换/恢复脚本 |
+| 来源迁移 | `guide-manager/migration.js`、`helper/apply-migration.mjs`、`helper/recover-migration.mjs`、`helper/migrate-guide-manager.cmd` 与控制器恢复入口 |
 | 管理页与 HTTP | `guide-manager/index.js`、`client.js`；新运行文件加入 package.json.files 和控制器复制清单 |
 | 默认/宿主/UI 测试 | `guide-manager/test/` 下远端、迁移、发布产物及对应 opt-in Host/UI 验收工具 |
 | 运维文档 | manager README、维护手册、功能检查清单；项目状态保持唯一进度来源 |
 
-以上新文件/API 名称为施工定位，可按既有实现合并共享函数，但不得绕过最终产物校验、官方锁或独立恢复边界。已有默认测试和 5A/5B/5C 真机链路必须保留回归。
+以上文件/API 已在工作区落地；不得绕过最终产物校验、官方锁或独立恢复边界。已有默认测试和 5A/5B/5C 真机链路必须保留回归；5E 的真实 Edge/桌面验收仍需在新证据目录补做。
 
 代码检查使用 `npm test`、`build:check`、`doctor`、`repo:check`、`git diff --check`，另核对 tgz 文件清单。5D/5E 分别创建新的日期证据目录，记录提交/产物 SHA、操作前后状态、错误、截图和 live 文件/进程保护结果；UI 两端串行运行，防止相互误判进程退出。未运行的项不写通过，已知诊断单列。
 
-本轮后续范围不包含：任意跨 schema 数据迁移、registry 来源通用迁移、自动启动停机助手、外部依赖一键代装、跨平台移植或任意断电点自动恢复。SHA 用于发现内容损坏/错包；发布可信度仍依赖所配置仓库及其发布权限，不能将同源 SHA 视为独立签名证明。
+5D 已覆盖面板内自动停机执行；5E 及后续范围仍不包含：任意跨 schema 数据迁移、registry 来源通用迁移、外部依赖一键代装、跨平台移植或任意断电点自动恢复。SHA 用于发现内容损坏/错包；发布可信度仍依赖所配置仓库及其发布权限，不能将同源 SHA 视为独立签名证明。
 
 ## 12. 官方接口依据
 

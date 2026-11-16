@@ -9,6 +9,7 @@ import { artifactInventory } from './artifacts.js'
 import { cacheArtifact, cachePath, createInstallPlan, digest, fingerprint, INSTALL_ORDER, profileSnapshot, readCatalog, readJson, selectedKeys, stageInstall, writeJson } from './install.js'
 import { createUpgradePlan, readUpgradeCatalog, stagePackagePlan } from './upgrade.js'
 import { assertMaintenanceIdle, createMaintenancePlan, readManagerCatalog, stageMaintenance } from './maintenance.js'
+import { createMigrationPlan, stageMigration } from './migration.js'
 
 const safeError = (error) => /^(github-[a-z0-9-]+|source-[a-z0-9-]+)$/.test(error?.message ?? '') ? error.message : 'source-validation-failed'
 const alive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e.code !== 'ESRCH' } }
@@ -123,12 +124,14 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
     return saved
   }
   const prepare = (request, state) => {
-    if (!['install', 'upgrade', 'manager-upgrade'].includes(request?.kind) || Object.keys(request).some((k) => !['kind', 'snapshotId', 'components', 'targets', 'version'].includes(k))) throw new Error('source-invalid-request')
+    if (!['install', 'upgrade', 'manager-upgrade', 'migration'].includes(request?.kind) || Object.keys(request).some((k) => !['kind', 'snapshotId', 'components', 'targets', 'version'].includes(k))) throw new Error('source-invalid-request')
     const saved = snapshot(request.snapshotId)
-    const allowed = request.kind === 'install' ? ['kind', 'snapshotId', 'components'] : request.kind === 'upgrade' ? ['kind', 'snapshotId', 'targets'] : ['kind', 'snapshotId', 'version']
+    const allowed = request.kind === 'install' ? ['kind', 'snapshotId', 'components']
+      : request.kind === 'upgrade' ? ['kind', 'snapshotId', 'targets']
+        : request.kind === 'migration' ? ['kind', 'snapshotId'] : ['kind', 'snapshotId', 'version']
     if (Object.keys(request).some((key) => !allowed.includes(key)) || request.targets?.some((target) => !target || Object.keys(target).some((key) => !['key', 'version'].includes(key)))) throw new Error('source-invalid-request')
     const catalog = saved.catalog
-    let combo, keys
+    let combo, keys, managerTarget
     const installed = state.components.filter((c) => readJson(join(profile.dir, 'package.json')).dependencies?.[c.package])
     if (request.kind === 'install') { keys = selectedKeys(request.components); combo = catalog.combinations.find((c) => c.id === catalog.recommendedCombination) }
     else if (request.kind === 'upgrade') {
@@ -136,9 +139,15 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
       combo = catalog.combinations.filter((c) => fingerprint(c.host) === fingerprint(host) && request.targets.every((t) => c.versions[t.key] === t.version))
         .sort((a, b) => installed.filter((i) => a.versions[i.key] !== i.version).length - installed.filter((i) => b.versions[i.key] !== i.version).length || a.id.localeCompare(b.id))[0]
       keys = INSTALL_ORDER // existing cold upgrade validator verifies the complete chosen combination
+    } else if (request.kind === 'migration') {
+      combo = catalog.combinations.find((c) => c.id === catalog.recommendedCombination)
+      keys = INSTALL_ORDER
+      managerTarget = catalog.artifacts.find((a) => a.key === 'manager' && a.version === catalog.recommendedManager)
+      if (!managerTarget) throw new Error('source-manager-target-unavailable')
     }
     const chosen = request.kind === 'manager-upgrade' ? catalog.artifacts.filter((a) => a.key === 'manager' && a.version === request.version)
-      : combo ? catalog.artifacts.filter((a) => keys.includes(a.key) && a.version === combo.versions[a.key]) : []
+      : request.kind === 'migration' ? catalog.artifacts.filter((a) => (keys.includes(a.key) && a.version === combo.versions[a.key]) || a === managerTarget)
+        : combo ? catalog.artifacts.filter((a) => keys.includes(a.key) && a.version === combo.versions[a.key]) : []
     if (!chosen.length || request.kind !== 'manager-upgrade' && fingerprint(combo.host) !== fingerprint(host)) throw new Error('source-no-compatible-target')
     const before = profileSnapshot(profile.dir)
     return start('prepare', structuredClone(request), async (task, client, retry, signal) => {
@@ -174,8 +183,11 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
       signal.throwIfAborted()
       if (fingerprint(profileSnapshot(profile.dir)) !== fingerprint(before)) throw new Error('source-profile-changed')
       const directory = join(root, 'prepared', task.id)
-      const local = (a) => ({ ...a, file: cachePath(profile.dir, a.sha256) })
-      let catalogPath
+      const local = (a) => {
+        const file = cachePath(profile.dir, a.sha256)
+        return { ...a, file, ...(existsSync(file) ? { files: artifactInventory(file, a.sha256).files } : {}) }
+      }
+      let catalogPath, managerCatalogPath = null
       if (request.kind === 'install') {
         catalogPath = join(directory, 'install.json')
         writeJson(catalogPath, { schema: 1, product: 'dsh-guide-mode', release: catalog.release.tag,
@@ -185,12 +197,21 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
         catalogPath = join(directory, 'upgrade.json')
         writeJson(catalogPath, { schema: 2, product: 'dsh-guide-mode', artifacts: needed.map(local), combinations: [combo] })
         readUpgradeCatalog(catalogPath)
+      } else if (request.kind === 'migration') {
+        catalogPath = join(directory, 'install.json')
+        managerCatalogPath = join(directory, 'manager.json')
+        writeJson(catalogPath, { schema: 1, product: 'dsh-guide-mode', release: catalog.release.tag,
+          components: INSTALL_ORDER.map((key) => local(catalog.artifacts.find((a) => a.key === key && a.version === combo.versions[key]))) })
+        writeJson(managerCatalogPath, { schema: 3, product: 'dsh-guide-mode', artifacts: [local(managerTarget)] })
+        readCatalog(catalogPath)
+        readManagerCatalog(managerCatalogPath, host)
       } else {
         catalogPath = join(directory, 'manager.json')
         writeJson(catalogPath, { schema: 3, product: 'dsh-guide-mode', artifacts: chosen.map(local) })
         readManagerCatalog(catalogPath, host)
       }
-      return { catalogPath, catalogHash: digest(readFileSync(catalogPath)), snapshotId: request.snapshotId }
+      return { catalogPath, managerCatalogPath, managerVersion: managerTarget?.version ?? null,
+        catalogHash: digest(readFileSync(catalogPath)), snapshotId: request.snapshotId }
     })
   }
   const verify = (entry, file) => {
@@ -204,6 +225,10 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
     if (task.kind !== 'prepare' || task.status !== 'ready' || task.configHash !== configHash() || fingerprint(task.before) !== fingerprint(profileSnapshot(profile.dir))
       || digest(readFileSync(task.result.catalogPath)) !== task.result.catalogHash) throw new Error('source-preparation-stale')
     const request = task.payload
+    if (request.kind === 'migration') {
+      if (!task.result.managerCatalogPath || !existsSync(task.result.managerCatalogPath)) throw new Error('source-preparation-stale')
+      return createMigrationPlan(state, { catalogPath: task.result.catalogPath, managerCatalogPath: task.result.managerCatalogPath, managerVersion: task.result.managerVersion }, host)
+    }
     if (request.kind === 'install') return createInstallPlan(state, readCatalog(task.result.catalogPath, { requiredKeys: selectedKeys(request.components) }), request.components)
     if (request.kind === 'upgrade') return createUpgradePlan(state, readUpgradeCatalog(task.result.catalogPath), request.targets, host)
     return createMaintenancePlan(state, { kind: 'manager-upgrade', version: request.version }, managerRoot, task.result.catalogPath, host)
@@ -215,7 +240,8 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
       if (current.id !== expectedId) throw new Error('source-plan-changed')
       const result = task.payload.kind === 'install'
         ? stageInstall(state, readCatalog(task.result.catalogPath, { requiredKeys: selectedKeys(task.payload.components) }), task.payload.components, expectedId)
-        : task.payload.kind === 'upgrade' ? stagePackagePlan(current, expectedId) : stageMaintenance(current, expectedId, managerRoot)
+        : task.payload.kind === 'upgrade' ? stagePackagePlan(current, expectedId)
+          : task.payload.kind === 'migration' ? stageMigration(current, expectedId) : stageMaintenance(current, expectedId, managerRoot)
       save({ ...task, status: 'staged', stagedPlanId: expectedId })
       return result
     },

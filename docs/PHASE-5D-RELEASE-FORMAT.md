@@ -1,6 +1,6 @@
 # Phase 5D-0 / 5D-1：发布格式与发布端使用
 
-更新：2026-11-08。实现的是远端元数据契约、固定提交打包、历史版本保留、草稿上传/核对工具及 tag/manual workflow。消费端下载、管理页连接和 link 迁移分别属于后续 5D-2/3 与 5E。阶段进度以 [项目状态](../PROJECT-STATUS.md) 为准，施工范围见 [方案](PHASE-5D-5E-IMPLEMENTATION-PLAN.md)。
+更新：2026-11-16。实现的是远端元数据契约、固定提交打包、历史版本保留、草稿上传/核对工具及 tag/manual workflow。消费端下载与管理页连接已由 5D-2/3 完成并在 5D-4 真实验收；5E-0/1/2 已在工作区实现并通过默认/隔离测试，尚未生成新 Release 或完成真实两端 E-07 验收（本机一次性切换另见 [安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md)）。阶段进度以 [项目状态](../PROJECT-STATUS.md) 为准，施工范围见 [方案](PHASE-5D-5E-IMPLEMENTATION-PLAN.md)。
 
 ## 1. schema 4 发布契约
 
@@ -21,7 +21,7 @@
 
 没有 `url`/`file`/token 等字段。实际 release/asset ID 在后续访问指定仓库时解析并绑定；由下载器处理临时地址，不把它写回发布契约。完整样例通过工具生成，勿手改哈希或将本地路径粘进远端清单。
 
-`source-config.example.json` 是独立的 schema 1 连接配置：provider=github、owner/repo、channel=stable、tokenEnv=`DSH_GUIDE_GITHUB_TOKEN`，可选 access=public/private。它仅声明变量名，不包含 token；公开模式不使用/发送其值。manager 1.1.2 内置公开来源，生成器也为公开 manager 输出 access=public 示例。5D-3 已接入管理页，见 [后端](PHASE-5D-CONSUMER-BACKEND.md) / [管理页](PHASE-5D-HTTP-UI.md)。
+`source-config.example.json` 是独立的 schema 1 连接配置：provider=github、owner/repo、channel=stable、tokenEnv=`DSH_GUIDE_GITHUB_TOKEN`，可选 access=public/private。它仅声明变量名，不包含 token；公开模式不使用/发送其值。manager 1.1.2 起内置公开来源（当前 1.2.0），生成器也为公开 manager 输出 access=public 示例。5D-3 已接入管理页，见 [后端](PHASE-5D-CONSUMER-BACKEND.md) / [管理页](PHASE-5D-HTTP-UI.md)。
 
 ## 2. 发布产物
 
@@ -47,11 +47,11 @@
 
 ## 3. 固定提交生成与本地检查
 
-以下是形成正式提交后的维护命令；当前尚未提交的实现不会因命令默认选择 HEAD 就自动纳入发布。
+以下是形成正式提交后的维护命令；从明确提交生成，未提交实现不会因命令默认选择 HEAD 就自动纳入发布。当前最新正式 tag 为 `guide-v1.3.0`，下例用下一版本 tag 占位：
 
 ```powershell
 $sourceCommit = (git rev-parse HEAD).Trim()
-npm run manager:remote-release -- --repository PreLuna/dsh-guide-mode --commit $sourceCommit --tag guide-v1.1.0 --output dist/remote-candidate-01
+npm run manager:remote-release -- --repository PreLuna/dsh-guide-mode --commit $sourceCommit --tag guide-v1.4.0 --output dist/remote-candidate-01
 npm run manager:github-release -- verify --bundle dist/remote-candidate-01
 npm run manager:github-release -- draft --bundle dist/remote-candidate-01
 ```
@@ -112,4 +112,4 @@ npm run manager:github-release -- publish --bundle dist/remote-candidate-01 --ex
 
 prepare job 权限 Contents read，upload job 才有 Contents write；写凭据仅传给对应步骤。上传 job checkout 的是 prepare 输出的固定提交，按仓库串行发布，避免两次发布读到不同历史后互相覆盖。源码 ref/tag 通过环境变量传递给严格参数解析器，不拼接成 shell 代码。
 
-代码和模拟 API 回归不等于 GitHub 托管 runner 或真实草稿链路验收。实际执行情况必须另记证据；本次实现未自行创建 tag、push、草稿或正式 Release。
+代码和模拟 API 回归不等于 GitHub 托管 runner 或真实草稿链路验收。实际执行情况必须另记证据；本仓库已实际创建 tag、草稿与正式 Release，最新稳定版本为 `guide-v1.3.0`，记录见 [5D-4 报告](../evidence/phase5d4-2026-11-09/report.md) 与 `github-releases-final.json`。以后每次发布仍须另记证据，不能沿用本次结论。

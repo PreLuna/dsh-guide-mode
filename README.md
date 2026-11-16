@@ -2,19 +2,15 @@
 
 在主会话旁边打开继承上下文的指导对话，用独立 `guide` preset 提供建议或按要求执行修改。指导可使用写工具，并可与主会话 goal 并行。
 
-两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。2026-11-09 用户已将仓库公开，使用 GitHub Releases 分发独立 tgz；六组件源码基线 `1.1.0`，manager 公开源实现为 `1.1.2`。npm 元数据保留 `private:true`、`UNLICENSED`，未发布 npm/市场。
+两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。功能主体已完成：指导会话与上下文继承、goal 并行准入、模型投影与控制拦截、结算防护、sidebar 专区、归档、manager 的安装/升级/恢复/卸载/修复/自升级、公开源查询下载、面板内自动执行与重启核对均已实现，并通过隔离及真实 Edge/独立桌面验收。工作区另有未发布的 5E-0/1/2 实现：link 来源清点、内容差异、停机迁移、源码快照与独立恢复。
 
-截至 2026-11-05，`guide-manager` 已在工作区实现并登记到本机 desktop：官方插件页提供「指导」标签页，聚合六个组件、依赖边、宿主 BOM 和 `guide` skill 状态。Phase 2 在切换前跑兼容门禁；Phase 3 增加本地 link 源码变更检测、reload helper 和冷切换 patch 回滚；Phase 4 接入 `@michengai/dsh-skills-manager` 的状态与“设置 → 技能”深链。Registry/tarball 升级仍由官方插件页负责。
+支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。
 
-**2026-11-05：Phase 1–4 整体验收完成。** 20 个 Node 进程、manager 30 用例、隔离端到端及 live 冒烟通过。**2026-11-07：5A/5B 本地包路径完成隔离整体验收**：先装 manager，再从管理页安装组件；按兼容组合单独或联动升级，保存旧包与依赖锁并可恢复。5C 继续补齐依赖卸载、原版本修复与管理器自升级/外部恢复，另提供插件页无法启动时的外部组件修复入口。未切换 live 安装或发布 npm。设计见 [Phase 5](docs/PHASE-5-ASSESSMENT.md)、[5B](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)、[5C](docs/PHASE-5C-MAINTENANCE.md)，交付进度见 [项目状态](PROJECT-STATUS.md)，剩余功能与测试方法见 [检查表](docs/FUNCTIONAL-TEST-MATRIX.md)。
+当前发布与本机安装：最新正式 Release 为 [guide-v1.3.0](https://github.com/PreLuna/dsh-guide-mode/releases/tag/guide-v1.3.0)，内含 manager `1.2.0` 与六组件 `1.1.0`。npm 元数据保持 `private:true`、`UNLICENSED`，未发布 npm/市场。2026-11-10 本机 desktop 已将七个自有包从工作区 link 切换为该 Release 的网络 tgz（SHA 固定缓存），核对状态 `verified-running`；源码目录保留，其他插件与配置不变。见 [安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md)。
 
-支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。工作区在 1.1.0 基线上另有未发布的本地改动：自动归档默认关闭、专区改为混合分组，见 [CHANGELOG](CHANGELOG.md) 的 Unreleased。
+剩余范围只有明确列出的扩展能力，不再作为待讨论项：5E-0/1/2 的**代码与默认/隔离测试**已在工作区完成，但尚未发布到 Release，真实 Edge/独立桌面的 E-07 两端验收仍待补；registry/git 与任意跨 schema 迁移、损坏缓存找回、断电点自动恢复、外部依赖一键代装仍未实现。详见 [项目状态](PROJECT-STATUS.md) 与 [功能检查表](docs/FUNCTIONAL-TEST-MATRIX.md)；各阶段实现细节见 [Phase 5](docs/PHASE-5-ASSESSMENT.md)、[5B](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)、[5C](docs/PHASE-5C-MAINTENANCE.md)、[5D](docs/PHASE-5D-REAL-ACCEPTANCE.md)、[5E 方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) 与 [面板执行](docs/PHASE-5-PANEL-EXECUTION.md)。
 
-2026-11-08 按已定顺序完成 5D-0/1 的本地施工：远端发布格式、固定提交七包、草稿核对/显式发布工具和 tag/manual workflow，见 [发布端说明](docs/PHASE-5D-RELEASE-FORMAT.md)。消费端查询/下载/UI（5D-2/3）、真实远端验收及当前 link 来源迁移（5E）仍按 [施工方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) 后续推进；尚未真实发布或切换 live。
-
-2026-11-09：5D 公开远端整体验收完成。新装 manager 后默认连接公开来源，无需 token/source.json；实际 Edge/独立桌面均通过匿名六包安装、官方冷重启、单包与联动升级、来源不可用时恢复、manager 升级及外部恢复。见 [后端](docs/PHASE-5D-CONSUMER-BACKEND.md) / [管理页](docs/PHASE-5D-HTTP-UI.md) / [真实验收](evidence/phase5d4-2026-11-09/report.md)。日常 link 来源尚未迁移，5E 未开始。
-
-从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，通过官方插件页安装，再到“插件 → 指导”检查并准备组件。确认后仍需保存工作、运行外部助手并重启；better-sidebar、guide skill/skills manager 按各自入口管理。版本/宿主与恢复边界见 [5D-4](docs/PHASE-5D-REAL-ACCEPTANCE.md)。
+从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，通过官方插件页安装，再到“插件 → 指导”检查并准备组件。确认前保存工作；manager 1.2.0 会自动执行、重启并返回指导页核对，旧版或故障恢复仍可使用页面给出的手动助手。better-sidebar、guide skill/skills manager 按各自入口管理。版本/宿主与恢复边界见 [5D-4](docs/PHASE-5D-REAL-ACCEPTANCE.md)，面板自动执行说明见 [面板执行](docs/PHASE-5-PANEL-EXECUTION.md)。
 
 ## 使用
 
@@ -40,9 +36,9 @@
 | [guide-preset](guide-preset/README.md) | `guide` persona 与工具面；外部用户级 guide skill 缺失时明确降级 |
 | [guide-goal-adapter](guide-goal-adapter/README.md) | 在私有 subagents 作用域复用原 driver/join |
 | [guide-sidebar-adapter](guide-sidebar-adapter/README.md) | 官方 sidebar 的局部数据视图与原任务组件装饰 |
-| [guide-manager](guide-manager/README.md) | 产品管理页：六组件、依赖边、宿主 BOM/产物、`guide` skill 与 skills manager 深链；兼容门禁、热/冷切换、reload 与回滚 |
+| [guide-manager](guide-manager/README.md) | 产品管理页：六组件、依赖边、宿主 BOM/产物、`guide` skill 与 skills manager 深链；兼容门禁、热/冷切换、reload/回滚、安装/升级/恢复/卸载/修复/自升级、公开源下载与面板自动执行 |
 
-本机 desktop 已登记六个运行组件与 `guide-manager`，官方 `dsh-better-sidebar` 保持 registry 版本 `0.28.2`。`guide-manager` 在 2026-11-05 完成四阶段整体验收：隔离 Host 的 panel 热切换、admission pending 准备/取消、goal 成对 patch、skills 深链，以及 live 的指导页、构建产物和技能管理页三项冒烟全部通过；其 BOM 写在自身 `package.json` 的 `dshGuide` 字段。最近一次核对：准入 active、`C/R/M=8/2/4`，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。证据见 [O19 生产部署](evidence/O19-production-2026-11-03/report.md) / [O2/R6 迁移](evidence/O2-R6-desktop-migration-2026-11-03/report.md) / [1.1.0 实施](evidence/O12-O21-engineering-2026-11-03/report.md)。
+本机 desktop 当前登记六个运行组件与 `guide-manager`，官方 `dsh-better-sidebar` 保持 registry 版本 `0.28.2`。2026-11-10 切换后七个自有包的依赖均为 `.guide-manager/package-cache/<sha256>.tgz`，来源为 `guide-v1.3.0` 发布附件；manager `1.2.0`、六组件 `1.1.0`，运行状态 `verified-running`。`guide-manager` 的 BOM 写在自身 `package.json` 的 `dshGuide` 字段；切换前的准入、shield、O6 与四阶段验收记录继续作为历史证据，见 [O19 生产部署](evidence/O19-production-2026-11-03/report.md) / [O2/R6 迁移](evidence/O2-R6-desktop-migration-2026-11-03/report.md) / [1.1.0 实施](evidence/O12-O21-engineering-2026-11-03/report.md) / [网络包安装](evidence/install-online-2026-11-10/report.md)。
 
 生产代码不包含上游 driver、join 或任务组件副本；旧 fork 已提炼为 [历史设计摘要](docs/HISTORY-AND-MAINTENANCE-NOTES.md) 后删除。UI 的 label 前缀过滤和 goal 的可信 provider 身份是不同判据，不能互相替代。
 
@@ -61,7 +57,10 @@
 | 归档 | 阻止模型执行；其他原生 UI 可能仍允许点开/输入，用户已接受；自动归档默认关闭 |
 | 嵌套指导 | v1 不专门支持，保留默认 depth 限制 |
 | 版本变化 | 未知 driver/join/sidebar/tool 来源回退明确状态；完整面板预检见 O21 |
-| 管理页 | 保留 Phase 1–4 启停/技能/源码 reload；5A 本地包首次安装；5B 兼容组合升级、旧包/依赖锁备份与恢复、重启健康核对；开发 link 受保护，目录外的包走官方插件页 |
+| 管理页 | 官方插件页「指导」tab；Phase 1–4 启停/技能/源码 reload；5A 首次安装；5B 兼容组合升级、旧包/依赖锁备份与版本恢复；5C 卸载、原版本修复、管理器自升级与外部恢复；5D 公开源检查、下载、缓存与计划确认；1.2.0 确认后自动执行并重启返回核对；5E 工作区实现 link 清点、内容差异、迁移计划、停机切换与独立恢复（未发布）。开发 link 受保护，远端与本地包操作共用官方锁 |
+| 远端分发 | 公开 GitHub Releases，默认免 token/source.json；查询、按依赖闭包下载、SHA/tar/契约校验、离线缓存与来源不可用恢复 |
+| 面板自动执行 | manager 1.2.0 支持首次安装、独立/联动升级、版本恢复、修复、卸载及同协议管理器升级；确认后自动停机执行、重启、返回指导页并核对实际运行状态，手动助手保留为恢复入口 |
+| 本机来源 | 自 2026-11-10 起七个自有包为网络发布包固定缓存；开发工作区继续作为源码、测试和隔离验证来源 |
 
 ## 配置
 
@@ -91,7 +90,7 @@ archive:
 
 公开仓库：[PreLuna/dsh-guide-mode](https://github.com/PreLuna/dsh-guide-mode)。可 clone 后运行 `npm run repo:check`、`npm test` 和 `npm run doctor`。六个运行组件加 `guide-manager` 仍依赖上述固定 DSH／官方 sidebar 基线；本仓库不会安装或替换整个宿主。
 
-统一安装、升级、完整卸载与回退见 [维护手册](docs/MAINTENANCE.md)。入口是 [scripts/workspace.mjs](scripts/workspace.mjs) 的 `prepare` 与 [scripts/apply-profile.ps1](scripts/apply-profile.ps1)，原则是先在隔离副本验证、停 Host、生成计划、审阅后应用，并保存文件级恢复记录。准入核心与 shield 核心采用冷更新；panel 客户端变更需要硬刷新。Windows 上 `.ps1` 维护脚本要求 PowerShell 7（`pwsh`），Windows PowerShell 5.1 不支持 `ConvertFrom-Json -AsHashtable` 和覆盖式 `[IO.File]::Move`。
+日常安装、升级、卸载与恢复从官方插件页的「指导」管理页发起，使用 manager 的网络包或本地可信包事务；完整流程见 [维护手册](docs/MAINTENANCE.md)。工作区 link 的开发维护入口是 [scripts/workspace.mjs](scripts/workspace.mjs) 的 `prepare` 与 [scripts/apply-profile.ps1](scripts/apply-profile.ps1)，原则是先在隔离副本验证、停 Host、生成计划、审阅后应用，并保存文件级恢复记录；当前 live 已是发布包，不用这条路径覆盖。准入核心与 shield 核心采用冷更新；panel 客户端变更需要硬刷新。Windows 上 `.ps1` 维护脚本要求 PowerShell 7（`pwsh`），Windows PowerShell 5.1 不支持 `ConvertFrom-Json -AsHashtable` 和覆盖式 `[IO.File]::Move`。
 
 两个 adapter 的本机切换（关闭 DSH Host 后）：
 
@@ -112,9 +111,9 @@ node guide-sidebar-adapter/scripts/prepare-official.mjs
 本机基线（无需安装 DSH）：
 
 ```powershell
-npm test          # 24 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter + 8 manager
+npm test          # 32 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter + 16 manager
 npm run build:check
-npm run doctor    # 版本、私有许可、用户级 guide skill
+npm run doctor    # 版本、公开来源、私有许可、用户级 guide skill
 npm run repo:check # 仓库文件边界与当前文档链接
 ```
 
@@ -129,9 +128,9 @@ node guide-goal-adapter/scripts/smoke.mjs --integration --sidebar
 node guide-panel/scripts/lifecycle-smoke.mjs   # 隔离真实 Host、HMR 与跨进程恢复
 ```
 
-浏览器 UI 使用 `guide-sidebar-adapter/test/browser_test.py`（stdin 传配置、Edge/Playwright、隔离 profile，不读取真实用户凭据）。
+浏览器 UI 使用 `guide-sidebar-adapter/test/browser_test.py`（stdin 传配置、Edge/Playwright、隔离 profile，不读取真实用户凭据）；manager 的远端与面板执行使用 `guide-manager/test/remote-acceptance.py`、`one-click-acceptance.py`，真实匿名后端另运行 `node guide-manager/test/remote-live.mjs <新目录> --public`。
 
-最近结果：原 driver/join 12/12、sidebar 核心及官方消费函数 5/5、B′ 真实 Runtime 34 组、真实隔离 Host 86 项断言、浏览器 11 项通过；1.1.0 为 20 个 Node 检查进程（含 manager 的 30 个测试用例）、90 项真实 Host、11+2 项浏览器及 O2/R6 两进程回归。模型使用本机确定性 fixture，没有调用用户外部模型。逐项证据与未覆盖项见 [PROJECT-STATUS](PROJECT-STATUS.md) 与 [证据索引](evidence/README.md)。
+最近结果：默认 `npm test` 32 个 Node 进程全部通过，其中 manager 145 个测试用例；manager 1.2.0 面板执行在真实 Edge 与独立桌面各完成 8 次自动安装/升级/恢复/修复/卸载/自升级操作，均返回可见指导页并核对 `verified-running`、0 page error。5E-0/1/2 已覆盖清点/差异、计划指纹、迁移执行、失败回源、源码快照恢复与执行预览，并在隔离 profile 用真实官方 pnpm 完成七包迁移；真实 Edge/独立桌面的 E-07 迁移验收尚未运行。历史结果仍为原 driver/join 12/12、sidebar 核心及官方消费函数 5/5、B′ 真实 Runtime 34 组、真实隔离 Host 86 项断言、浏览器 11 项通过；模型使用本机确定性 fixture，没有调用用户外部模型。逐项证据与未覆盖项见 [PROJECT-STATUS](PROJECT-STATUS.md) 与 [证据索引](evidence/README.md)。
 
 ## 诊断
 
@@ -142,16 +141,19 @@ node guide-panel/scripts/lifecycle-smoke.mjs   # 隔离真实 Host、HMR 与跨�
 
 ## 文档地图
 
-全仓库 7 篇文档，每类事实只有一个出处：
+核心 7 篇负责当前事实，Phase 5 阶段文档只保存实现与验收细节，不重复维护交付台账：
 
 | 文档 | 唯一职责 |
 |---|---|
 | 本文 | 使用、当前安装、配置和诊断 |
-| [PROJECT-STATUS.md](PROJECT-STATUS.md) | 当前交付、已定决定 D1–D31、未完成事项、验证索引、结果分级 |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | 已接受边界与暂缓事项（PT-6、RM-3/5/7、Q4、O5 等**已定稿**，不再反复修改） |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | provider、身份、局部作用域、shield 和生命周期 |
+| [PROJECT-STATUS.md](PROJECT-STATUS.md) | 当前交付、已定决定 D1–D35、真实剩余范围、验证索引、结果分级 |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 已接受边界与维持现状口径（PT-6、RM-3/5/7、Q4、O5 等**已定稿**，不因功能完成重开） |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | provider、身份、局部作用域、shield、manager、远端来源与执行生命周期 |
 | [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | 目录地图、安装/升级/卸载/回退、升级门禁、仓库与打包 |
 | [docs/HISTORY-AND-MAINTENANCE-NOTES.md](docs/HISTORY-AND-MAINTENANCE-NOTES.md) | 已删旧方案／fork／部署脚本中保留的维护经验 |
-| [CHANGELOG.md](CHANGELOG.md) | 版本历史 |
+| [CHANGELOG.md](CHANGELOG.md) | 版本历史与发布标签 |
+| [docs/PHASE-5-ASSESSMENT.md](docs/PHASE-5-ASSESSMENT.md) | Phase 5 分期、完成状态与 5E 剩余边界 |
+| [docs/PHASE-5-PANEL-EXECUTION.md](docs/PHASE-5-PANEL-EXECUTION.md) / [5B](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md) / [5C](docs/PHASE-5C-MAINTENANCE.md) / [5D](docs/PHASE-5D-REAL-ACCEPTANCE.md) | 各阶段实现与验收细节 |
+| [docs/LOCAL-ONLINE-INSTALL-2026-11-10.md](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md) | 本机一次性来源切换的运维记录 |
 
 本地不入库的还有 [证据索引](evidence/README.md)（报告、日志、JSON、截图与保留规则）。

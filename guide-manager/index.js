@@ -20,6 +20,7 @@ import {
 import { catalogView, createInstallPlan, installView, readCatalog, stageInstall } from './install.js'
 import { createRestorePlan, createUpgradePlan, packageView, readUpgradeCatalog, stagePackagePlan, upgradeCatalogView } from './upgrade.js'
 import { cancelMaintenance, createMaintenancePlan, maintenanceView, managerCatalogView, stageMaintenance } from './maintenance.js'
+import { cancelMigration, createMigrationPlan, migrationInventory, migrationView, stageMigration } from './migration.js'
 import { createRemoteManager } from './remote.js'
 import { createExecutionController } from './execution.js'
 const remoteManagers = new WeakMap()
@@ -46,6 +47,7 @@ const HELPER_RELOAD = join(PACKAGE_DIR, 'helper', 'reload-guide-manager.cmd')
 const HELPER_ROLLBACK = join(PACKAGE_DIR, 'helper', 'rollback-guide-manager.cmd')
 const HELPER_INSTALL = join(PACKAGE_DIR, 'helper', 'install-guide-manager.cmd')
 const HELPER_PACKAGE = join(PACKAGE_DIR, 'helper', 'update-guide-manager.cmd')
+const HELPER_MIGRATION = join(PACKAGE_DIR, 'helper', 'migrate-guide-manager.cmd')
 const PENDING_VERSION = 1
 const HOST_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
@@ -600,10 +602,37 @@ async function collectState(ctx, config = {}) {
       { key: 'better-sidebar', owner: 'official-plugins', installed: host.betterSidebar?.actual != null, version: host.betterSidebar?.actual ?? null },
     ],
   }
+  const migration = profileContext?.dir ? migrationView(profileContext.dir) : { pending: null, result: null, transactions: [] }
+  const migrationReceipt = migration.result
+  const migrationRestarted = migrationReceipt?.finishedAt && HOST_STARTED_AT > Date.parse(migrationReceipt.finishedAt)
+  const migrationHealthy = Array.isArray(migrationReceipt?.entries) && migrationReceipt.entries.every((entry) => {
+    if (entry.key === 'manager') return state.manager.version === entry.version && state.manager.mode === 'ready'
+    const component = components.find((item) => item.key === entry.key)
+    const enabled = entry.enabled !== false
+    return component?.version === entry.version && component?.enabled === enabled
+      && (enabled ? ['ready', 'ready-unverified'].includes(component?.status) : component?.status === 'disabled')
+  }) && host.dsh.match === true && host.cordis.match === true
+  let migrationInventoryRows = []
+  if (profileContext?.dir) {
+    try {
+      migrationInventoryRows = migrationInventory(profileContext.dir, { state: { components }, hostStartedAt: HOST_STARTED_AT })
+        .map(({ source, ...rest }) => ({ ...rest, source: source === undefined ? null : {
+          version: source.version, path: source.path, filesHash: source.filesHash, bytes: source.bytes, contract: source.contract,
+          dataSchema: source.dataSchema, sourceChanged: source.sourceChanged,
+        } }))
+    } catch (error) { migrationInventoryRows = [{ error: String(error.message ?? error) }] }
+  }
+  state.migration = { phase: 'phase-5e', ...migration, inventory: migrationInventoryRows,
+    helperCommand: profileContext?.dir ? `& ${quote(HELPER_MIGRATION)} -Profile ${quote(profileContext.dir)}` : null,
+    recoveryCommand: migrationReceipt?.recoveryCommand ?? null,
+    verification: migrationReceipt?.status === 'migrated-awaiting-restart'
+      ? migrationRestarted ? migrationHealthy ? 'verified-running' : 'restart-health-check-failed' : 'awaiting-restart'
+      : migrationReceipt?.status === 'migrating' && HOST_STARTED_AT > Date.parse(migrationReceipt.startedAt) ? 'interrupted' : null,
+  }
   const supersededBy = (own, others) => own?.finishedAt && others.some((other) => Date.parse(other?.startedAt ?? '') > Date.parse(own.finishedAt))
-  if (supersededBy(receipt, [packageReceipt, maintenanceReceipt])) state.installation.verification = 'superseded'
-  if (supersededBy(packageReceipt, [receipt, maintenanceReceipt])) state.packageManagement.verification = 'superseded'
-  if (supersededBy(maintenanceReceipt, [receipt, packageReceipt])) state.maintenance.verification = 'superseded'
+  if (supersededBy(receipt, [packageReceipt, maintenanceReceipt, migrationReceipt])) state.installation.verification = 'superseded'
+  if (supersededBy(packageReceipt, [receipt, maintenanceReceipt, migrationReceipt])) state.packageManagement.verification = 'superseded'
+  if (supersededBy(maintenanceReceipt, [receipt, packageReceipt, migrationReceipt])) state.maintenance.verification = 'superseded'
   state.distribution = remoteManagers.get(ctx)?.view() ?? { configured: false }
   state.execution = executionManagers.get(ctx)?.view(state) ?? { available: false, active: false }
   state.warnings = buildWarnings(state)
@@ -648,6 +677,7 @@ async function setComponentEnabled(ctx, key, enabled, config = {}) {
   const maintenance = maintenanceView(serviceOf(ctx, 'profileContext')?.dir)
   if (maintenance.pending || ['applying', 'recovery-required', 'invalid'].includes(maintenance.result?.status)) return { ok: false, code: 'maintenance-operation-pending', message: 'apply or cancel maintenance before switching components' }
   if (packageView(serviceOf(ctx, 'profileContext')?.dir).pending) return { ok: false, code: 'package-operation-pending', message: 'cancel or apply the prepared package operation first' }
+  if (migrationView(serviceOf(ctx, 'profileContext')?.dir).pending) return { ok: false, code: 'migration-operation-pending', message: 'cancel or apply the prepared source migration first' }
   if (installView(serviceOf(ctx, 'profileContext')?.dir).pending) return { ok: false, code: 'install-pending', message: 'cancel or apply the prepared installation before toggling components' }
   if (key === 'manager') return { ok: false, code: 'locked', message: 'the manager is protected and has no switch' }
   const definition = COMPONENTS.find((item) => item.key === key)
@@ -790,6 +820,21 @@ function cancelPackage(ctx, payload) {
   return { application: 'pending-cleared' }
 }
 
+async function migrationPlan(ctx, config, payload) {
+  return createMigrationPlan(await collectState(ctx, config), payload, readBom().guide.host)
+}
+
+async function prepareMigration(ctx, config, payload) {
+  if (payload.confirm !== true) throw new Error('confirmation-required')
+  const plan = await migrationPlan(ctx, config, payload)
+  return { ...stageMigration(plan, payload.planId), helperPath: HELPER_MIGRATION }
+}
+
+function cancelMigrationPlan(ctx, payload) {
+  if (payload.confirm !== true) throw new Error('confirmation-required')
+  return cancelMigration(serviceOf(ctx, 'profileContext')?.dir, payload.planId)
+}
+
 async function planInstallation(ctx, config, requested) {
   const state = await collectState(ctx, config)
   return createInstallPlan(state, readCatalog(catalogPathOf(ctx, config)), requested)
@@ -811,7 +856,7 @@ function cancelInstallation(ctx, payload) {
   return { application: 'pending-cleared' }
 }
 
-async function handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, executionActions, req, res) {
+async function handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, migrationActions, sourceActions, executionActions, req, res) {
   const connection = serviceOf(injected, 'connection')
   const rejection = typeof connection?.requestRejection === 'function' ? connection.requestRejection(req) : undefined
   if (rejection !== undefined) {
@@ -855,14 +900,16 @@ async function handle(injected, getState, setEnabled, installActions, packageAct
     }
     return
   }
-  if (pathname.startsWith(`${ROUTE_PREFIX}/install/`) || pathname.startsWith(`${ROUTE_PREFIX}/packages/`) || pathname.startsWith(`${ROUTE_PREFIX}/maintenance/`)) {
+  if (pathname.startsWith(`${ROUTE_PREFIX}/install/`) || pathname.startsWith(`${ROUTE_PREFIX}/packages/`) || pathname.startsWith(`${ROUTE_PREFIX}/maintenance/`) || pathname.startsWith(`${ROUTE_PREFIX}/migration/`)) {
     if (req.method !== 'POST') {
       writeJson(res, 405, { ok: false, error: { message: 'method not allowed' } })
       return
     }
     try {
       const payload = await readJsonBody(req)
-      const actions = pathname.startsWith(`${ROUTE_PREFIX}/install/`) ? installActions : pathname.startsWith(`${ROUTE_PREFIX}/packages/`) ? packageActions : maintenanceActions
+      const actions = pathname.startsWith(`${ROUTE_PREFIX}/install/`) ? installActions
+        : pathname.startsWith(`${ROUTE_PREFIX}/packages/`) ? packageActions
+          : pathname.startsWith(`${ROUTE_PREFIX}/migration/`) ? migrationActions : maintenanceActions
       const action = pathname.slice(pathname.lastIndexOf('/') + 1)
       if (!Object.hasOwn(actions, action)) {
         writeJson(res, 404, { ok: false, error: { message: 'not found' } })
@@ -871,7 +918,8 @@ async function handle(injected, getState, setEnabled, installActions, packageAct
       const value = await actions[action](payload)
       writeJson(res, 200, { ok: true, value })
     } catch (error) {
-      writeJson(res, 409, { ok: false, error: { code: 'install-refused', message: String(error.message ?? error) } })
+      const code = pathname.startsWith(`${ROUTE_PREFIX}/migration/`) ? 'migration-refused' : 'install-refused'
+      writeJson(res, 409, { ok: false, error: { code, message: String(error.message ?? error) } })
     }
     return
   }
@@ -963,6 +1011,11 @@ export async function apply(ctx, config = {}) {
     stage: (payload) => preparePackage(ctx, config, payload),
     cancel: (payload) => cancelPackage(ctx, payload),
   }
+  const migrationActions = {
+    plan: (payload) => migrationPlan(ctx, config, payload),
+    stage: (payload) => prepareMigration(ctx, config, payload),
+    cancel: (payload) => cancelMigrationPlan(ctx, payload),
+  }
   const maintenanceActions = {
     plan: (payload) => maintenancePlan(ctx, config, payload),
     stage: async (payload) => {
@@ -998,6 +1051,7 @@ export async function apply(ctx, config = {}) {
     stagePreparedSource: async (payload) => { if (payload.confirm !== true) throw new Error('confirmation-required'); return remote.stage(payload.taskId, payload.planId, await getState()) },
     planUpgrade: packageActions.plan, planPackageRestore: packageActions['restore-plan'], preparePackageChange: packageActions.stage, cancelPackageChange: packageActions.cancel,
     planMaintenance: maintenanceActions.plan, prepareMaintenance: maintenanceActions.stage, cancelMaintenance: maintenanceActions.cancel,
+    planMigration: migrationActions.plan, prepareMigration: migrationActions.stage, cancelMigration: migrationActions.cancel,
     readOnly: false, actionScope: 'phase-4', packageActionScope: 'phase-5b' })
   ctx.inject(['webServer', 'connection'], (injected) => {
     const webServer = serviceOf(injected, 'webServer')
@@ -1007,7 +1061,7 @@ export async function apply(ctx, config = {}) {
       kind: 'prefix',
       path: ROUTE_PREFIX,
       handler: (req, res) => {
-        void handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, sourceActions, executionActions, req, res)
+        void handle(injected, getState, setEnabled, installActions, packageActions, maintenanceActions, migrationActions, sourceActions, executionActions, req, res)
       },
     }), 'guide-manager: status and phase-4 action route')
   })

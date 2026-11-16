@@ -79,6 +79,20 @@ window.__ModuleLoader__.load({
       sourceRate: 'GitHub 请求额度已用尽，请稍后重试。', sourceNetwork: '网络连接失败或超时，请重试。', sourceIntegrity: '包完整性校验失败，未进入安装。',
       sourceStale: '配置或安装状态已变化，请重新准备并预览。', sourceBusy: '已有任务或包操作待处理，请先完成或取消。',
       sourceHint: '下载后预览版本与联动范围，确认执行将自动安装、重启并核对结果。', sourceBlocked: '当前计划无法执行', sourceLink: '当前来源为开发 link 或尚未固定到包缓存，需要先迁移来源。',
+      migrationTitle: '开发 link 来源迁移',
+      migrationHint: '把已安装的开发 link 包切换到固定发布 tgz，并保留源码快照与恢复入口。仅迁移本机的七个指导模式自有包。',
+      migrationEmpty: '没有可迁移的 link 来源；当前安装已经是固定包或组件缺失。',
+      migrationCheck: '先在上方检查更新，再准备迁移。',
+      migrationPrepareField: '迁移目标', migrationPrepare: '下载并准备迁移', migrationPlan: '预览迁移计划',
+      migrationConfirm: '确认准备迁移', migrationPending: '迁移已准备，保存工作后自动执行或运行外部助手。',
+      migrationSource: '原源码', migrationTarget: '目标版本', migrationDiff: '内容差异',
+      migrationMatching: '发布内容与源码一致', migrationChanged: '有改动', migrationMissing: '仅发布包包含', migrationExtra: '仅源码包含',
+      migrationSourceChanged: '源码在本 Host 启动后改过，执行前会重新核对。',
+      migrationAwaiting: '迁移完成，等待重启核对。', migrationVerified: '迁移后运行就绪',
+      migrationFailed: '迁移失败，已尝试恢复原 link。', migrationRecovery: '迁移恢复需要人工处理，请检查回执和事务备份。',
+      migrationInterrupted: '迁移中断或恢复未完成，请检查回执。', migrationCancel: '取消迁移准备', migrationNoTarget: '发布目录没有兼容的迁移目标。', migrationManagerTarget: '目标 manager 不包含 5E 迁移文件，无法迁移 manager；请先发布支持 5E 的 manager，或只迁移组件。',
+      migrationLink: '源目录', migrationFiles: '个随包文件', migrationSourceVersion: '源码版本',
+      migrationHistory: '历史迁移记录', migrationPendingShort: '迁移准备中',
       tab: '指导',
       title: '指导模式',
       subtitle: '安装组件、检查兼容性与管理指导模式',
@@ -262,6 +276,20 @@ window.__ModuleLoader__.load({
       sourceRate: 'GitHub request limit reached. Retry later.', sourceNetwork: 'Network failure or timeout. Please retry.', sourceIntegrity: 'Package integrity verification failed; installation was not started.',
       sourceStale: 'Configuration or installation changed. Prepare and preview again.', sourceBusy: 'Another task or package operation needs attention first.',
       sourceHint: 'Review versions and dependencies after download. Confirmation installs, restarts and verifies the result automatically.', sourceBlocked: 'This plan cannot execute', sourceLink: 'The current source is a development link or is not pinned to the package cache. Source migration is required.',
+      migrationTitle: 'Development link source migration',
+      migrationHint: 'Move installed development links to pinned release tgz packages while keeping a source snapshot and recovery entry. Only the seven owned guidance packages are migrated.',
+      migrationEmpty: 'No link source to migrate; this installation is already pinned or the components are missing.',
+      migrationCheck: 'Check for updates above before preparing the migration.',
+      migrationPrepareField: 'Migration target', migrationPrepare: 'Download and prepare migration', migrationPlan: 'Preview migration plan',
+      migrationConfirm: 'Confirm migration preparation', migrationPending: 'Migration prepared. Save your work, then execute automatically or run the external helper.',
+      migrationSource: 'Source', migrationTarget: 'Target version', migrationDiff: 'Content diff',
+      migrationMatching: 'Published content matches the source', migrationChanged: 'changed', migrationMissing: 'only in release', migrationExtra: 'only in source',
+      migrationSourceChanged: 'The source changed after this Host started; it is re-checked before execution.',
+      migrationAwaiting: 'Migration completed; restart verification pending.', migrationVerified: 'Running after migration',
+      migrationFailed: 'Migration failed; the original links were restored.', migrationRecovery: 'Migration recovery needs attention; inspect the receipt and transaction backup.',
+      migrationInterrupted: 'Migration was interrupted or recovery did not complete; inspect the receipt.', migrationCancel: 'Cancel migration preparation', migrationNoTarget: 'The release catalog has no compatible migration target.', migrationManagerTarget: 'The target manager does not contain the 5E migration files, so it cannot be migrated; publish a 5E-capable manager or migrate components only.',
+      migrationLink: 'Source path', migrationFiles: 'package files', migrationSourceVersion: 'source version',
+      migrationHistory: 'Historical migration', migrationPendingShort: 'Migration prepared',
       tab: 'Guide',
       title: 'Guidance Mode',
       subtitle: 'Install components, check compatibility and manage guidance mode',
@@ -575,6 +603,7 @@ window.__ModuleLoader__.load({
     }
 
     function sourceError(code, t) {
+      if (/manager-target-lacks-migration/.test(code ?? '')) return t('migrationManagerTarget')
       if (/execution-target-manual-only/.test(code ?? '')) return t('executeManualTarget')
       if (/^execution-/.test(code ?? '')) return t('executeFailed')
       if (/http-401|http-403/.test(code ?? '')) return t('sourceAuth')
@@ -610,7 +639,7 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = React.useState(false)
       const [error, setError] = React.useState(null)
       const execution = state.execution, marker = executionMarker(), task = execution?.task
-      const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.pending?.present
+      const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.migration?.pending || state.pending?.present
       if (!execution?.available && !task && !marker) return null
       const active = execution?.active || Boolean(marker)
       const act = async (confirm) => {
@@ -659,7 +688,8 @@ window.__ModuleLoader__.load({
       }, [task?.id, task?.status])
       if (!distribution) return null
       const running = task?.status === 'running'
-      const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.pending?.present
+      const migrationTask = task?.kind === 'prepare' && task.payload?.kind === 'migration'
+      const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.migration?.pending || state.pending?.present
       const locked = busy || running || !!pending
       const available = (state.components ?? []).filter((item) => kind === 'install' ? !item.installed : item.installed)
       const versions = (key) => [...new Set((catalog?.versions ?? []).filter((item) => item.key === key).map((item) => item.version))]
@@ -678,7 +708,7 @@ window.__ModuleLoader__.load({
         } catch (failure) { setError(sourceError(String(failure.message ?? failure), t)); if (action === 'stage') onChanged() }
         finally { setBusy(false) }
       }
-      const helper = state.maintenance?.pending ? state.maintenance.helperCommand : state.packageManagement?.pending ? state.packageManagement.helperCommand : state.installation?.pending ? state.installation.helperCommand : null
+      const helper = state.migration?.pending ? state.migration.helperCommand : state.maintenance?.pending ? state.maintenance.helperCommand : state.packageManagement?.pending ? state.packageManagement.helperCommand : state.installation?.pending ? state.installation.helperCommand : null
       return h('section', { style: S.section, 'data-guide-source': true },
         h('h3', { style: S.sectionTitle }, t('sourceTitle')),
         h('div', { style: S.card },
@@ -700,7 +730,7 @@ window.__ModuleLoader__.load({
                     h('option', { value: '' }, '—'), versions('manager').map((v) => h('option', { key: v, value: v }, v))),
               h('button', { style: S.actionButton, disabled: locked || empty, onClick: () => request('prepare', payload) }, t('sourcePrepare')),
             ) : null,
-            task ? h('div', { 'data-guide-source-task': true },
+            task && !migrationTask ? h('div', { 'data-guide-source-task': true },
               running ? h('div', { role: 'status', style: S.note }, t(task.kind === 'check' ? 'sourceChecking' : 'sourceDownloading'),
                 ` ${task.progress?.completed ?? 0}/${task.progress?.total ?? 0}`, task.progress?.bytes ? ` · ${Math.ceil(task.progress.bytes / 1024)} KB` : '') : null,
               running ? h('button', { style: S.actionButton, disabled: busy, onClick: () => request('cancel', { taskId: task.id }) }, t('sourceCancel')) : null,
@@ -713,7 +743,7 @@ window.__ModuleLoader__.load({
                 h('button', { style: S.actionButton, disabled: locked, onClick: () => request(task.kind === 'check' ? 'check' : 'prepare', task.kind === 'check' ? {} : task.payload) }, t('sourceRetry'))) : null,
               task.status === 'staged' || pending ? h('div', { style: S.notice }, t(pending ? 'sourceStaged' : 'sourceHandedOff')) : null,
             ) : null,
-            plan && plan.taskId === task?.id && !pending ? h('div', null,
+            plan && !migrationTask && plan.taskId === task?.id && !pending ? h('div', null,
               state.execution?.available ? h('div', { style: S.reason }, t('executeWarning')) : null,
               h('ul', null, plan.entries.map((entry) => h('li', { key: entry.key }, `${entry.package}: ${entry.previous?.version ? `${entry.previous.version} → ` : ''}${entry.version}`))),
               plan.warnings?.length ? h('div', { style: S.note }, `${t('gateWarning')}: ${plan.warnings.map((warning) => warning === 'guide-skill-not-ready' ? t('skillNotReady') : warning === 'host-not-fully-verified' ? t('sourceHostUnverified') : warning).join(', ')}`) : null,
@@ -722,6 +752,74 @@ window.__ModuleLoader__.load({
             helper ? h('details', null, h('summary', null, t('executeFallback')), h('div', { style: S.mono }, helper)) : null,
             state.maintenance?.pending?.kind === 'manager-upgrade' && state.maintenance.recoveryCommand ? h('div', null, h('div', { style: S.note }, t('maintenanceRecovery')), h('div', { style: S.mono }, state.maintenance.recoveryCommand)) : null,
           ),
+          error ? h('div', { style: S.reason, role: 'alert' }, error) : null,
+        ),
+      )
+    }
+
+    function MigrationCard({ migration, distribution, state, t, onChanged }) {
+      const [plan, setPlan] = React.useState(null)
+      const [busy, setBusy] = React.useState(false)
+      const [error, setError] = React.useState(null)
+      if (!migration) return null
+      const task = distribution?.task, catalog = distribution?.catalog
+      const migrationTask = task?.kind === 'prepare' && task.payload?.kind === 'migration'
+      const pending = migration.pending
+      const result = migration.result
+      const inventory = migration.inventory ?? []
+      const migratable = inventory.filter((item) => item.migratable)
+      const locked = busy || Boolean(state.execution?.active) || Boolean(pending) || Boolean(migrationTask && task.status === 'running')
+      const request = async (action, body, group = 'source') => {
+        setBusy(true); setError(null)
+        try {
+          const value = await installRequest(action, body, group)
+          if (action === 'stage' && state.execution?.available) await executePrepared(state, value)
+          if (action === 'plan') setPlan({ ...value, taskId: task.id })
+          else setPlan(null)
+          if (action !== 'plan') onChanged()
+        } catch (failure) { setError(sourceError(String(failure.message ?? failure), t)); if (action === 'stage') onChanged() }
+        finally { setBusy(false) }
+      }
+      const status = migration.verification === 'superseded' ? 'migrationHistory'
+        : migration.verification === 'verified-running' ? 'migrationVerified'
+          : migration.verification === 'restart-health-check-failed' ? 'installHealthFailed'
+            : migration.verification === 'interrupted' || result?.status === 'recovery-required' || result?.status === 'invalid' ? 'migrationRecovery'
+              : result?.status === 'failed-restored' ? 'migrationFailed' : result?.status === 'migrated-awaiting-restart' ? 'migrationAwaiting' : null
+      return h('section', { style: S.section, 'data-guide-migration': true },
+        h('h3', { style: S.sectionTitle }, t('migrationTitle')),
+        h('div', { style: S.card },
+          h('div', { style: S.note }, t('migrationHint')),
+          inventory.length === 0 ? h('div', { style: S.note }, t('migrationEmpty'))
+            : h('div', null,
+              h('div', { style: S.note }, `${t('migrationSource')}: ${migratable.length} / ${inventory.length}`),
+              h('ul', { style: S.warningList }, inventory.map((item) => h('li', { key: item.key },
+                `${componentLabel({ key: item.key, package: item.package }, t)} · ${item.sourceKind ?? '—'}${item.source?.version ? ` · ${item.source.version}` : ''}${item.source?.path ? ` · ${item.source.path}` : ''}${item.error ? ` · ${item.error}` : ''}`))),
+            ),
+          migratable.length === 0 ? null : h('div', null,
+            catalog?.snapshotId ? h('div', { style: S.note }, `${t('sourcePrepare')}: ${catalog.release?.tag ?? ''}`)
+              : h('div', { style: S.note }, t('migrationCheck')),
+            h('button', { style: S.actionButton, disabled: locked || !catalog?.snapshotId, onClick: () => request('prepare', { kind: 'migration', snapshotId: catalog.snapshotId }) }, t('migrationPrepare')),
+            migrationTask && task.status === 'running' ? h('div', { role: 'status', style: S.note }, t('sourceDownloading'), ` ${task.progress?.completed ?? 0}/${task.progress?.total ?? 0}`) : null,
+            migrationTask && task.status === 'ready' && !pending ? h('div', { style: S.notice },
+              h('div', null, t('sourceReady')),
+              h('button', { style: S.actionButton, disabled: busy, onClick: () => request('plan', { taskId: task.id }) }, t('migrationPlan'))) : null,
+            migrationTask && ['failed', 'cancelled', 'interrupted'].includes(task.status) ? h('div', { style: S.reason, role: 'alert' }, sourceError(task.error, t)) : null,
+            plan && plan.taskId === task?.id && !pending ? h('div', null,
+              state.execution?.available ? h('div', { style: S.reason }, t('executeWarning')) : null,
+              h('ul', { style: S.warningList }, plan.entries.map((entry) => h('li', { key: entry.key },
+                `${entry.package}: ${entry.source?.version ?? ''} → ${entry.target?.version ?? ''} · ${entry.diff?.available ? entry.diff.contentMatches ? t('migrationMatching') : `${t('migrationChanged')} ${entry.diff.changedCount}, ${t('migrationMissing')} ${entry.diff.missingCount}, ${t('migrationExtra')} ${entry.diff.extraCount}` : t('notChecked')}`))),
+              plan.blockers?.length ? h('div', { style: S.reason, role: 'alert' }, `${t('sourceBlocked')}: ${plan.blockers.join(', ')}`) : null,
+              h('button', { style: S.actionButton, disabled: locked || plan.blockers?.length > 0, onClick: () => request('stage', { taskId: plan.taskId, planId: plan.id, confirm: true }) }, t(state.execution?.available ? 'executeConfirm' : 'migrationConfirm')),
+            ) : null,
+          ),
+          pending ? h('div', { style: S.notice },
+            h('div', null, t('migrationPending')),
+            h('div', { style: S.mono }, migration.helperCommand ?? t('none')),
+            h('button', { style: S.actionButton, disabled: busy, onClick: () => request('cancel', { planId: pending.id, confirm: true }, 'migration') }, t('migrationCancel')),
+          ) : null,
+          status ? h('div', { style: S.note, 'data-guide-migration-result': true }, t(status)) : null,
+          result?.error ? h('div', { style: S.reason }, result.error, result.recoveryError) : null,
+          migration.recoveryCommand ? h('div', null, h('div', { style: S.note }, t('maintenanceRecovery')), h('div', { style: S.mono }, migration.recoveryCommand)) : null,
           error ? h('div', { style: S.reason, role: 'alert' }, error) : null,
         ),
       )
@@ -1216,6 +1314,7 @@ window.__ModuleLoader__.load({
           : null,
         state.pending?.error ? h('div', { style: S.banner }, `pending: ${state.pending.error}`) : null,
         h(SourceCard, { distribution: state.distribution, state, t, onChanged: refresh }),
+        h(MigrationCard, { migration: state.migration, distribution: state.distribution, state, t, onChanged: refresh }),
         h(InstallationCard, { installation: state.installation, components: state.components ?? [], remoteAvailable: state.distribution?.configured, state, t, onChanged: refresh }),
         h(PackageCard, { management: state.packageManagement, components: state.components ?? [], state, t, onChanged: refresh }),
         h(MaintenanceCard, { maintenance: state.maintenance, components: state.components ?? [], state, t, onChanged: refresh, onOpenSkills }),

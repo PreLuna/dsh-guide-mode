@@ -148,6 +148,16 @@ test('consumer query, preparation and offline installer bridge', async (t) => {
     assert.equal(readJson(task.result.catalogPath).schema, 3)
     assert.equal(task.progress.total, 1)
   })
+  await t.test('migration preparation downloads all seven artifacts and yields both local catalogs', async () => {
+    const f = fixture(), snapshotId = await f.check()
+    const task = await f.remote.wait(f.remote.prepare({ kind: 'migration', snapshotId }, f.state).taskId)
+    assert.equal(task.status, 'ready', JSON.stringify(task))
+    assert.equal(task.progress.total, 7)
+    assert.equal(readJson(task.result.catalogPath).schema, 1)
+    assert.equal(readJson(task.result.managerCatalogPath).schema, 3)
+    assert.equal(readJson(task.result.catalogPath).components.some((entry) => entry.files), true)
+    assert.equal(readJson(task.result.managerCatalogPath).artifacts.some((entry) => entry.files), true)
+  })
   await t.test('restart marks abandoned task interrupted and permits retry after dead owner', async () => {
     const f = fixture()
     const id = '11111111-1111-4111-8111-111111111111', root = join(f.profile.dir, '.guide-manager/remote')

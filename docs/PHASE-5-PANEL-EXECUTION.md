@@ -2,9 +2,9 @@
 
 2026-11-09。承接 5A～5D 已有包事务，按用户要求补齐“确认后还要手动运行助手”的体验缺口。此项不替代 [5E 来源迁移](PHASE-5D-5E-IMPLEMENTATION-PLAN.md)，不隐式替换日常开发 link。验证结果归口 [项目状态](../PROJECT-STATUS.md) 与 [本轮报告](../evidence/one-click-2026-11-09/report.md)。
 
-实现与隔离验收已完成：31 个默认测试进程、manager 135 用例；真实 Edge 与独立桌面各 8 次自动操作全部完成，0 page error。六组件使用实际公开远端；管理器自升级使用明确的本地同协议目标 1.2.1，外部恢复另以系统 PowerShell 5.1 验证。日常 link 来源未迁移。
+实现与隔离验收已完成：31 个默认测试进程、manager 135 用例；真实 Edge 与独立桌面各 8 次自动操作全部完成，0 page error。六组件使用实际公开远端；管理器自升级使用明确的本地同协议目标 1.2.1，外部恢复另以系统 PowerShell 5.1 验证。本机 desktop 已于 2026-11-10 将日常安装切换到该发布包（manager 1.2.0、六组件 1.1.0 / `verified-running`）；工作区 5E-0/1/2 迁移已实现并通过默认/隔离测试，真实两端验收与发布待补。
 
-正式版本：[guide-v1.3.0 / manager 1.2.0](https://github.com/PreLuna/dsh-guide-mode/releases/tag/guide-v1.3.0)。附件 `local-dsh-guide-manager-1.2.0.tgz` 可通过官方插件页安装。首次从旧版升级仍按旧流程；工作区 link 用户需重启 DSH 加载新 Host 代码，来源迁移继续按 5E 单独实施。
+正式版本：[guide-v1.3.0 / manager 1.2.0](https://github.com/PreLuna/dsh-guide-mode/releases/tag/guide-v1.3.0)。附件 `local-dsh-guide-manager-1.2.0.tgz` 可通过官方插件页安装。首次从旧版升级仍按旧流程；工作区 link 用户需重启 DSH 加载新 Host 代码，5E 迁移代码已在工作区实现但尚未发布/完成真实两端验收，本机一次性切换见 [安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md)。
 
 ## 用户流程
 

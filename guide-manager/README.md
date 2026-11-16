@@ -1,14 +1,16 @@
 # Guide manager
 
-manager 1.2.0：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
+manager 1.3.0：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态；新增 link 来源清点/差异/迁移与恢复。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
 
 2026-11-09：manager 1.1.2 增加默认公开发布来源。通过官方插件页安装本仓库 manager tgz 后，直接进入“插件 → 指导 → 远端发布来源”检查并下载，无需配置 token 或 source.json。公开模式使用 Release 直链与 Git 智能 HTTP 的 tag/commit 核验，不消耗匿名 REST API 配额；保留包 SHA/tar/契约与现有冷事务门禁。实际整体验收进展见 [5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 
-2026-11-07：按 [Phase 5 设计](../docs/PHASE-5-ASSESSMENT.md) 实现独立安装入口、本地包升级/恢复、卸载/修复与管理器升级。manager 本身无需安装六个业务组件即可启动；原 Phase 1–4 开关、技能与源码 reload 语义保留。隔离验收与部署状态见 [项目状态](../PROJECT-STATUS.md)；未发布 npm，也未切换 live desktop 的安装来源。
+2026-11-07：按 [Phase 5 设计](../docs/PHASE-5-ASSESSMENT.md) 实现独立安装入口、本地包升级/恢复、卸载/修复与管理器升级。manager 本身无需安装六个业务组件即可启动；原 Phase 1–4 开关、技能与源码 reload 语义保留。后续 5D 接入公开 GitHub Release 来源，1.2.0 增加确认后自动执行与重启返回核对；2026-11-10 本机 desktop 已从 link 切到发布包。npm 未发布，安装与部署状态见 [项目状态](../PROJECT-STATUS.md) 和 [安装记录](../docs/LOCAL-ONLINE-INSTALL-2026-11-10.md)。
+
+2026-11-16：工作区增加 5E link 来源迁移（尚未发布到 live）：管理页显示七个自有包的 link/固定来源清点、实际源码与目标 tgz 文件差异；确认后由 `apply-migration.mjs` 停机备份四文件与源码快照、清理目标 importer 解析、安装固定缓存包，失败回源 link 或快照，`recover-migration.mjs` 提供外部事务恢复。隔离 profile 已用真实官方 pnpm 完成七包迁移；真实 Edge/独立桌面验收与新 Release 仍未执行，见 [5E 方案](../docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) 和 [隔离证据](../evidence/migration-acceptance-2026-11-16/report.md)。
 
 ## Phase 5A：安装入口
 
-管理页增加“安装组件”区：选择组件 → 预览依赖与精确版本 → 确认准备 → 保存工作 → 运行安装助手 → 重启核对。选择 panel 自动补齐 preset/shield/admission；选择 admission 自动补齐 shield。推荐组合为六组件，sidebar 需要匹配的官方 better-sidebar；缺少时可取消该可选组件。已安装的同版本组件只保留，不覆盖 link；不同版本、未启用依赖或未验收版本必须先处理，不能借首次安装执行升级。
+管理页增加“安装组件”区：选择组件 → 预览依赖与精确版本 → 保存工作 → 确认执行并重启；manager 1.2.0 会自动停机安装、重启并返回核对，旧版或故障恢复仍可运行页面给出的安装助手。选择 panel 自动补齐 preset/shield/admission；选择 admission 自动补齐 shield。推荐组合为六组件，sidebar 需要匹配的官方 better-sidebar；缺少时可取消该可选组件。已安装的同版本组件只保留，不覆盖 link；不同版本、未启用依赖或未验收版本必须先处理，不能借首次安装执行升级。
 
 ### 本机生成可安装包
 
@@ -23,7 +25,7 @@ npm run manager:release -- --output dist/phase5a-local-01
 ### 执行与恢复
 
 - 预览绑定 profile 的 package.json、pnpm-lock.yaml、cordis.patch.yml、pnpm-workspace.yaml 和发布目录；确认或执行时变化会拒绝过期计划。
-- 确认仅写 `.guide-manager/install-pending.json`。页面给出含目标 `-Profile` 的安装助手命令；`helper/install-guide-manager.cmd` 通过原 PowerShell wrapper 的 `-Install` 模式停 DSH 后执行。
+- 确认先写 `.guide-manager/install-pending.json`。manager 1.2.0 在用户再次确认“执行并重启”后自动启动执行器、停 DSH、安装并重启返回；旧版或故障恢复仍可使用页面给出的助手命令，`helper/install-guide-manager.cmd` 通过原 PowerShell wrapper 的 `-Install` 模式停 DSH 后执行。
 - 独立 `apply-install.mjs` 在官方 `withFileLock(package.json)` 内调用共享 `runProfilePnpm`，将 tgz 固定到 profile `.guide-manager/package-cache/<sha256>.tgz`，一次解析全部新增包，禁用自动 peer 安装与构建脚本。安装成功、包名/版本/契约、宿主产物核对完成后才登记 bundle，并经官方 patch writer 启用组件、配对关闭原 goal driver；最后复核组合配置。
 - profile 原文件备份到 `.guide-manager/install-backups/`。失败时恢复文件并用宿主 pnpm 修复旧依赖图。`failed-restored` 可重试；`recovery-required` 保留备份和回执，wrapper 不自动重启 DSH。硬崩溃中断不能据普通异常恢复测试宣称自动恢复；应按备份人工处理，后续包版本事务在 5B 实施。
 - 回执 `.guide-manager/install-result.json` 可在刷新后读取。`installed-awaiting-restart` 不等于已运行；新的 Host 启动后，版本、组件状态与依赖边通过才显示已就绪。home overlay 和其他启动配置仍可能覆盖 profile，必须查看实际运行状态。
@@ -66,7 +68,7 @@ POST /guide-manager/api/packages/cancel        # { planId, confirm:true }
 GET  /guide-manager/api/state                  # packageManagement: catalog/pending/result/transactions/verification
 ```
 
-5B 设计见 [事务说明](../docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)。`test/acceptance.py` 测真实 UI 与生产助手；`test/run-package-host.mjs` 测真实官方 pnpm 的故障与恢复。测试版 `1.1.1`/`1.2.0` 只在独立夹具生成，生产 manifest 仍为 1.1.0。
+5B 设计见 [事务说明](../docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)。`test/acceptance.py` 测真实 UI 与生产助手；`test/run-package-host.mjs` 测真实官方 pnpm 的故障与恢复。5B/5C/5D 的测试版与故障版只在独立夹具生成，生产组合由 manager BOM 和 Release 清单声明（当前 manager 1.2.0 + 六组件 1.1.0）。
 
 ## Phase 5C：卸载、修复与管理器升级
 
@@ -86,7 +88,7 @@ DSH 桌面合并加载客户端时，缺失的组件 manifest 可能导致整个
 
 ## Phase 5D-0/1：发布端
 
-5D-0/1 已提供独立的远端 schema 4 契约和维护端发布工具：`npm run manager:remote-release` 从明确提交生成七包与远端清单；`npm run manager:github-release -- verify|draft|publish` 校验/准备发布，写远端需显式 `--execute`。开发快照不可上传发布，旧版本与兼容组合保留，同版本改字节拒绝。详见 [格式与使用](../docs/PHASE-5D-RELEASE-FORMAT.md)。消费端已由下述 5D-2/3 接入，真实发布与整体验收另行记录。
+5D-0/1 已提供独立的远端 schema 4 契约和维护端发布工具：`npm run manager:remote-release` 从明确提交生成七包与远端清单；`npm run manager:github-release -- verify|draft|publish` 校验/准备发布，写远端需显式 `--execute`。开发快照不可上传发布，旧版本与兼容组合保留，同版本改字节拒绝。详见 [格式与使用](../docs/PHASE-5D-RELEASE-FORMAT.md)。消费端已由下述 5D-2/3 接入；真实公开发布与 Edge/独立桌面整体验收已在 5D-4 完成，最新正式版本为 `guide-v1.3.0`。
 
 ## Phase 5D-2：后端准备服务
 
@@ -94,7 +96,22 @@ Host config.source 或 sourcePath（默认 profile/.guide-manager/source.json）
 
 ## Phase 5D-3：HTTP 与管理页
 
-“远端发布来源”区接入检查、安装缺失组件/升级组件/升级 manager、进度、取消/重试、刷新恢复，以及精确计划预览/确认。确认后使用原助手执行，manager 自升级保留外部恢复入口。source/check、prepare、task、cancel、plan、stage 均为受 connection 围栏保护的 POST；浏览器不传凭据或任意来源。未配置远端时保留本地功能。HTTP/客户端回归和隔离 Edge 交互已通过，真实私有 Release/官方冷操作/独立桌面整体链路仍属 5D-4。详见 [接口、流程与测试](../docs/PHASE-5D-HTTP-UI.md)。
+“远端发布来源”区接入检查、安装缺失组件/升级组件/升级 manager、进度、取消/重试、刷新恢复，以及精确计划预览/确认。manager 1.2.0 确认后自动执行并重启返回核对（旧版/故障恢复仍可用原助手），manager 自升级保留外部恢复入口。source/check、prepare、task、cancel、plan、stage 均为受 connection 围栏保护的 POST；浏览器不传凭据或任意来源。未配置远端时使用内置公开源或保留本地功能。HTTP/客户端回归、隔离 Edge 交互与真实公开源 Edge/独立桌面整体链路均已完成，详见 [接口、流程与测试](../docs/PHASE-5D-HTTP-UI.md) 和 [真实 5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
+
+## Phase 5E：link 来源迁移（工作区）
+
+“开发 link 来源迁移”区只读列出七个自有包的 `link:`/固定来源、源码路径与版本；点击“下载并准备迁移”后，从当前 Release 准备六个组件与 manager 的目标 tgz，并生成绑定四文件、源码文件哈希、目标 SHA 和 catalog 的迁移计划。确认后写入 `migration-pending.json`，由 execution 自动执行或手动 `helper/migrate-guide-manager.cmd` 执行。
+
+`helper/apply-migration.mjs` 在 profile 官方锁内备份四文件与源码快照，删除目标包旧 lock importer 解析，经官方 pnpm 安装固定缓存 tgz，核对版本/契约/宿主/启停配置；失败恢复原 link，原源码缺失时从快照重建 `link:` 来源。`helper/recover-migration.mjs` 由控制器副本执行事务级恢复；`restart-guide-manager.ps1 -RecoverMigration -TransactionId <id>` 是对外入口。真实 Edge/桌面验收和新 Release 尚未执行。
+
+```text
+POST /guide-manager/api/migration/plan    # { catalogPath, managerCatalogPath, components?, managerVersion? }
+POST /guide-manager/api/migration/stage   # 同上 + planId + confirm:true
+POST /guide-manager/api/migration/cancel  # { planId, confirm:true }
+GET  /guide-manager/api/state             # migration.inventory/pending/result/verification
+```
+
+默认测试在 `test/migration.test.mjs`，覆盖清点/差异、源码漂移、计划指纹、成功迁移、失败回源、快照恢复、execution 预览与 Host API；真实两端验收仍为后续门禁。
 
 ## Phase 1–4 基线机制
 
@@ -183,7 +200,7 @@ Host 通过 `pluginPackages` 解析实际目录并哈希；包或文件不可用
 
 ### 本地 link
 
-本机六个组件都通过 `link:` 登记。Host 读取 profile 的 dependency spec，递归取包内最新 mtime，和本进程启动时间比较：
+工作区开发 link 部署的六个组件通过 `link:` 登记；本机 live desktop 自 2026-11-10 起是固定缓存包，不显示这条源码变更提示。Host 读取 profile 的 dependency spec，递归取包内最新 mtime，和本进程启动时间比较：
 
 - `update.mode: 'source-reload'`；
 - `update.sourceChanged: true` 表示源码在本次 Host 启动后改过；
@@ -193,11 +210,11 @@ Host 通过 `pluginPackages` 解析实际目录并哈希；包或文件不可用
   ```
 - reload helper 只停/重启 `DeepSeek Harness`，不修改任何包或 profile。
 
-这条路径就是当前本地安装的实际升级方式：改源码 → reload → 重新加载 Host/client。
+这是开发 link 部署的升级方式：改源码 → reload → 重新加载 Host/client。live 的发布包升级不使用这条路径，而是走“远端发布来源”或本地包事务；两者不能混用。
 
 ### registry / tarball / git
 
-这些包在 `update.mode: 'package-manager'`，UI 提示到官方插件页更新。官方 manager 的更新是 `removeBundle` → `installBundle`，本 manager 不重复这套破坏性事务；官方的暂存、失败恢复和取消语义仍由官方 UI 负责。
+registry/git 来源在 `update.mode: 'package-manager'`，UI 提示到官方插件页更新；官方 manager 的更新是 `removeBundle` → `installBundle`，本 manager 不重复这套破坏性事务。可信 tarball 与公开 Release 包则进入 Phase 5 的安装/升级/恢复事务，由本 manager 保存旧包、配置与回执并在重启后核对。
 
 ### 冷切换回滚
 
@@ -279,14 +296,16 @@ POST /guide-manager/api/action  # set-component-enabled
 
 ## 安装与测试
 
-本机 desktop 已安装并验证「指导」tab。Phase 4 的代码是 link 到工作区的，更新后需要重启一次 DSH 才能加载新的 Host 代码。
+本机 desktop 已安装并验证「指导」tab；live 为 manager 1.2.0 + 六组件 1.1.0 的固定缓存包，工作区开发 link 修改后仍需重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
-node guide-manager/test/core.test.mjs
-node guide-manager/test/host-state.test.mjs
-node guide-manager/test/client-registration.test.mjs
-node guide-manager/test/helper.test.mjs
+npm test                     # 32 个 Node 进程，manager 145 个用例
+npm run build:check
+npm run doctor
+node guide-manager/test/remote-live.mjs dist/remote-live --public
 ```
+
+隔离包验收和面板执行另用 `guide-manager/test/setup-acceptance.mjs`、`acceptance.py`、`remote-acceptance.py`、`one-click-acceptance.py`；它们使用独立 home/profile，不操作 live。
 
 ### 隔离验证（2026-11-05）
 
@@ -314,11 +333,11 @@ node guide-manager/test/helper.test.mjs
 
 ## 边界
 
-- Phase 4 只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 仍锁定。
+- 组件启停只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 自身受保护。安装/升级/恢复/卸载/修复/自升级是独立的包事务入口。
 - 操作前门禁只阻断明确不兼容的组合；宿主版本、产物不可用、版本漂移、skill 未就绪作为警告，不把“未验证”伪称为“不兼容”。
-- 本地 link 的“升级”是源码更新 + reload helper；可信本地 tarball 使用 5A/5B/5C；其余 registry/git 来源仍由官方插件页维护。
+- 本地 link 的“升级”是源码更新 + reload helper；可信本地 tarball 与公开 Release 包使用 5A/5B/5C/5D 事务；其余 registry/git 来源仍由官方插件页维护。5E link 来源迁移已在工作区实现，尚未发布或完成真实两端验收；本机一次性切换见安装记录。
 - 技能安装、禁用、来源管理由 `@michengai/dsh-skills-manager` 负责；本 manager 只读状态并深链到它的设置 section。
 - rollback helper 只恢复最新一份 patch 备份，不等同于完整的包版本回滚。
-- UI 不自动运行 helper；helper 需要用户双击，因为它会关闭并重启 DSH。
+- manager 1.2.0 在用户确认后会自动执行、重启并返回核对；手动 helper 保留给旧版、未知启动方式与故障恢复。执行前仍须保存工作。
 - 冷切换写的是 profile patch，不修改 `package.json`、lockfile 或官方包。
 - 不是兼容性证明：`ready` 只表示该组合在已验证 BOM 内；`ready-unverified` 明确表示未验证。

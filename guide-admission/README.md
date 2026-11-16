@@ -14,7 +14,7 @@ S 来自 `slots.size`，包括 creating、closing、external、带 inbox 的 idl
 
 容量策略拒绝使用原生支持的 `ACTIVATION_LIMIT_REACHED` / `CONTINUATION_UNAVAILABLE`，具体原因保存在 `admissionReason` 和 state；原生 prompt 对外映射为可重试的 `subagent/delivery-unavailable`。不自动排队或重发问题。
 
-安装与回退必须与 panel 配套：profile 依赖和 bundles 中登记本服务，放在 panel 前，创建本地 junction；移除 panel 的 capacity/reserve/maxGuides 配置。旧覆盖值先迁移到此服务，旧 capacity 与 Host 不一致时应先核对。完整部署脚本和证据见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
+安装与回退必须与 panel 配套：profile 依赖和 bundles 中登记本服务，放在 panel 前，包来源为 SHA 固定缓存或开发 link；移除 panel 的 capacity/reserve/maxGuides 配置。旧覆盖值先迁移到此服务，旧 capacity 与 Host 不一致时应先核对。当前 live 使用 manager 管理的发布包，2026-11-03 的直接部署脚本和证据保留为历史入口，见 [实施记录](../evidence/O19-production-2026-11-03/report.md)。
 
 验证入口：`node guide-admission/test/core.test.mjs`；真实 Host：`node evidence/O19-production-2026-11-03/run.mjs`。生产包不导入研究原型。
 

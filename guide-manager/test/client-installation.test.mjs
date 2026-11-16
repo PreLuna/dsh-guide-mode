@@ -64,6 +64,21 @@ function reset({ available = true } = {}) {
   }
 }
 
+test('migration card prepares the remote migration without changing the profile in the browser', async () => {
+  reset()
+  snapshot.distribution = { configured: true, repository: { owner: 'fixture', repo: 'guide' }, catalog: { snapshotId: 'migration-snapshot', release: { tag: 'guide-test' } }, task: null }
+  snapshot.migration = { inventory: [{ key: 'panel', package: '@local/dsh-guide-panel', installed: true, enabled: true, sourceKind: 'link', spec: 'link:C:/src/panel', migratable: true, source: { version: '1.1.0', path: 'C:/src/panel', files: 10 } }], pending: null, result: null, helperCommand: "& 'migrate-guide-manager.cmd' -Profile 'isolated'" }
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, payload: JSON.parse(options.body) })
+    return { ok: true, json: async () => ({ ok: true, value: { taskId: 'migration-task' } }) }
+  }
+  const prepare = button('migrationPrepare')
+  assert.notEqual(prepare, undefined)
+  await prepare.props.onClick()
+  assert.match(requests[0].url, /\/source\/prepare$/)
+  assert.deepEqual(requests[0].payload, { kind: 'migration', snapshotId: 'migration-snapshot' })
+})
+
 test('manager-only page explains missing release configuration and never initiates an installation on render', () => {
   reset({ available: false })
   assert.match(text(tree()), /installCatalogMissing/)

@@ -157,6 +157,7 @@ export function stageInstall(state, release, requested, expectedId) {
   const maintenanceResult = join(state.profile.dir, '.guide-manager', 'maintenance-result.json')
   if (existsSync(maintenanceResult) && ['applying', 'recovery-required', 'invalid'].includes(readJson(maintenanceResult).status)) throw new Error('maintenance-recovery-required')
   if (existsSync(join(state.profile.dir, '.guide-manager', 'package-pending.json'))) throw new Error('package-operation-pending')
+  if (existsSync(join(state.profile.dir, '.guide-manager', 'migration-pending.json'))) throw new Error('migration-operation-pending')
   const plan = createInstallPlan(state, release, requested)
   if (plan.id !== expectedId) throw new Error('stale-install-plan: preview again')
   if (plan.blockers.length) throw new Error(`install-blocked:${plan.blockers.join(',')}`)

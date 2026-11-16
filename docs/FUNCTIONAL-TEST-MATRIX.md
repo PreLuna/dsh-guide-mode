@@ -1,24 +1,40 @@
 # 功能核对与测试清单
 
-更新：2026-11-08。当前交付/待办以 [项目状态](../PROJECT-STATUS.md) 为准；本表区分“已有实现”“未实现的后续能力”和“实现已有、覆盖仍需扩展”。5A/5B/5C 的本地包管理不等于公共 npm 产品化，也不等于所有业务功能重新做过真实模型验收。
+更新：2026-11-16。当前交付/待办以 [项目状态](../PROJECT-STATUS.md) 为准。功能主体已完成；本表第 1 节记录**按现有实现生效**的能力，第 2 节只列真正未实现的扩展能力，第 3 节列实现已有但覆盖仍需扩展的验证。5A～5D、管理器 1.2.0 与工作区 5E-0/1/2 已实现；5E 的新 Release 与真实两端 E-07 验收仍未执行。
 
-用户已同意 **5D 远端发布/下载 → 真实隔离验收 → 5E 当前 link 来源迁移**。2026-11-09 用户公开仓库后，5D 的实际发布、匿名下载、官方 pnpm 与 Edge/独立桌面整体链路均已验收；29 个默认测试进程、manager 120 用例及两端 12 组实际 UI 断言通过。D-01～D-07 的分层证据与边界见 [报告](../evidence/phase5d4-2026-11-09/report.md)，5E 尚未开始。
+## 1. 已完成的能力（按现有实现）
 
-## 尚未实现或需要完善的能力
-
-| 项目 | 当前事实 | 建议下一步 |
+| 能力 | 当前实现 | 验证 / 证据 |
 |---|---|---|
-| 跨机器分发与更新发现 | 5D 公开源首版已通过真实隔离验收，manager 默认公开仓库，免 token/source.json；安装、升级与恢复实际通过 | 保持有限宿主/版本组合，后续新发布继续复验；日常旧安装接入按 5E 处理 |
-| 现有 link/registry 组件迁移 | 开发 link 可重载；5B/5C 不会隐式替换它们，组件维护要求 SHA 固定来源 | 5D 验收后按 5E 实现已安装 link 自有包的差异预览、源码/配置备份和外部恢复；registry/git 通用迁移仍延期 |
-| 任意版本与数据迁移 | 仅有限验收组合，同宿主/契约和 schema 1；无迁移执行或逆向迁移框架 | 新版本出现真实 schema 变化时设计迁移与恢复边界；不能只加版本号 |
-| 缓存损坏与配置语义修复 | 可修复安装文件损坏；原包缓存丢失/损坏时阻断；不重置用户配置或会话 | 后续可从可信目录按旧 SHA 找回；配置诊断与用户选择性重置另做 |
-| 面板内完成安装与重启 | manager 1.2.0 已实现并通过真实 Edge/独立桌面各 8 次自动操作，含本地目标管理器自升级；0 page error；原生 PowerShell 5.1 外部恢复通过 | [实现与测试](PHASE-5-PANEL-EXECUTION.md)；首次从旧管理器升级仍按旧流程，外部故障恢复保留 |
-| 历史事务显示文案 | 安装及组件版本事务的 superseded 已显示历史记录，不再显示“等待重启核对” | 继续区分当前操作与历史记录 |
-| 中断任务恢复 | 普通异常自动修复、写锁与失败回执已实现；硬中断可识别并阻止错误重启 | 扩展“只读诊断 → 选择事务 → 恢复”的外部工具，逐个断点验证；不盲删 pending |
-| 外部依赖一体化分发 | 展示 guide skill、skills manager、better-sidebar，并提供技能设置入口；不代替其安装/升级逻辑 | 为目标分发渠道写清安装指引；若要一键代装，先定义外部来源和责任 |
-| 可选产品交互 | Q7 折叠、批量操作没有实现；跨会话文件锁、嵌套指导不在 v1 范围 | 依实际需求排序，不将已接受边界误列为缺陷 |
+| 指导会话与上下文 | 独立 `guide-fork` provider；seed 取父会话最后一个 completed turn 之前的事件，同时指定 `guide` preset；首次 delivery:caller，后续可冷恢复 | [架构](ARCHITECTURE.md) / panel 测试 |
+| goal 并行与准入 | 独立 goal adapter 复用原 driver/join；可信直属指导不阻挡续轮，普通工作、pending、external、closing、身份未知仍等待 | [goal 报告](../evidence/LI-stage1-2026-11-02/report.md) / [生产准入](../evidence/O19-production-2026-11-03/report.md) |
+| 名额与容量 | C 跟 Host、R 按原生池、M 按 profile 全局；原生同步占槽前检查；零预算禁入 | [O19 实施](../evidence/O19-production-2026-11-03/report.md) |
+| 模型工具面 | `list_agents` 隐藏指导及其后代；模型 `send_message`/`interrupt_agent` 到指导分支被拒；普通工作与孩子回报放行 | [O6 修复](../evidence/B-prime-fixes-2026-11-02/report.md) / `guide-panel/test/model-projection.test.mjs` |
+| 结算防护 | 独立 Host shield 包装父 `followup`/`steer`/`inject`，丢弃已登记指导的 settled 通知；panel HMR 不卸载 | [O2/R6 验收](../evidence/O2-R6-2026-11-02/report.md) |
+| sidebar 局部视图 | 官方 0.28.2 + 独立 sessions facade；树/图/计数/auto-open 共用过滤结果，底部独立专区混合分组 | [阶段二报告](../evidence/LI-stage2-2026-11-02/report.md) |
+| 归档 | 手动归档停止执行、保留历史、可取消并重新打开；自动归档保留能力、默认 `auto:false`，显式开启后按 25%/50%/75% 压力扫描 | [O12/O20/O21](../evidence/O12-O21-engineering-2026-11-03/report.md) / `guide-panel/test/scheduler*.test.mjs` |
+| 管理页基础 | 官方插件页「指导」tab；六组件、依赖边、宿主 BOM/产物、`guide` skill 与 skills manager 深链；兼容门禁、热/冷切换、reload 与 patch 回滚 | [Phase 1–4 验收](../evidence/O23-four-phase-acceptance-2026-11-05/report.md) |
+| 5A 首次安装 | 可信本地发布目录、推荐组合、依赖闭包、精确计划、停机安装、失败恢复与会话运行核对 | [5A 验收](../evidence/phase5-acceptance-2026-11-07/report.md) |
+| 5B 升级与版本恢复 | 有限兼容组合、最小联动、稳定缓存、四文件与旧 tgz 备份、失败修复、显式恢复 | [5B 证据](../evidence/phase5b-2026-11-07/report.md) |
+| 5C 卸载、修复、自升级 | 依赖卸载与 preset 保护、goal 原生 driver 恢复、SHA 原包修复、独立控制器自升级与外部恢复 | [5C 证据](../evidence/phase5c-2026-11-07/report.md) |
+| 5D 发布与公开源 | schema 4 发布清单、固定提交七包、草稿/正式发布；默认公开源检查、按闭包下载、SHA/tar 校验、缓存与离线恢复 | [发布格式](PHASE-5D-RELEASE-FORMAT.md) / [真实 5D-4](../evidence/phase5d4-2026-11-09/report.md) |
+| 5E link 来源迁移（工作区） | 七包 link 清点、源码内容差异、目标 tgz 准备、精确迁移计划、停机执行器、四文件/源码快照、旧 importer 清理、失败回源、快照恢复、`/migration` API 与 MigrationCard；隔离 profile 已用真实官方 pnpm 完成七包迁移 | [5E 方案](PHASE-5D-5E-IMPLEMENTATION-PLAN.md) / `guide-manager/test/migration.test.mjs` / [隔离证据](../evidence/migration-acceptance-2026-11-16/report.md) |
+| 管理页自动执行 | manager 1.2.0 首次安装、独立/联动升级、版本恢复、修复、卸载及同协议管理器升级；确认后自动停机执行、重启、返回指导页并核对 | [面板执行](PHASE-5-PANEL-EXECUTION.md) / [执行证据](../evidence/one-click-2026-11-09/report.md) |
+| 本机来源切换 | 2026-11-10 七个自有包从 workspace link 切到 `guide-v1.3.0` 网络 tgz，manager 1.2.0、六组件 1.1.0 / `verified-running` | [安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md) / [证据](../evidence/install-online-2026-11-10/report.md) |
+| 工程与文档 | 32 个 Node 检查进程、manager 145 用例、生成物检查、公开源 doctor、仓库边界与文档链接检查、最小 CI 与 tag/manual 发布 workflow | `npm test` / `npm run build:check` / `npm run doctor` / `npm run repo:check` |
 
-## 已实现但仍需扩展的验证
+## 2. 仍需后续施工的能力
+
+| 项目 | 当前事实 | 剩余工作 |
+|---|---|---|
+| registry/git 与任意跨 schema 迁移 | 只支持可信本地/远端包与数据 schema 1；开发 link 受保护，不隐式替换 registry/git 来源 | 出现真实 schema 变化时设计迁移与逆向恢复边界；`registry`/`git` 来源单独定义 |
+| 缓存损坏与配置语义修复 | 可修复安装文件损坏；原包缓存丢失/损坏时阻断；不重置用户配置或会话 | 从可信目录按旧 SHA 找回缓存；配置诊断与用户选择性重置另做 |
+| 中断任务恢复 | 普通异常自动修复、写锁、失败回执与 `recovery-required` 已实现；硬中断可识别并阻止错误重启 | 扩展“只读诊断 → 选择事务 → 恢复”的外部工具，逐个断点验证；不盲删 pending |
+| 外部依赖一体化分发 | 展示 `guide` skill、skills manager、better-sidebar 并给出技能设置入口；不代替其安装/升级逻辑 | 为目标渠道写清安装指引；若要一键代装，先定义外部来源与责任 |
+| 可选产品交互 | Q7 折叠、批量操作未实现；跨会话文件锁、嵌套指导不在 v1 范围 | 依实际需求排序；不把已接受边界误列为缺陷 |
+| npm/市场发布 | 仅通过 GitHub Releases 分发；七包 `private:true`、`UNLICENSED`，未发布 npm/市场 | 需要时再决定命名空间、许可证、市场元数据与发布渠道 |
+
+## 3. 已实现但仍需扩展的验证
 
 | 覆盖缺口 | 测试方式与通过条件 |
 |---|---|
@@ -26,18 +42,19 @@
 | 原生 Stop 的所有入口、任意服务关闭顺序、第三方后续包装 | 分别从原生对话、面板、父停止与 Host 退出触发；不得泄漏包装、误投递结算或阻断普通工作 |
 | O17 独立容量语义 | capacity=1，指导运行占槽、结算释放、idle 不占；检查 native used 与 admission 同源快照 |
 | 长时资源与多窗口 SSE | 固定窗口数和操作频率，至少记录稳定期基线与长时趋势；关闭窗口后连接/内存可回落，无排队增长 |
-| 自动归档 low 600 秒完整实测 | 显式开启 archive.auto，保持相应压力与 idle 条件到期；确认只归档符合条件的会话 |
-| PT-6 Windows 沙箱 PTY | 仍为用户已暂缓事项；保留沙箱失败与无沙箱对照事实，不以对照结果覆盖失败 |
-| live 包来源切换 | 本轮没有切换 live 的依赖、lock 或 patch；隔离验收通过后，部署仍须保存用户工作和回退资料 |
+| 自动归档 low 600 秒完整实测 | 显式开启 `archive.auto`，保持相应压力与 idle 条件到期；确认只归档符合条件的会话 |
+| PT-6 Windows 沙箱 PTY | 仍为用户暂缓事项；保留沙箱失败与无沙箱对照事实，不以对照结果覆盖失败 |
+| 5E 真实两端与发布 | 在真实 Edge/独立 Electron 的隔离 profile 覆盖成功迁移、普通失败回源、源码目录丢失快照恢复、管理页恢复入口和迁移后普通升级；通过后再发布新 manager 并制定具体 live 部署清单 |
+| 真实模型长压/故障 | 可选的 30 分钟以上真实模型 soak 与 provider 故障注入；不阻塞当前首轮方案 |
 
-这些是覆盖缺口或已定边界，不表示已发现相应功能缺陷；不要重复开启已完成的 O2/R6/O6/O8 基线整改。
+这些是覆盖缺口或已定边界，不表示已发现相应功能缺陷；不要重复开启已完成的 O2/R6/O6/O8/5A～5D 基线整改。
 
-## 每次改包管理的可重复测试
+## 4. 每次改包管理的可重复测试
 
 先运行确定性工程检查：
 
 ```powershell
-npm test
+npm test                  # 32 个 Node 进程，含 manager 145 用例
 npm run build:check
 npm run doctor
 npm run repo:check
@@ -63,6 +80,8 @@ python guide-manager/test/acceptance.py <另一份新证据目录> desktop --mai
 Electron --expose-internals guide-manager/test/run-maintenance-host.mjs <独立故障profile/setup.json>
 ```
 
+manager 1.2.0 的面板自动执行另用真实 UI 验收：`guide-manager/test/one-click-acceptance.py <新验收目录> web|desktop`，从实际面板点击发起，测试程序不代为执行包操作，也不在重启后手动导航到指导页。公开源后端可先运行 `node guide-manager/test/remote-live.mjs <新目录> --public`。
+
 | 场景 | 断言 |
 |---|---|
 | manager-only、首次安装 | 官方插件页有指导 tab；依赖闭包正确；刷新保留准备；重启六组件就绪 |
@@ -71,14 +90,15 @@ Electron --expose-internals guide-manager/test/run-maintenance-host.mjs <独立�
 | 原版本修复 | 删除 panel manifest/入口后 manager 可打开；重装修复全部文件；四 profile 哈希不变 |
 | 桌面客户端无法启动 | 宿主合并加载因缺失 manifest 失败时，运行独立 repair-components.ps1；重启后面板恢复并核对原包 |
 | 自升级/外部恢复 | 升级前恢复命令可见；正常版本新进程核对；故障版无 API 时仍可由独立副本恢复；删除新 tgz/cache 后仍可恢复 |
+| 面板自动执行 | 确认前不执行；准备/执行指纹漂移拒绝；重启后返回可见指导页并核对新 Host 的实际版本与运行状态；启动失败保留计划与恢复入口 |
 | 冲突/失败 | 过期计划、校验失败、官方写锁争用拒绝；卸载后注入故障恢复旧包与配置；恢复再次失败不自动重启 |
 | 无旁路影响 | sentinel 会话文件、外部依赖保留；用户 live 四文件 SHA 和既有 DSH PID/创建时间不变 |
 
 删除/损坏 pnpm 安装文件时先 `unlink`，不要写穿 hardlink 修改共享 store。测试 profile 与数据写在证据目录；进程按 launcher PID + 创建时间清理，禁止按同名进程全停。
 
-## 包管理通过后，业务功能冒烟
+## 5. 包管理通过后，业务功能冒烟
 
-以下应在独立测试 workspace/profile 上执行；记录 Host 状态、操作前后文件、截图与断言。需要真实模型调用的项保留为显式测试轮次并记录费用/时长，本轮包管理验收没有发起模型任务。
+以下应在独立测试 workspace/profile 上执行；记录 Host 状态、操作前后文件、截图与断言。需要真实模型调用的项保留为显式测试轮次并记录费用/时长，包管理验收不发起模型任务。
 
 | 功能 | 操作 | 通过条件 |
 |---|---|---|
@@ -93,4 +113,4 @@ Electron --expose-internals guide-manager/test/run-maintenance-host.mjs <独立�
 
 每次记录 `status=passed|failed|blocked|known-diagnostic`、版本/产物 SHA、断言、错误、日志/截图路径。未运行的项写“未运行”，不要用已有单元测试或早期验收替代本轮事实。
 
-2026-11-09：5D-4 已补真实公开 Release、官方 pnpm 与两端完整链路；错误响应、取消、限流、损坏包等保持默认确定性测试，不人为破坏实际远端。可运行 `node guide-manager/test/remote-live.mjs <新目录> --public` 做真实匿名后端验证；`remote-acceptance.py` 需先按 [5D-4](PHASE-5D-REAL-ACCEPTANCE.md) 创建新的隔离 profile，再执行安装/升级/恢复验收。真实证据见 [报告](../evidence/phase5d4-2026-11-09/report.md)。
+2026-11-09：5D-4 已补真实公开 Release、官方 pnpm 与两端完整链路；错误响应、取消、限流、损坏包等保持默认确定性测试，不人为破坏实际远端。真实证据见 [报告](../evidence/phase5d4-2026-11-09/report.md)。2026-11-10 本机来源切换已单独记录；它验证的是这次运维操作，不是通用 5E 能力。

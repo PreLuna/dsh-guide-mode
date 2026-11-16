@@ -144,8 +144,8 @@ export function createManagerRestorePlan(profile, transactionId, managerRoot) {
 }
 
 export function assertMaintenanceIdle(profile, allowed = '') {
-  for (const name of ['pending.json', 'install-pending.json', 'package-pending.json', 'maintenance-pending.json']) if (name !== allowed && existsSync(join(profile, '.guide-manager', name))) throw new Error(`another-operation-pending:${name}`)
-  for (const [name, statuses] of [['maintenance', MAINTENANCE_BUSY], ['install', ['installing', 'recovery-required', 'invalid']], ['package', ['upgrading', 'restoring', 'recovery-required', 'invalid']]]) {
+  for (const name of ['pending.json', 'install-pending.json', 'package-pending.json', 'maintenance-pending.json', 'migration-pending.json']) if (name !== allowed && existsSync(join(profile, '.guide-manager', name))) throw new Error(`another-operation-pending:${name}`)
+  for (const [name, statuses] of [['maintenance', MAINTENANCE_BUSY], ['install', ['installing', 'recovery-required', 'invalid']], ['package', ['upgrading', 'restoring', 'recovery-required', 'invalid']], ['migration', ['migrating', 'recovery-required', 'invalid']]]) {
     const path = join(profile, '.guide-manager', `${name}-result.json`)
     if (existsSync(path) && statuses.includes(readJson(path).status)) throw new Error(`${name}-recovery-required`)
   }

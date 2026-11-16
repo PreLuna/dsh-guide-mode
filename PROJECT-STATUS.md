@@ -1,12 +1,14 @@
 # 项目状态与待办
 
-更新：2026-11-09（Asia/Shanghai）。本文件是**当前事实与待办的唯一出处**：交付状态、已定决定、真正剩余的工作。已接受边界与暂缓事项见 [已定边界](docs/DECISIONS.md)，实现机制见 [架构](docs/ARCHITECTURE.md)，历史经验见 [历史经验](docs/HISTORY-AND-MAINTENANCE-NOTES.md)。
+更新：2026-11-16（Asia/Shanghai）。本文件是**当前事实与待办的唯一出处**：交付状态、已定决定、真正剩余的工作。已接受边界与暂缓事项见 [已定边界](docs/DECISIONS.md)，实现机制见 [架构](docs/ARCHITECTURE.md)，历史经验见 [历史经验](docs/HISTORY-AND-MAINTENANCE-NOTES.md)。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 better-sidebar `0.28.2`。未知 adapter 构建回退原行为，不承诺任意版本免维护。
 
+当前安装（2026-11-10）：本机 desktop 的自有包为 manager `1.2.0` + 六组件 `1.1.0`，来源是 `guide-v1.3.0` Release 的网络 tgz，固定到 profile `.guide-manager/package-cache/<sha256>.tgz`，状态 `verified-running`；开发工作区仍是源码与测试来源。七包保持 `private:true`、`UNLICENSED`，未发布 npm/市场。
+
 ## 1. 当前交付
 
-两阶段核心改造、实际安装、成对回退均已完成。完整平台回归仍有明确边界，不能据此称所有历史问题都已解决。
+功能主体已经完成：指导会话与上下文继承、goal 并行准入、模型投影与控制拦截、结算防护、sidebar 专区、归档、manager 的安装/升级/恢复/卸载/修复/自升级、公开源查询下载、面板内自动执行与重启核对均已实现，并通过隔离及真实 Edge/独立桌面验收。5E-0/1/2 的 link 来源迁移已加入工作区并通过默认/隔离测试，尚未发布或完成真实两端验收。剩余范围见 §3.4 以及已接受边界和验证覆盖缺口。
 
 | 交付 | 状态 | 当前实现 / 证据 |
 |---|---|---|
@@ -22,21 +24,23 @@
 | R4 / R7 / R8 / R9 / O10 | 本机工程基线完成 | 本地 Git、最小 CI、生成物检查/加载、guide skill 降级、locale 清理、六包统一装卸恢复 |
 | guide-manager Phase 1–4 | 四阶段整体验收完成（2026-11-05） | 官方 Plugins 页「指导」tab；六组件、依赖边、宿主 BOM/产物、`guide` skill 与 skills manager 深链；兼容门禁；热/冷切换；本地 link reload；冷切换回滚；20 个 Node 进程、manager 30 用例、隔离端到端与 live 三项冒烟通过；[README](guide-manager/README.md) / [验收记录](evidence/O23-four-phase-acceptance-2026-11-05/report.md) |
 | Phase 5A 独立管理器安装入口 | 隔离整体验收通过（2026-11-07） | 真实 Edge 与独立 Electron 桌面从 manager-only 安装六组件，生产助手限定实例停机/重启，全部 ready、健康核对通过；修复打包 peer 路径、PowerShell 参数冲突与重启环境；[验收](evidence/phase5-acceptance-2026-11-07/report.md) |
-| Phase 5B 独立升级与包版本恢复 | 实现与隔离整体验收通过（2026-11-07） | 可信本地兼容目录、最小联动、稳定包缓存、精确旧锁/配置/tgz 备份、失败修复与显式恢复；真实 Edge/Electron 验证单组件升级、三组件联动与连续恢复（原发布包/旧缓存缺失也恢复）；24 个 Node 进程、manager 60 用例；未切换 live、未发布 npm；[设计](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md) / [证据](evidence/phase5b-2026-11-07/report.md) |
+| Phase 5B 独立升级与包版本恢复 | 实现与隔离整体验收通过（2026-11-07） | 可信本地兼容目录、最小联动、稳定包缓存、精确旧锁/配置/tgz 备份、失败修复与显式恢复；真实 Edge/Electron 验证单组件升级、三组件联动与连续恢复（原发布包/旧缓存缺失也恢复）；24 个 Node 进程、manager 60 用例；当时未切换 live，后续由 5D-4 与本机安装记录补齐；[设计](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md) / [证据](evidence/phase5b-2026-11-07/report.md) |
 | Phase 5C 卸载、修复与管理器升级 | 实现与隔离功能验收通过（2026-11-07） | 依赖卸载/preset 保护、goal 原生恢复、SHA 原包修复、独立控制器自升级及外部恢复；桌面无法启动时另有外部组件修复；25 个 Node 进程、manager 75 用例、真实 pnpm 4 项、Edge 10 项/桌面 11 项通过（Edge 保留停机诊断）；[设计](docs/PHASE-5C-MAINTENANCE.md) / [证据](evidence/phase5c-2026-11-07/report.md) / [功能测试清单](docs/FUNCTIONAL-TEST-MATRIX.md) |
 | Phase 5D-0/5D-1 发布格式与发布端 | 本地及真实托管发布验证通过 | 固定提交七包、历史组合、草稿附件回读、显式正式发布与 tag/manual workflow；实际 GitHub runner 和正式 Release 已通过，草稿按 tag 查询差异已修复；[说明](docs/PHASE-5D-RELEASE-FORMAT.md) / [真实证据](evidence/phase5d4-2026-11-09/report.md) |
 | Phase 5D-2 消费端后端 | 本地实现与隔离验证通过（2026-11-09） | 异步查询/准备/取消、SHA 缓存、三类本地目录适配、服务接口与持久状态；27 个测试进程通过，网络为模拟传输，真实 tgz/离线计划验证；[说明](docs/PHASE-5D-CONSUMER-BACKEND.md) / [证据](evidence/phase5d-2026-11-09/report.md) |
 | Phase 5D-3 HTTP 接口与管理页 | 本地实现与隔离 Edge 交互通过（2026-11-09） | source 六个 POST 接口、三类操作选择、进度/取消/重试、刷新恢复、计划确认与原助手衔接；28 个测试进程通过，manager 118 用例；HTTP 使用模拟 GitHub、Edge 使用浏览器响应夹具；[说明](docs/PHASE-5D-HTTP-UI.md) / [证据](evidence/phase5d3-2026-11-09/report.md) |
 | Phase 5D-4 公开远端整体验收 | 完成（2026-11-09） | manager 1.1.2 默认公开来源，免 token/source.json；29 个测试进程、manager 120 用例；实际 Edge/独立桌面均通过匿名六包安装、独立/联动升级、来源不可用时恢复、manager 1.1.3 升级及外部恢复。12 组真实 UI 断言、各关键终态 verified-running；[说明](docs/PHASE-5D-REAL-ACCEPTANCE.md) / [证据](evidence/phase5d4-2026-11-09/report.md) |
+| 正式公开版本 | 已发布（guide-v1.1.0～v1.3.0） | 最新 [guide-v1.3.0](https://github.com/PreLuna/dsh-guide-mode/releases/tag/guide-v1.3.0) 为 manager 1.2.0 + 六组件 1.1.0；固定 tag/commit、附件 SHA/回读与公开发布工作流均已实际跑通；npm 未发布 |
 | Phase 5 面板内自动执行 | 实现与真实两端验收完成（2026-11-09） | manager 1.2.0；31 个默认测试进程、manager 135 用例；Edge/独立桌面各 8 次面板自动执行全部 completed，重启后返回可见指导页并核对，0 page error。六组件来自真实公开源，manager 自升级用明确本地测试目标 1.2.1；原生 PowerShell 5.1 外部恢复亦通过；[说明](docs/PHASE-5-PANEL-EXECUTION.md) / [证据](evidence/one-click-2026-11-09/report.md) |
-| Phase 5E link 来源迁移 | 未开始 | 日常七个自有包仍是工作区 link；差异预览、源码备份和停机切换待按原计划另行施工。5D 验收完成不等于日常环境已迁移；[方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) |
+| 本机网络包安装测试 | 完成（2026-11-10） | 用户确认重启后，日常七个自有包已从 link 切换为网上下载的 SHA 固定发布包：manager 1.2.0、六组件 1.1.0 / ready；隔离失败恢复及真实桌面核对通过。其他插件、配置和原源码保留；[安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md) |
+| Phase 5E 通用 link 来源迁移 | 工作区实现与默认/隔离测试完成（2026-11-16）；真实两端验收待补 | 新增 `migration.js`、`apply-migration.mjs`、恢复脚本、Host `/migration` 接口与 MigrationCard；覆盖清点/内容差异、计划指纹、停机切换、源码快照、失败回源、外部恢复和 execution 预览；隔离 profile 使用真实官方 pnpm 完成七包迁移。未发布到 Release，live 仍为 manager 1.2.0；E-07 真实 Edge/独立桌面验收未运行；[方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) / [隔离证据](evidence/migration-acceptance-2026-11-16/report.md) |
 | O11 / PT-6 | 暂缓，保留当前设计 | 原生结果卡与测试保留；默认沙箱 failed、无沙箱对照 45/45 passed，不改写为整体通过；[报告](evidence/O11-validation-2026-11-04/pt6/report.md) |
 | O11 / RM-3/5/7 | 按宿主默认机制收口 | 接受 persona／压缩／重试与上下文复制成本；[验收取舍](docs/DECISIONS.md) |
 | O11 / 多 pane、Git 与归档补测 | 主流程通过，边界已接受或划出范围 | 同 child 重复视图残留接受现状；原生编辑关闭保护不列为插件任务；[范围](docs/DECISIONS.md) / [报告](evidence/O11-residual-check-2026-11-04/report.md) |
 | R5 有界扩展观察 | 约 124 秒未复现，不代表长期修复 | 五页、六次刷新、六次重挂；660 次请求全部 200，关闭其他页面后 TCP 回落 |
-| 文档收口 | 2026-11-04 完成 | 12 篇合并为 7 篇，每类事实单一出处 |
+| 文档收口 | 2026-11-16 复核 | 核心 7 篇 + Phase 5 阶段文档；5E 工作区实现已记录，真实两端验收和发布仍明确标为未完成 |
 
-2026-11-03 desktop 状态：六个 `@local` link/bundle 已登记，准入 active、C/R/M=8/2/4，shield active/`inject=true`，O6 为 idle/no-target-tools（12 条注册与包装记录）。O6 的 idle 说明代码已加载，不表示本轮执行过用户真实模型的 list/control。`guide-manager` 1.1.0（Phase 1–4）已登记到该 profile；隔离端到端和 2026-11-05 live 三项冒烟均通过，四阶段整体验收完成。2026-11-07 开始 Phase 5 本地施工，部署/隔离验收结果另行记录，见 [设计](docs/PHASE-5-ASSESSMENT.md)。
+2026-11-10 desktop 状态：七个自有包已是网络发布包（manager 1.2.0、六组件 1.1.0），依赖指向 profile `.guide-manager/package-cache/<sha256>.tgz`，运行核对 `verified-running`；其他第三方插件、bundle、`cordis.patch.yml` 与 `pnpm-workspace.yaml` 保留，原 workspace 源码目录未删除。切换前 2026-11-03 的六个 `@local` link/bundle、准入 active/C/R/M=8/2/4、shield active/`inject=true` 与 O6 idle 记录继续作为历史证据。Phase 5 的部署与隔离验收见 [设计](docs/PHASE-5-ASSESSMENT.md) 和 [安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md)。
 
 ## 2. 已定决定
 
@@ -51,7 +55,7 @@
 | D5 | 面板 tab kind 使用 guide-panel，保留原生开始页 | 已实现 |
 | D6 | 过滤/专区使用窄注册接口，适配集中在独立兼容层 | 已迁移到 sidebar adapter v1 |
 | D7 | 任务 UI 仍按"指导: "前缀识别 | 已实现；调度使用可信 provider，不能复用 UI 判据 |
-| D8 | 自动归档压力分为 25% / 50% / 75% | 已实现；调度器整体去留见 O5 |
+| D8 | 自动归档压力分为 25% / 50% / 75% | 已实现；O5 已收口为保留能力、默认关闭（D27） |
 | D9 | reserve 为硬预留 | 生产已修：C 跟 Host、R 按池、M 按 profile 全局，零预算禁入 |
 | D10 | 压力按池原生 used / Host capacity，activation 释放后不计 | 已改同源按池快照与峰值保持；idle parked 在 native release 前计入 |
 | D11 | C3 峰值保持 holdMs，none 时保留闲置累计 | 已实现，默认 120 秒 |
@@ -60,7 +64,7 @@
 | D14 | 归档停止执行，显示休眠中，可重新打开 | 已实现，接受其他 UI 仍可能可见/可输入 |
 | D15 | v1 不专门支持嵌套指导 | 已定，保留默认 depth 限制 |
 | D16 | 任务页计数与树/图使用同一过滤结果 | 已实现 |
-| D17 | 文档按职责维护，避免重复台账漂移 | 2026-11-04 合并为 7 篇，单一出处 |
+| D17 | 文档按职责维护，避免重复台账漂移 | 2026-11-04 合并核心 7 篇；2026-11-10 复核阶段文档只保留实现/验收细节，当前事实仍只在本文维护 |
 | D18 | 分两阶段局部注入，最终去掉 fork 生产依赖 | 已完成 |
 | D19 | 接受指导与主 goal 并行执行修改 | 已实现，不另建跨会话文件锁 |
 | D20 | 原任务页底部独立滚动区，保留原图/树高度 | 已实现 |
@@ -75,15 +79,16 @@
 | D29 | Q4：核心会话行转圈保持现状 | 沿用宿主显示，不调整 UI |
 | D30 | 原生组件职责与已接受边界不反复列为强制整改 | 见 [已定边界](docs/DECISIONS.md) |
 | D31 | 先维护私有 GitHub 仓库，再决定公开或市场发布 | 初始策略；2026-11-09 用户自行公开仓库，当前按 D34 执行；未发布 npm/市场 |
-| D32 | Phase 5 使用独立 manager 安装入口 + 六个独立组件包；推荐组合安装、按需独立升级 | 5A/5B/5C 本地包路径已实现；发布、来源迁移、数据迁移另行推进；不做强制 suite 依赖入口 |
-| D33 | 先接通现有 GitHub Releases 的发布清单/下载并验收，再实施当前 link 环境的一次性切换 | 2026-11-08 用户同意；5D 已完成公开首版及真实整体验收，5E 未开始；registry 来源通用迁移、跨 schema 迁移不并入首版 |
+| D32 | Phase 5 使用独立 manager 安装入口 + 六个独立组件包；推荐组合安装、按需独立升级 | 5A–5D 与 manager 1.2.0 已实现并验收；5E-0/1/2 工作区实现与默认/隔离测试完成；不做强制 suite 依赖入口。registry/git 与跨 schema 数据迁移仍未实现 |
+| D33 | 先接通现有 GitHub Releases 的发布清单/下载并验收，再实施当前 link 环境的一次性切换 | 2026-11-08 用户同意；5D 已完成公开首版及真实整体验收；本机 link 环境已于 2026-11-10 一次性切到发布包。5E 通用迁移界面/事务已实现但仍待真实 E-07 验收与发布 |
 | D34 | 用户公开仓库后采用免 token 的默认公开来源 | 2026-11-09 用户自行将仓库设为 PUBLIC；manager 内置公开来源，Release 直链 + tag/commit 核验，不使用匿名 REST API。原私有/API 配置保留，npm 包仍 private/UNLICENSED |
+| D35 | 已完成能力按现有实现记录，不再作为待讨论项 | 2026-11-10 文档复核：真实剩余范围只在 §3.4 与 [功能检查表](docs/FUNCTIONAL-TEST-MATRIX.md) 维护；已接受边界继续按 [已定边界](docs/DECISIONS.md) 执行 |
 
-其他已保留方向：模型不可见投影（O6）要做；指导结算 inject 拦截（O8）要做；seed 成本接受（O13）；归档平台可见性接受（O15）；运行中占一个槽、闲置不占的语义接受。
+其他已保留方向：模型不可见投影（O6）与指导结算 inject 拦截（O8）均已实现；seed 成本接受（O13）；归档平台可见性接受（O15）；运行中占一个槽、闲置不占的语义接受。
 
-## 3. 未完成事项
+## 3. 剩余范围与验证缺口
 
-O2/R6（含 O8 部署确认）、O6 的 BP-1～BP-3、O19/O7/R1、O12/O20/O21 及本机工程基线均已在支持基线内关闭。完整平台回归与版本兼容不能由单项关闭推定完成；建议顺序不代表授权实现全部项目。
+O2/R6（含 O8 部署确认）、O6 的 BP-1～BP-3、O19/O7/R1、O12/O20/O21 及本机工程基线均已在支持基线内关闭。完整平台回归与版本兼容不能由单项关闭推定完成；本节只保留真正剩余的扩展能力、覆盖缺口与已接受边界。
 
 ### 3.1 平台回归与版本边界
 
@@ -113,16 +118,30 @@ O2/R6 已覆盖真实 scoped closing 与 panel HMR；整个 Host graceful shutdo
 
 ### 3.4 工程维护与分发
 
-本机生产元数据仍为六组件 + manager `1.1.0`（Phase 1–4 已在 desktop 验收）；保留既有 Git、CI、link 装卸/回退路径，见 [维护手册](docs/MAINTENANCE.md)。2026-11-07 按顺序完成 5A/5B，并实现 5C 的本地包卸载、原版本修复及 manager 自升级/外部恢复。工程检查允许组件独立版本，兼容性由精确版本组合、peer、契约、宿主产物与重启健康核对约束。测试用 `1.1.1`/`1.1.2`/`1.2.0` 仅在夹具中生成，故障版不用于用户安装。当前无 registry 最新版本发现，不覆盖开发 link；组件的非稳定缓存来源需显式迁移，manager 的本地 tgz 来源在恢复时固定到缓存。本轮未切换 live 安装，live 仍是 link 部署，不能把隔离包验收当作 live 来源迁移完成。正式分发、来源迁移、跨 schema 迁移、可信源缓存找回、断电点自动恢复及外部依赖的一键代装均未实现；[功能核对与测试清单](docs/FUNCTIONAL-TEST-MATRIX.md) 逐项记录实现缺口与验证缺口。需要持续维护的是两个 adapter 的兼容边界，不是重新开启 fork 维护。
+截至 2026-11-16，本机生产安装仍是 manager `1.2.0` + 六组件 `1.1.0` 的网络发布包（正式 Release 未包含 5E 迁移代码）；开发工作区仍是源码、测试和隔离验证来源。公开仓库的正式 Release 链已跑通，七包保持 `private:true`/`UNLICENSED`，未发布 npm/市场。日常安装、升级、卸载与恢复使用官方插件页的「指导」管理页；workspace 的 `prepare`/`apply` 保留给开发 link 维护，见 [维护手册](docs/MAINTENANCE.md)。
 
-2026-11-08 已定后续顺序为 **5D 远端分发/查询/下载 → 隔离验收 → 5E link 来源迁移 → 隔离验收 → live 具体部署准备**。5D-0/5D-1 的格式校验、固定提交产物、草稿/正式发布工具及 workflow 已完成本地实现。截至 2026-11-08 未新增消费端下载/UI，也未真实上传、创建远端 tag/Release 或迁移；代码的默认完整回归与发布工具测试不等于 GitHub 托管 runner/私有仓库链路验收。生产元数据仍 1.1.0；工作区含未提交实现，真实发布需先形成包含这些实现的正式来源提交，不能把本地临时 Git 夹具提交当成真实仓库提交。详见 [发布端说明](docs/PHASE-5D-RELEASE-FORMAT.md) 和 [证据](evidence/phase5d-2026-11-08/report.md)。首版使用现有仓库私有策略与 GitHub Releases，不新增服务器；外部凭据与真实远端访问在对应验收项记录，不能用 mock 结果替代。
+已交付的分发与管理能力：5D-0/1 固定提交发布与草稿/正式发布工具；5D-2 查询、下载、缓存、准备计划；5D-3 管理页与 HTTP 接口；5D-4 公开源真实 Edge/独立桌面整体验收；manager 1.2.0 面板内自动执行、重启返回与运行核对；2026-11-10 本机一次性来源切换。2026-11-16 工作区完成 5E-0/1/2 代码与默认/隔离测试，但未生成新 Release、未部署到 live。分层证据见 [发布端说明](docs/PHASE-5D-RELEASE-FORMAT.md)、[后端](docs/PHASE-5D-CONSUMER-BACKEND.md)、[管理页](docs/PHASE-5D-HTTP-UI.md)、[真实验收](docs/PHASE-5D-REAL-ACCEPTANCE.md) 与 [安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md)。
 
-2026-11-09：5D 公开源首版已完成真实整体验收。新用户安装公开 manager tgz 后，无需 token/source.json，即可检查、下载并确认计划；实际官方 pnpm、Edge/桌面冷重启、组件与 manager 升级/恢复均通过。执行仍需外部助手，日常环境来源迁移属未开始的 5E。证据和分层边界见 [报告](evidence/phase5d4-2026-11-09/report.md)；历史事务显示文案等可选收口见 [功能清单](docs/FUNCTIONAL-TEST-MATRIX.md)。
+尚未完成/保留的扩展能力：
+
+- **5E 真实两端验收与发布**：代码、Host API、MigrationCard 与恢复入口已在工作区实现；E-07 真实 Edge/独立桌面迁移验收、新 Release 发布与 live 部署仍未执行。本机 2026-11-10 的切换是维护者一次性运维操作，不能替代 E-07。
+- **registry/git 来源迁移与任意跨 schema 数据迁移**：没有通用执行/逆向迁移框架；新版本出现真实 schema 变化时再设计。
+- **缓存损坏找回与配置语义修复**：原包缓存丢失/损坏时当前阻断，不重置用户配置或会话。
+- **断电/硬中断的通用外部恢复**：普通异常自动恢复、写锁与失败回执已实现；只读诊断→选择事务→逐断点恢复仍待扩展。
+- **外部依赖一键代装**：`guide` skill、skills manager、better-sidebar 只展示状态并提供各自入口，由其所属管理器维护。
+- **npm/市场发布**：当前只通过 GitHub Releases 分发，不发布 npm。
+
+逐项功能与测试方式见 [功能核对与测试清单](docs/FUNCTIONAL-TEST-MATRIX.md)。需要持续维护的是两个 adapter、manager、发布契约与宿主产物的兼容边界，不是重新开启 fork 维护。
 
 ## 4. 验证索引
 
 | 验证 | 最新结果 | 证据 |
 |---|---|---|
+| 默认工程检查 | 32 个 Node 进程通过；manager 145 个用例 | `npm test` / `npm run build:check` / `npm run doctor` / `npm run repo:check` |
+| 5D 公开源整体验收 | 29 个进程、120 用例、12 组真实 UI 断言；两端安装/升级/恢复/manager 升级均 `verified-running` | [真实验收](evidence/phase5d4-2026-11-09/report.md) |
+| 面板自动执行 1.2.0 | 31 个进程、135 用例；Edge/独立桌面各 8 次自动操作全部 completed、0 page error | [执行报告](evidence/one-click-2026-11-09/report.md) |
+| 5E 迁移实现（工作区） | 8 个迁移用例通过：七包清点/差异、源码漂移拒绝、精确计划、成功迁移、失败回源、快照恢复、execution 预览与 Host API；隔离 profile 真实官方 pnpm 七包迁移通过 | `guide-manager/test/migration.test.mjs` / [隔离证据](evidence/migration-acceptance-2026-11-16/report.md) / [5E 方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) |
+| 本机网络包安装 | manager 1.2.0 + 六组件 1.1.0 / ready；切换与隔离失败恢复通过 | [安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md) / [证据](evidence/install-online-2026-11-10/report.md) |
 | 原 driver/join + Cordis | 12/12 | [日志](evidence/LI-stage1-2026-11-02/final-tests.log) |
 | sidebar 核心 + 实际官方 count/auto-open 消费函数 | 5/5 | [日志](evidence/LI-stage2-2026-11-02/final-tests.log) |
 | 真实隔离 Host goal 循环 | 11 项断言通过 | [runtime-result](evidence/LI-stage2-2026-11-02/runtime-result.json) |
@@ -169,4 +188,8 @@ O2/R6 已覆盖真实 scoped closing 与 panel HMR；整个 Host graceful shutdo
 | O6 / O8 | BP-1～3 修复与 34 组 Runtime、86 项 Host、11 项浏览器验收完成 |
 | O13 / O14 / O15 | seed 成本接受 / v1 不做嵌套 / 归档可见性接受，不再反复待定 |
 | R2 / R3 | 官方安装产物已核验；旧 fork 全量测试不再是当前交付门槛 |
-| O16 | 文档已按职责合并为 7 篇，历史快照保留 |
+| O16 | 核心文档按职责维护；Phase 5 阶段文档保留实现/验收细节，当前台账统一在本文件 |
+| 5A / 5B / 5C / 5D | 首次安装、升级与版本恢复、卸载/修复/自升级、公开源发布与下载均已实现并验收 |
+| 5E-0 / 5E-1 / 5E-2 | 工作区实现清点/差异、迁移执行器、恢复入口、Host API 与 MigrationCard；默认/隔离测试通过，真实两端验收和发布未执行 |
+| manager 1.2.0 / guide-v1.3.0 | 面板自动执行与重启返回核对完成；最新正式 Release 为 manager 1.2.0 + 六组件 1.1.0 |
+| 2026-11-10 本机来源切换 | 一次性运维操作完成，七个自有包改为网络发布包固定缓存；不等于 5E 产品能力 |

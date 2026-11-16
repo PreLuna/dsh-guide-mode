@@ -4,7 +4,7 @@
 
 ## 配置与服务
 
-2026-11-09 公开源补充：manager 1.1.2 内置 `PreLuna/dsh-guide-mode`、`access:public`，未指定配置且无 profile source.json 时使用该默认值。新用户无需 token 或手写来源文件。公开查询使用 latest 附件直链，固定 tag 附件下载配合 Git 智能 HTTP 的 tag/commit 核验，不走 REST API；私有/API 路径保留。
+2026-11-09 公开源补充：manager 1.1.2 起（当前 1.2.0）内置 `PreLuna/dsh-guide-mode`、`access:public`，未指定配置且无 profile source.json 时使用该默认值。新用户无需 token 或手写来源文件。公开查询使用 latest 附件直链，固定 tag 附件下载配合 Git 智能 HTTP 的 tag/commit 核验，不走 REST API；私有/API 路径保留。
 
 manager Host 配置可提供 `source` 对象或 `sourcePath`；默认读取目标 profile 的 `.guide-manager/source.json`。格式为 5D-0 定义的 schema 1：
 
@@ -54,4 +54,4 @@ state.distribution 返回配置仓库与最近任务的状态/进度/结果；�
 
 本地测试使用真实离线 tgz、Node Response 和注入传输，覆盖查询不全量下载、单包/闭包、缓存、错 SHA、取消、重试、限流/鉴权、漂移拒绝、三类目录及离线冷安装计划验证；发布工具继续使用抽出的共享传输并保留回归。证据见 [本轮报告](../evidence/phase5d-2026-11-09/report.md)。
 
-5D-4 已实际发布并验证公开源、官方 pnpm 与 Edge/Electron 安装/升级/恢复；无 token/source.json 的默认引导通过。没有实施 live 来源迁移或模型推理；后续为独立的 5E。
+5D-4 已实际发布并验证公开源、官方 pnpm 与 Edge/Electron 安装/升级/恢复；无 token/source.json 的默认引导通过。2026-11-10 本机 desktop 已一次性切换到发布包并核对 `verified-running`，这是维护者运维操作；工作区已增加 5E 查询准备 kind、迁移界面/事务与恢复入口，尚未发布或完成真实两端验收，也没有发起模型推理。

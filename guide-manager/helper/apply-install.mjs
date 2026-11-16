@@ -20,6 +20,7 @@ export function validateInstallPlan(plan, path) {
   const manifest = readJson(join(plan.profile.dir, 'package.json'))
   if (existsSync(join(plan.profile.dir, '.guide-manager', 'pending.json'))) throw new Error('cold-toggle-pending')
   if (existsSync(join(plan.profile.dir, '.guide-manager', 'maintenance-pending.json'))) throw new Error('maintenance-operation-pending')
+  if (existsSync(join(plan.profile.dir, '.guide-manager', 'migration-pending.json'))) throw new Error('migration-operation-pending')
   if (existsSync(join(plan.profile.dir, '.guide-manager', 'install-result.json')) && readJson(join(plan.profile.dir, '.guide-manager', 'install-result.json')).status === 'recovery-required') throw new Error('install-recovery-required')
   for (const entry of plan.entries) {
     const known = release.catalog.components.find((item) => item.key === entry.key)
@@ -60,6 +61,25 @@ export async function officialRuntime() {
     }),
     saveManifest: operations.saveManifest,
     writePluginEnabled,
+    yaml,
+    removeImporterEntries(profile, names) {
+      const path = join(profile.dir, 'pnpm-lock.yaml')
+      if (!existsSync(path)) throw new Error('migration-lockfile-unavailable')
+      const text = readFileSync(path, 'utf8')
+      const document = yaml.parseDocument(text)
+      if (document.errors.length) throw new Error('invalid-profile-yaml')
+      const before = document.toJS()
+      if (!before.importers?.['.']?.dependencies || typeof before.importers['.']?.dependencies !== 'object') throw new Error('unsupported-lockfile-importer-layout')
+      for (const name of names) document.deleteIn(['importers', '.', 'dependencies', name])
+      const after = document.toJS()
+      const strip = (value) => {
+        const copy = structuredClone(value)
+        for (const name of names) delete copy.importers['.'].dependencies[name]
+        return copy
+      }
+      if (fingerprint(strip(before)) !== fingerprint(strip(after))) throw new Error('lockfile-update-escaped-owned-importers')
+      if (fingerprint(before) !== fingerprint(after)) writeFileSync(path, document.toString({ lineWidth: 0 }))
+    },
     enabledEntries(plan) {
       const rows = configurationRows({ ...plan.profile, patchPath: join(plan.profile.dir, 'cordis.patch.yml') })
       return plan.entries.map((entry) => ({ ...entry, enabled: rows.some((row) => row.id === INSTALL_ROWS[entry.key]?.[0] && row.disabled !== true) }))

@@ -13,7 +13,7 @@ function validate(plan, path) {
   if (id !== fingerprint(body) || plan.blockers?.length !== 0 || !Array.isArray(plan.entries) || !plan.entries.length) throw new Error('invalid-package-plan-fingerprint')
   const profile = plan.profile.dir
   if (fingerprint(profileSnapshot(profile)) !== fingerprint(plan.before) || fingerprint(installedPackageHashes(profile, plan.entries)) !== fingerprint(plan.packageHashes)) throw new Error('stale-package-profile')
-  for (const name of ['pending.json', 'install-pending.json', 'maintenance-pending.json']) if (existsSync(join(profile, '.guide-manager', name))) throw new Error('another-operation-pending')
+  for (const name of ['pending.json', 'install-pending.json', 'maintenance-pending.json', 'migration-pending.json']) if (existsSync(join(profile, '.guide-manager', name))) throw new Error('another-operation-pending')
   const resultPath = join(profile, '.guide-manager', 'package-result.json')
   if (existsSync(resultPath) && readJson(resultPath).status === 'recovery-required') throw new Error('package-recovery-required')
   if (plan.kind === 'package-restore') {

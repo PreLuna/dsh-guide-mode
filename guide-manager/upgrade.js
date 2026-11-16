@@ -42,11 +42,13 @@ export function installedPackageHashes(profile, entries) {
 }
 
 function assertNoPending(profile) {
-  for (const name of ['pending.json', 'install-pending.json', 'package-pending.json', 'maintenance-pending.json']) if (existsSync(join(profile, '.guide-manager', name))) throw new Error(`another-operation-pending:${name}`)
+  for (const name of ['pending.json', 'install-pending.json', 'package-pending.json', 'maintenance-pending.json', 'migration-pending.json']) if (existsSync(join(profile, '.guide-manager', name))) throw new Error(`another-operation-pending:${name}`)
   const maintenance = join(profile, '.guide-manager', 'maintenance-result.json')
   if (existsSync(maintenance) && ['applying', 'recovery-required', 'invalid'].includes(readJson(maintenance).status)) throw new Error('maintenance-recovery-required')
   const result = packageView(profile).result
   if (['upgrading', 'restoring', 'recovery-required', 'invalid'].includes(result?.status)) throw new Error('package-recovery-required')
+  const migration = join(profile, '.guide-manager', 'migration-result.json')
+  if (existsSync(migration) && ['migrating', 'recovery-required', 'invalid'].includes(readJson(migration)?.status)) throw new Error('migration-recovery-required')
 }
 
 export function createUpgradePlan(state, release, targets, expectedHost) {

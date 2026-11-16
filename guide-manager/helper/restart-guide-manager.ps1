@@ -6,6 +6,7 @@
     (default)  apply pending.json, then restart DSH
     -Reload    only stop and restart DSH so changed local link sources load
     -Rollback  restore the newest cordis.patch.yml backup, then restart DSH
+    -Migration apply a confirmed link-to-release migration, then restart DSH
 
   Double-click restart-guide-manager.cmd, reload-guide-manager.cmd, or
   rollback-guide-manager.cmd. Only `DeepSeek Harness` processes are stopped;
@@ -21,6 +22,9 @@ param(
   [switch]$Install,
   [switch]$PackageChange,
   [switch]$Maintenance,
+  [switch]$Migration,
+  [switch]$RecoverMigration,
+  [string]$TransactionId = '',
   [string]$LaunchRecord = '',
   [switch]$NoRestart,
   [switch]$GracefulOnly,
@@ -30,11 +34,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $profileDir = [IO.Path]::GetFullPath($Profile)
-$modeCount = @($Reload, $Rollback, $Install, $PackageChange, $Maintenance).Where({ $_ }).Count
+$modeCount = @($Reload, $Rollback, $Install, $PackageChange, $Maintenance, $Migration, $RecoverMigration).Where({ $_ }).Count
 if ($modeCount -gt 1) { throw 'Choose exactly one helper mode' }
-$pendingName = if ($Maintenance) { 'maintenance-pending.json' } elseif ($PackageChange) { 'package-pending.json' } elseif ($Install) { 'install-pending.json' } else { 'pending.json' }
+$pendingName = if ($Maintenance) { 'maintenance-pending.json' } elseif ($PackageChange) { 'package-pending.json' } elseif ($Migration) { 'migration-pending.json' } elseif ($Install) { 'install-pending.json' } else { 'pending.json' }
 $pendingPath = if ($Pending -eq '') { Join-Path (Join-Path $profileDir '.guide-manager') $pendingName } else { [IO.Path]::GetFullPath($Pending) }
-$applyName = if ($Maintenance) { 'apply-maintenance.mjs' } elseif ($PackageChange) { 'apply-package.mjs' } elseif ($Install) { 'apply-install.mjs' } else { 'apply-pending.mjs' }
+$applyName = if ($Maintenance) { 'apply-maintenance.mjs' } elseif ($PackageChange) { 'apply-package.mjs' } elseif ($Migration) { 'apply-migration.mjs' } elseif ($Install) { 'apply-install.mjs' } else { 'apply-pending.mjs' }
 $applyScript = Join-Path $here $applyName
 $stateDir = Join-Path $profileDir '.guide-manager'
 $backupDir = Join-Path $stateDir 'backups'
@@ -211,6 +215,8 @@ function Start-Dsh {
 if (-not (Test-Path -LiteralPath $DshExe)) { throw "DSH executable not found: $DshExe" }
 if ($Install -and ($Reload -or $Rollback)) { throw 'Install cannot be combined with Reload or Rollback' }
 if ($PackageChange -and ($Install -or $Reload -or $Rollback)) { throw 'PackageChange cannot be combined with another mode' }
+if ($Migration -and ($Install -or $PackageChange -or $Maintenance -or $Reload -or $Rollback)) { throw 'Migration cannot be combined with another mode' }
+if ($RecoverMigration -and ($Install -or $PackageChange -or $Maintenance -or $Migration -or $Reload -or $Rollback)) { throw 'RecoverMigration cannot be combined with another mode' }
 
 if ($Reload) {
   Write-Log 'reload mode: restart DSH so local-source changes load.'
@@ -259,6 +265,38 @@ if ($Rollback) {
   exit 0
 }
 
+if ($RecoverMigration) {
+  if ($TransactionId -notmatch '^\d{13}-[a-f0-9]{12}$') { throw 'A migration transaction id is required' }
+  $recoverScript = Join-Path $here 'recover-migration.mjs'
+  if (-not (Test-Path -LiteralPath $recoverScript)) { throw "recover-migration.mjs not found: $recoverScript" }
+  $stopped = $false
+  $status = 'failed'
+  $errorMessage = $null
+  try {
+    $stopped = Stop-Dsh
+    if ($stopped) { Write-Log 'DSH is stopped.' }
+    if ((Get-DshProcesses).Count -gt 0) { throw 'DSH is still running; refusing to patch a live profile.' }
+    $savedNodeMode = $env:ELECTRON_RUN_AS_NODE
+    try {
+      $env:ELECTRON_RUN_AS_NODE = '1'
+      & $DshExe --expose-internals $recoverScript $profileDir $TransactionId 2>&1 | ForEach-Object { Add-Content -LiteralPath $logPath -Value $_ -Encoding utf8; Write-Output $_ }
+      $recoverExit = $LASTEXITCODE
+    } finally { $env:ELECTRON_RUN_AS_NODE = $savedNodeMode }
+    if ($recoverExit -ne 0) { throw "recover-migration.mjs failed (exit $recoverExit)" }
+    $status = 'recovered'
+  } catch {
+    $errorMessage = $_.Exception.Message
+    Write-Log "FAILED: $errorMessage"
+  } finally {
+    if ($stopped -and $status -eq 'recovered') {
+      try { Start-Dsh } catch { Write-Log "restart failed: $($_.Exception.Message)" }
+    }
+    Write-Result $status @{ stoppedDsh = $stopped; transactionId = $TransactionId; error = $errorMessage }
+  }
+  if ($status -ne 'recovered') { throw $errorMessage }
+  exit 0
+}
+
 if (-not (Test-Path -LiteralPath $pendingPath)) {
   Write-Log "no pending intent: $pendingPath"
   Write-Result 'nothing-pending'
@@ -267,11 +305,11 @@ if (-not (Test-Path -LiteralPath $pendingPath)) {
 if (-not (Test-Path -LiteralPath $applyScript)) { throw "apply-pending.mjs not found: $applyScript" }
 
 $pendingDocument = Get-Content -LiteralPath $pendingPath -Raw -Encoding utf8 | ConvertFrom-Json
-$intentProfile = if ($Install -or $PackageChange -or $Maintenance) { [string]$pendingDocument.profile.dir } else { [string]$pendingDocument.profile }
+$intentProfile = if ($Install -or $PackageChange -or $Maintenance -or $Migration) { [string]$pendingDocument.profile.dir } else { [string]$pendingDocument.profile }
 if ([IO.Path]::GetFullPath($intentProfile) -ne $profileDir) {
   throw "Pending intent belongs to another profile: $($pendingDocument.profile)"
 }
-$operationLabel = if ($Maintenance) { 'maintenance' } elseif ($PackageChange) { 'package upgrade/recovery' } elseif ($Install) { 'first installation' } else { 'cold component intents' }
+$operationLabel = if ($Maintenance) { 'maintenance' } elseif ($PackageChange) { 'package upgrade/recovery' } elseif ($Migration) { 'link-source migration' } elseif ($Install) { 'first installation' } else { 'cold component intents' }
 Write-Log "applying $operationLabel; profile=$profileDir"
 
 $stopped = $false
@@ -285,8 +323,8 @@ try {
   Write-Log "running $applyScript"
   & $DshExe --expose-internals $applyScript $pendingPath 2>&1 | ForEach-Object { Add-Content -LiteralPath $logPath -Value $_ -Encoding utf8; Write-Output $_ }
   $applyExit = $LASTEXITCODE
-  if ($Install -or $PackageChange -or $Maintenance) {
-    $receiptName = if ($Maintenance) { 'maintenance-result.json' } elseif ($PackageChange) { 'package-result.json' } else { 'install-result.json' }
+  if ($Install -or $PackageChange -or $Maintenance -or $Migration) {
+    $receiptName = if ($Maintenance) { 'maintenance-result.json' } elseif ($PackageChange) { 'package-result.json' } elseif ($Migration) { 'migration-result.json' } else { 'install-result.json' }
     $installResultPath = Join-Path $stateDir $receiptName
     if (Test-Path -LiteralPath $installResultPath) {
       try {
@@ -295,13 +333,13 @@ try {
         $status = 'recovery-required'
         throw 'Installation receipt is unreadable; DSH will remain stopped until the profile is checked.'
       }
-      if ($installReceipt.status -in @('recovery-required', 'installing', 'upgrading', 'restoring', 'applying')) {
+      if ($installReceipt.status -in @('recovery-required', 'installing', 'upgrading', 'restoring', 'applying', 'migrating')) {
         $status = 'recovery-required'
         throw 'Installation was interrupted or dependency recovery failed; DSH will remain stopped. See install-result.json and its backup.'
       }
     }
   }
-  if (($Install -or $PackageChange -or $Maintenance) -and $applyExit -eq 3) {
+  if (($Install -or $PackageChange -or $Maintenance -or $Migration) -and $applyExit -eq 3) {
     $status = 'recovery-required'
     throw 'Dependency restoration requires manual repair; DSH will remain stopped. See install-result.json and its backup.'
   }

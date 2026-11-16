@@ -1,10 +1,10 @@
 # Phase 5C：卸载、修复与管理器升级
 
-更新：2026-11-07。实现范围为私有、本地 tarball 分发，沿用 [Phase 5](PHASE-5-ASSESSMENT.md) 的独立 manager + 六组件方案。真实验收结果见 [本轮报告](../evidence/phase5c-2026-11-07/report.md)，后续缺口与功能测试见 [检查表](FUNCTIONAL-TEST-MATRIX.md)。
+更新：2026-11-10。实现范围最初为私有、本地 tarball 分发，沿用 [Phase 5](PHASE-5-ASSESSMENT.md) 的独立 manager + 六组件方案；后续 5D 接入公开 GitHub Release 来源，manager 1.2.0 增加面板自动执行。真实验收结果见 [本轮报告](../evidence/phase5c-2026-11-07/report.md)，后续缺口与功能测试见 [检查表](FUNCTIONAL-TEST-MATRIX.md)。
 
 ## 使用路径
 
-管理页新增“卸载、修复与管理器升级”。选择组件 → 预览 → 确认准备 → 保存工作 → 运行页面给出的、含目标 profile 的外部助手。浏览器刷新可恢复 pending/结果；助手只停止目标实例，并按原 home/profile/启动方式重启。成功回执先表示包操作完成，新 Host 核对运行状态后才显示 `verified-running`。
+管理页新增“卸载、修复与管理器升级”。选择组件 → 预览精确计划 → 保存工作 → 确认执行。manager 1.2.0 会自动启动执行器、停止目标实例、执行包操作并重启返回核对；旧版或故障恢复仍可运行页面给出的外部助手。浏览器刷新可恢复 pending/结果；助手只停止目标实例，并按原 home/profile/启动方式重启。成功回执先表示包操作完成，新 Host 核对运行状态后才显示 `verified-running`。
 
 | 操作 | 实际行为 | 保护与限制 |
 |---|---|---|
@@ -32,7 +32,7 @@ profile patch 用 YAML AST 只清理目标 id/name 的覆盖、insert 行和 gro
 node scripts/prepare-manager-catalog.mjs --release dist/release-a/manager-catalog.json --release dist/release-b/manager-catalog.json --output dist/manager-catalog.json
 ```
 
-给 manager Host config 设置绝对 `managerCatalogPath`，或将目录放到目标 profile 的 `.guide-manager/manager-catalog.json`。同版本不同字节拒绝合并。目录只选择 manager 白名单包，不能由 HTTP 客户端传任意 npm spec/脚本/下载 URL。默认无远端“检查更新”；registry 安装的 manager 仍可在官方插件页维护，本轮面板的自升级入口面向可信本地 tarball。
+给 manager Host config 设置绝对 `managerCatalogPath`，或将目录放到目标 profile 的 `.guide-manager/manager-catalog.json`。同版本不同字节拒绝合并。目录只选择 manager 白名单包，不能由 HTTP 客户端传任意 npm spec/脚本/下载 URL。manager 1.2.0 已默认连接公开远端来源检查更新，也能从远端准备目录执行同协议自升级；本地 `managerCatalogPath` 继续用于隔离验收和恢复，registry 安装的 manager 仍可在官方插件页维护。
 
 准备维护时将当前 manager 的执行代码和 helper 复制到：
 
@@ -50,7 +50,7 @@ node scripts/prepare-manager-catalog.mjs --release dist/release-a/manager-catalo
 
 省略 `-TransactionId` 时选择最近一次尚未恢复的成功 manager 升级；仍严格核对该事务后的 profile 快照。脚本先生成恢复计划，等待 Electron Node 完成后，才调用同目录的生产停机助手。恢复只依赖旧包备份与外部副本；新包原发布文件、缓存或入口缺失也可恢复。若旧包恢复也失败，保持停止并记录 `recovery-required`。
 
-管理器最初通过官方插件页安装的 `file:<原 tgz>` 可以升级；事务保存原包。恢复时旧 manager 的来源规范化到本 profile 的 SHA 缓存，避免未来依赖临时发布目录。因此 manager 恢复保证旧包字节及其余配置恢复，**不承诺恢复原 tgz 路径或旧 lockfile 字节**。这与 5B 组件的精确旧锁恢复不同，预览提示该差异。生产版本目前保持 1.1.0；故障版仅在测试夹具产生。
+管理器最初通过官方插件页安装的 `file:<原 tgz>` 可以升级；事务保存原包。恢复时旧 manager 的来源规范化到本 profile 的 SHA 缓存，避免未来依赖临时发布目录。因此 manager 恢复保证旧包字节及其余配置恢复，**不承诺恢复原 tgz 路径或旧 lockfile 字节**。这与 5B 组件的精确旧锁恢复不同，预览提示该差异。当前生产安装为 manager 1.2.0 + 六组件 1.1.0；故障版仅在测试夹具产生。
 
 ## 事务与故障处理
 
