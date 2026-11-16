@@ -102,7 +102,7 @@ Host config.source 或 sourcePath（默认 profile/.guide-manager/source.json）
 
 “开发 link 来源迁移”区只读列出七个自有包的 `link:`/固定来源、源码路径与版本；点击“下载并准备迁移”后，从当前 Release 准备六个组件与 manager 的目标 tgz，并生成绑定四文件、源码文件哈希、目标 SHA 和 catalog 的迁移计划。确认后写入 `migration-pending.json`，由 execution 自动执行或手动 `helper/migrate-guide-manager.cmd` 执行。
 
-`helper/apply-migration.mjs` 在 profile 官方锁内备份四文件与源码快照，删除目标包旧 lock importer 解析，经官方 pnpm 安装固定缓存 tgz，核对版本/契约/宿主/启停配置；失败恢复原 link，原源码缺失时从快照重建 `link:` 来源。`helper/recover-migration.mjs` 由控制器副本执行事务级恢复；`restart-guide-manager.ps1 -RecoverMigration -TransactionId <id>` 是对外入口。真实 Edge/桌面验收和新 Release 尚未执行。
+`helper/apply-migration.mjs` 在 profile 官方锁内备份四文件与源码快照，删除目标包旧 lock importer 解析，经官方 pnpm 安装固定缓存 tgz，核对版本/契约/宿主/启停配置；失败恢复原 link，原源码缺失时从快照重建 `link:` 来源。`helper/recover-migration.mjs` 由控制器副本执行事务级恢复；`restart-guide-manager.ps1 -RecoverMigration -TransactionId <id>` 是对外入口。独立 Electron 桌面 E-07 已通过，`guide-v1.4.0` 已发布并部署到 live；真实 Edge 浏览器 UI 仍未单独验收。
 
 ```text
 POST /guide-manager/api/migration/plan    # { catalogPath, managerCatalogPath, components?, managerVersion? }
