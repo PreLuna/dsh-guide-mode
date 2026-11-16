@@ -37,4 +37,4 @@ targets 为 `[{key,version}]`。source 路由仅支持 POST；未知动作 404�
 
 可选真实 Edge 页面测试：先用 `setup-acceptance.mjs` 在新的证据目录创建隔离 profile，再执行 `python guide-manager/test/source-ui.py <目录>`。它在官方 Host 中加载实际 manager/React，拦截浏览器 source/state 响应以测试页面渲染、轮询、取消重试、刷新与确认；不代替 HTTP 测试或真实 GitHub 验收。只关闭记录 PID/创建时间的自有测试进程，并核对页面操作前后的四文件与既有 DSH 进程。
 
-5D-4 的 D-01～D-07 已按公开源方向分层验收；实际发布与两端操作不再只依赖夹具。来源不可用通过隔离来源故障注入验证，不称为物理断网。manager 1.2.0 已在此页面上增加“确认执行并重启”的自动执行衔接；本机 desktop 于 2026-11-10 一次性切到发布包。工作区已增加 5E MigrationCard 与 `/migration` 接口，尚未发布或完成真实两端验收。
+5D-4 的 D-01～D-07 已按公开源方向分层验收；实际发布与两端操作不再只依赖夹具。来源不可用通过隔离来源故障注入验证，不称为物理断网。manager 1.2.0 已在此页面上增加“确认执行并重启”的自动执行衔接；本机 desktop 于 2026-11-10 一次性切到发布包。5E MigrationCard 与 `/migration` 接口已随 manager 1.3.0 发布，独立 Electron E-07 通过，live 已升级；真实 Edge UI 待补。

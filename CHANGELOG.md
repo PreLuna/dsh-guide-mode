@@ -2,7 +2,8 @@
 
 ## manager 1.3.0 / guide-v1.4.0 — 2026-11-16
 
-- Implement 5E-0/1/2 in the workspace: read-only inventory of the seven owned `link:` dependencies, source-vs-release file diff, exact migration plans bound to profile/source/target hashes, cold migration executor with four-file and source snapshots, target importer cleanup, pinned tgz installation, failure restore to original links or source snapshots, transaction recovery, `/migration/plan|stage|cancel`, and the manager MigrationCard. Default tests: 8 migration cases; an isolated profile also migrated all seven links using real official pnpm and real tgz (see [migration acceptance](evidence/migration-acceptance-2026-11-16/report.md)). This is not published to a Release or deployed to live; real Edge/desktop E-07 acceptance remains pending.
+- Implement 5E-0/1/2: read-only inventory of the seven owned `link:` dependencies, source-vs-release file diff, exact migration plans bound to profile/source/target hashes, cold migration executor with four-file and source snapshots, target importer cleanup, pinned tgz installation, failure restore to original links or source snapshots, transaction recovery, `/migration/plan|stage|cancel`, and the manager MigrationCard.
+- Validation: 8 migration default tests; an isolated profile migrated all seven links using real official pnpm and real tgz; real isolated Electron desktop E-07 prepared, confirmed and restarted through the UI with `verified-running` (see [migration acceptance](evidence/migration-acceptance-2026-11-16/report.md) / [E-07](evidence/migration-e07-2026-11-16/report.md)). Published as `guide-v1.4.0` (commit `bf9e51e`) and deployed to live as manager 1.3.0. Real Edge browser UI remains a separate validation gap.
 
 ## 2026-11-10 — 本机来源切换（workspace operation）
 

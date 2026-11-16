@@ -50,7 +50,7 @@ node scripts/prepare-manager-catalog.mjs --release dist/release-a/manager-catalo
 
 省略 `-TransactionId` 时选择最近一次尚未恢复的成功 manager 升级；仍严格核对该事务后的 profile 快照。脚本先生成恢复计划，等待 Electron Node 完成后，才调用同目录的生产停机助手。恢复只依赖旧包备份与外部副本；新包原发布文件、缓存或入口缺失也可恢复。若旧包恢复也失败，保持停止并记录 `recovery-required`。
 
-管理器最初通过官方插件页安装的 `file:<原 tgz>` 可以升级；事务保存原包。恢复时旧 manager 的来源规范化到本 profile 的 SHA 缓存，避免未来依赖临时发布目录。因此 manager 恢复保证旧包字节及其余配置恢复，**不承诺恢复原 tgz 路径或旧 lockfile 字节**。这与 5B 组件的精确旧锁恢复不同，预览提示该差异。当前生产安装为 manager 1.2.0 + 六组件 1.1.0；故障版仅在测试夹具产生。
+管理器最初通过官方插件页安装的 `file:<原 tgz>` 可以升级；事务保存原包。恢复时旧 manager 的来源规范化到本 profile 的 SHA 缓存，避免未来依赖临时发布目录。因此 manager 恢复保证旧包字节及其余配置恢复，**不承诺恢复原 tgz 路径或旧 lockfile 字节**。这与 5B 组件的精确旧锁恢复不同，预览提示该差异。当前生产安装为 manager 1.3.0 + 六组件 1.1.0；故障版仅在测试夹具产生。
 
 ## 事务与故障处理
 
