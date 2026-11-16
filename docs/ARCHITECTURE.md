@@ -6,7 +6,7 @@
 
 ## 当前部署形态（2026-11-16）
 
-工作区是源码、测试和隔离验证的来源。本机 desktop 的七个自有依赖已指向 profile `.guide-manager/package-cache/<sha256>.tgz`，来自公开 Release `guide-v1.4.0`：manager `1.3.0`，六组件 `1.1.0`，升级回执 `verified-running`。其他插件、bundle、`cordis.patch.yml` 与 workspace 配置保持原样。开发 link 部署仍可通过 workspace `prepare`/`apply-profile.ps1` 建立，不覆盖当前 live 包缓存。运维记录见 [早期安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md) 与 [manager 升级](evidence/live-manager-upgrade-2026-11-16/live-manager-upgrade-result.json)。
+工作区是源码、测试和隔离验证的来源。本机 desktop 的七个自有依赖已指向 profile `.guide-manager/package-cache/<sha256>.tgz`，来自公开 Release `guide-v1.4.0`：manager `1.3.0`，六组件 `1.1.0`，升级回执 `verified-running`。其他插件、bundle、`cordis.patch.yml` 与 workspace 配置保持原样。开发 link 部署仍可通过 workspace `prepare`/`apply-profile.ps1` 建立，不覆盖当前 live 包缓存。运维记录见 [早期安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md) 与 [manager 升级](../evidence/live-manager-upgrade-2026-11-16/live-manager-upgrade-result.json)。
 
 ## 会话、preset 与上下文
 
