@@ -81,6 +81,7 @@ $env:ELECTRON_RUN_AS_NODE = '1'
 - `guide-manager/test/recovery.test.mjs`：5 个用例（install 诊断/恢复、package 诊断/恢复、maintenance 恢复、缺失备份不声称可恢复）；
 - `guide-manager/test/remote.test.mjs`：新增 1 个公开源缓存重建用例；
 - 全量：34 个 Node 进程、manager 155 用例通过。
+- 隔离夹具：删除真实缓存并由本地 catalog 重建；制造 install 中断备份并用真实 Electron Node/官方 pnpm 恢复，现场见 [隔离验收](../evidence/phase5f-2026-11-17/report.md)。
 
 尚未执行：真实进程强杀/断电注入、真实损坏缓存现场、发布与 live 部署。当前 live 仍为 manager 1.3.0，不包含本页 5F 代码。
 

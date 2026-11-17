@@ -34,7 +34,7 @@
 | Phase 5 面板内自动执行 | 实现与真实两端验收完成（2026-11-09） | manager 1.2.0；31 个默认测试进程、manager 135 用例；Edge/独立桌面各 8 次面板自动执行全部 completed，重启后返回可见指导页并核对，0 page error。六组件来自真实公开源，manager 自升级用明确本地测试目标 1.2.1；原生 PowerShell 5.1 外部恢复亦通过；[说明](docs/PHASE-5-PANEL-EXECUTION.md) / [证据](evidence/one-click-2026-11-09/report.md) |
 | 本机网络包安装测试 | 完成（2026-11-10） | 用户确认重启后，日常七个自有包已从 link 切换为网上下载的 SHA 固定发布包：manager 1.2.0、六组件 1.1.0 / ready；隔离失败恢复及真实桌面核对通过。其他插件、配置和原源码保留；[安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md) |
 | Phase 5E 通用 link 来源迁移 | 已发布并完成独立 Electron 桌面 E-07；真实 Edge 浏览器 UI 未单独验收 | `guide-v1.4.0` / manager 1.3.0；`migration.js`、`apply-migration.mjs`、恢复脚本、Host `/migration` 接口与 MigrationCard；隔离 profile 使用真实官方 pnpm 完成七包迁移，独立 Electron 桌面完成真实 UI 点击与自动重启核对。live 已升级；[方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) / [隔离证据](evidence/migration-acceptance-2026-11-16/report.md) / [E-07](evidence/migration-e07-2026-11-16/report.md) |
-| Phase 5F 硬中断恢复与缓存重建 | 工作区实现与默认测试完成；真实故障注入/新 Release 未执行 | `recovery.js` 只读诊断、`recover-hard-interrupt.mjs` 对 install/package/maintenance/manager 事务恢复、管理页恢复提示；`cache.js` 缺失/损坏缓存清点、SHA 校验重建、`/source/cache`、CacheCard 与离线 `rebuild-cache.mjs`。5 个恢复用例、4 个缓存用例、1 个远端重建用例；live 仍为 manager 1.3.0；[5F 说明](docs/PHASE-5F-RECOVERY.md) / [功能矩阵](docs/FUNCTIONAL-TEST-MATRIX.md) |
+| Phase 5F 硬中断恢复与缓存重建 | 工作区实现、默认测试与隔离恢复/缓存夹具通过；真实强杀/断电注入与新 Release 未执行 | `recovery.js` 只读诊断、`recover-hard-interrupt.mjs` 对 install/package/maintenance/manager 事务恢复、管理页恢复提示；`cache.js` 缺失/损坏缓存清点、SHA 校验重建、`/source/cache`、CacheCard 与离线 `rebuild-cache.mjs`。5 个恢复用例、4 个缓存用例、1 个远端重建用例；隔离缓存重建与 install 恢复夹具通过；live 仍为 manager 1.3.0；[5F 说明](docs/PHASE-5F-RECOVERY.md) / [隔离验收](evidence/phase5f-2026-11-17/report.md) / [功能矩阵](docs/FUNCTIONAL-TEST-MATRIX.md) |
 | O11 / PT-6 | 暂缓，保留当前设计 | 原生结果卡与测试保留；默认沙箱 failed、无沙箱对照 45/45 passed，不改写为整体通过；[报告](evidence/O11-validation-2026-11-04/pt6/report.md) |
 | O11 / RM-3/5/7 | 按宿主默认机制收口 | 接受 persona／压缩／重试与上下文复制成本；[验收取舍](docs/DECISIONS.md) |
 | O11 / 多 pane、Git 与归档补测 | 主流程通过，边界已接受或划出范围 | 同 child 重复视图残留接受现状；原生编辑关闭保护不列为插件任务；[范围](docs/DECISIONS.md) / [报告](evidence/O11-residual-check-2026-11-04/report.md) |
@@ -126,7 +126,7 @@ O2/R6 已覆盖真实 scoped closing 与 panel HMR；整个 Host graceful shutdo
 尚未完成/保留的扩展能力：
 
 - **5E 真实 Edge 浏览器 UI**：独立 Electron 桌面 E-07 已通过并已发布/live 部署；真实 Edge 浏览器中的 MigrationCard 点击链路尚未单独运行。本机 2026-11-10 的切换是维护者一次性运维操作，不能替代 E-07；E-07 证据见 [报告](evidence/migration-e07-2026-11-16/report.md)。
-- **5F 发布与真实故障注入**：硬中断恢复/缓存重建已在工作区实现并通过默认测试，尚未生成新 Release、未部署 live；真实断电/进程强杀与损坏缓存现场注入仍待补。
+- **5F 发布与真实故障注入**：硬中断恢复/缓存重建已在工作区实现并通过默认测试及隔离缓存/install 恢复夹具；尚未生成新 Release、未部署 live；真实断电/进程强杀仍待补。
 - **registry/git 来源迁移与任意跨 schema 数据迁移**：没有通用执行/逆向迁移框架；新版本出现真实 schema 变化时再设计。
 - **配置语义修复**：缓存文件已可按 SHA 重建；但不重置/推断用户配置语义，损坏配置仍需人工处理。
 - **任意断电点的完全自动恢复**：已有只读诊断、显式事务恢复和普通异常自动修复；没有针对所有断点的无人工自动恢复，也不盲删 pending。
