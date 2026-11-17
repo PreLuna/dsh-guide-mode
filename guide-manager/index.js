@@ -21,6 +21,8 @@ import { catalogView, createInstallPlan, installView, readCatalog, stageInstall 
 import { createRestorePlan, createUpgradePlan, packageView, readUpgradeCatalog, stagePackagePlan, upgradeCatalogView } from './upgrade.js'
 import { cancelMaintenance, createMaintenancePlan, maintenanceView, managerCatalogView, stageMaintenance } from './maintenance.js'
 import { cancelMigration, createMigrationPlan, migrationInventory, migrationView, stageMigration } from './migration.js'
+import { cachePlanView, cacheView } from './cache.js'
+import { recoveryView } from './recovery.js'
 import { createRemoteManager } from './remote.js'
 import { createExecutionController } from './execution.js'
 const remoteManagers = new WeakMap()
@@ -48,6 +50,8 @@ const HELPER_ROLLBACK = join(PACKAGE_DIR, 'helper', 'rollback-guide-manager.cmd'
 const HELPER_INSTALL = join(PACKAGE_DIR, 'helper', 'install-guide-manager.cmd')
 const HELPER_PACKAGE = join(PACKAGE_DIR, 'helper', 'update-guide-manager.cmd')
 const HELPER_MIGRATION = join(PACKAGE_DIR, 'helper', 'migrate-guide-manager.cmd')
+const HELPER_HARD_RECOVERY = join(PACKAGE_DIR, 'helper', 'recover-hard-interrupt.mjs')
+const HELPER_CACHE_REBUILD = join(PACKAGE_DIR, 'helper', 'rebuild-cache.mjs')
 const PENDING_VERSION = 1
 const HOST_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
@@ -634,6 +638,10 @@ async function collectState(ctx, config = {}) {
   if (supersededBy(packageReceipt, [receipt, maintenanceReceipt, migrationReceipt])) state.packageManagement.verification = 'superseded'
   if (supersededBy(maintenanceReceipt, [receipt, packageReceipt, migrationReceipt])) state.maintenance.verification = 'superseded'
   state.distribution = remoteManagers.get(ctx)?.view() ?? { configured: false }
+  state.cache = profileContext?.dir
+    ? { ...cacheView(profileContext), plan: cachePlanView(profileContext, [catalogPathOf(ctx, config), managerCatalogPathOf(ctx, config)]), helper: HELPER_CACHE_REBUILD }
+    : { entries: [], issues: [], healthy: false, plan: null, helper: HELPER_CACHE_REBUILD }
+  state.recovery = { ...recoveryView(profileContext?.dir ? profileContext : null), helper: HELPER_HARD_RECOVERY, profileDir: profileContext?.dir ?? null }
   state.execution = executionManagers.get(ctx)?.view(state) ?? { available: false, active: false }
   state.warnings = buildWarnings(state)
   return state
@@ -1033,6 +1041,7 @@ export async function apply(ctx, config = {}) {
   }
   const sourceActions = {
     check: (p) => { sourcePayload(p, []); return remote.check() },
+    cache: (p) => { sourcePayload(p, ['snapshotId']); return remote.rebuildCache(p.snapshotId) },
     prepare: async (p) => { sourcePayload(p, ['kind', 'snapshotId', 'components', 'targets', 'version']); return remote.prepare(p, await getState()) },
     task: (p) => { sourcePayload(p, ['taskId']); return remote.task(p.taskId) },
     cancel: (p) => { sourcePayload(p, ['taskId']); return remote.cancel(p.taskId) },
@@ -1045,7 +1054,7 @@ export async function apply(ctx, config = {}) {
   }
   ctx.provide('guideManager', { getState, setComponentEnabled: setEnabled, planInstallation: installActions.plan, prepareInstallation: installActions.stage, cancelInstallation: installActions.cancel,
     planExecution: executionActions.plan, startExecution: executionActions.start, acknowledgeExecution: executionActions.ack,
-    checkSource: remote.check, prepareSource: async (payload) => remote.prepare(payload, await getState()),
+    checkSource: remote.check, rebuildCache: (snapshotId) => remote.rebuildCache(snapshotId), prepareSource: async (payload) => remote.prepare(payload, await getState()),
     sourceTask: remote.wait, cancelSourceTask: remote.cancel,
     planPreparedSource: async (id) => remote.plan(id, await getState()),
     stagePreparedSource: async (payload) => { if (payload.confirm !== true) throw new Error('confirmation-required'); return remote.stage(payload.taskId, payload.planId, await getState()) },

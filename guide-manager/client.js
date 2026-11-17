@@ -90,6 +90,12 @@ window.__ModuleLoader__.load({
       migrationSourceChanged: '源码在本 Host 启动后改过，执行前会重新核对。',
       migrationAwaiting: '迁移完成，等待重启核对。', migrationVerified: '迁移后运行就绪',
       migrationFailed: '迁移失败，已尝试恢复原 link。', migrationRecovery: '迁移恢复需要人工处理，请检查回执和事务备份。',
+      cacheTitle: '包缓存', cacheHint: '检查七个自有包的固定缓存是否缺失或损坏；重建只写入缓存，不改变依赖。',
+      cacheHealthy: '缓存完整。', cacheCheck: '先检查更新，再按发布清单重建缓存。', cacheSource: '缓存来源',
+      cacheRebuild: '重建缺失/损坏缓存', cacheRebuilding: '正在下载并校验缓存', cacheRebuilt: '缓存已重建并从发布附件校验。',
+      cacheLocalPlan: '本地发布目录计划',
+      recoveryTitle: '硬中断恢复', recoveryHint: '检测到未完成的事务；请先停止对应 DSH，再在外部终端运行恢复助手。恢复会核对备份哈希，不会盲删 pending。',
+      recoveryHelper: '恢复助手',
       migrationInterrupted: '迁移中断或恢复未完成，请检查回执。', migrationCancel: '取消迁移准备', migrationNoTarget: '发布目录没有兼容的迁移目标。', migrationManagerTarget: '目标 manager 不包含 5E 迁移文件，无法迁移 manager；请先发布支持 5E 的 manager，或只迁移组件。',
       migrationLink: '源目录', migrationFiles: '个随包文件', migrationSourceVersion: '源码版本',
       migrationHistory: '历史迁移记录', migrationPendingShort: '迁移准备中',
@@ -287,6 +293,12 @@ window.__ModuleLoader__.load({
       migrationSourceChanged: 'The source changed after this Host started; it is re-checked before execution.',
       migrationAwaiting: 'Migration completed; restart verification pending.', migrationVerified: 'Running after migration',
       migrationFailed: 'Migration failed; the original links were restored.', migrationRecovery: 'Migration recovery needs attention; inspect the receipt and transaction backup.',
+      cacheTitle: 'Package cache', cacheHint: 'Check whether the seven owned pinned caches are missing or corrupt. A rebuild only writes cache files, never dependencies.',
+      cacheHealthy: 'Cache is complete.', cacheCheck: 'Check for updates, then rebuild from the release manifest.', cacheSource: 'Cache source',
+      cacheRebuild: 'Rebuild missing/corrupt cache', cacheRebuilding: 'Downloading and verifying cache', cacheRebuilt: 'Cache rebuilt and verified against release assets.',
+      cacheLocalPlan: 'Local release-directory plan',
+      recoveryTitle: 'Hard-interrupt recovery', recoveryHint: 'An unfinished transaction was detected. Stop the affected DSH first, then run the recovery helper from an external terminal. It verifies backup hashes and never blindly deletes pending files.',
+      recoveryHelper: 'Recovery helper',
       migrationInterrupted: 'Migration was interrupted or recovery did not complete; inspect the receipt.', migrationCancel: 'Cancel migration preparation', migrationNoTarget: 'The release catalog has no compatible migration target.', migrationManagerTarget: 'The target manager does not contain the 5E migration files, so it cannot be migrated; publish a 5E-capable manager or migrate components only.',
       migrationLink: 'Source path', migrationFiles: 'package files', migrationSourceVersion: 'source version',
       migrationHistory: 'Historical migration', migrationPendingShort: 'Migration prepared',
@@ -730,7 +742,7 @@ window.__ModuleLoader__.load({
                     h('option', { value: '' }, '—'), versions('manager').map((v) => h('option', { key: v, value: v }, v))),
               h('button', { style: S.actionButton, disabled: locked || empty, onClick: () => request('prepare', payload) }, t('sourcePrepare')),
             ) : null,
-            task && !migrationTask ? h('div', { 'data-guide-source-task': true },
+            task && !migrationTask && task.kind !== 'cache' ? h('div', { 'data-guide-source-task': true },
               running ? h('div', { role: 'status', style: S.note }, t(task.kind === 'check' ? 'sourceChecking' : 'sourceDownloading'),
                 ` ${task.progress?.completed ?? 0}/${task.progress?.total ?? 0}`, task.progress?.bytes ? ` · ${Math.ceil(task.progress.bytes / 1024)} KB` : '') : null,
               running ? h('button', { style: S.actionButton, disabled: busy, onClick: () => request('cancel', { taskId: task.id }) }, t('sourceCancel')) : null,
@@ -821,6 +833,56 @@ window.__ModuleLoader__.load({
           result?.error ? h('div', { style: S.reason }, result.error, result.recoveryError) : null,
           migration.recoveryCommand ? h('div', null, h('div', { style: S.note }, t('maintenanceRecovery')), h('div', { style: S.mono }, migration.recoveryCommand)) : null,
           error ? h('div', { style: S.reason, role: 'alert' }, error) : null,
+        ),
+      )
+    }
+
+    function CacheCard({ cache, distribution, state, t, onChanged }) {
+      const [busy, setBusy] = React.useState(false)
+      const [error, setError] = React.useState(null)
+      if (!cache) return null
+      const task = distribution?.task
+      const cacheTask = task?.kind === 'cache'
+      const pending = state.installation?.pending || state.packageManagement?.pending || state.maintenance?.pending || state.migration?.pending || state.pending?.present
+      const locked = busy || Boolean(state.execution?.active) || Boolean(pending) || Boolean(cacheTask && task.status === 'running')
+      const request = async (action, body, group = 'source') => {
+        setBusy(true); setError(null)
+        try {
+          await installRequest(action, body, group)
+          onChanged()
+        } catch (failure) { setError(sourceError(String(failure.message ?? failure), t)) }
+        finally { setBusy(false) }
+      }
+      return h('section', { style: S.section, 'data-guide-cache': true },
+        h('h3', { style: S.sectionTitle }, t('cacheTitle')),
+        h('div', { style: S.card },
+          h('div', { style: S.note }, t('cacheHint')),
+          cache.issues?.length ? h('ul', { style: S.warningList }, cache.issues.map((entry) => h('li', { key: entry.name },
+            `${componentLabel({ key: entry.name, package: entry.name }, t)} · ${entry.status}${entry.sha256 ? ` · ${entry.sha256.slice(0, 12)}` : ''}`)))
+            : h('div', { style: S.notice }, t('cacheHealthy')),
+          cache.plan?.blockers?.length ? h('div', { style: S.note }, `${t('cacheLocalPlan')}: ${cache.plan.blockers.join(', ')}`) : null,
+          cache.issues?.length ? h('div', null,
+            h('div', { style: S.note }, distribution?.catalog?.snapshotId ? `${t('cacheSource')}: ${distribution.catalog.release?.tag ?? ''}` : t('cacheCheck')),
+            h('button', { style: S.actionButton, disabled: locked || !distribution?.catalog?.snapshotId, onClick: () => request('cache', { snapshotId: distribution.catalog.snapshotId }) }, t('cacheRebuild')),
+            cacheTask && task.status === 'running' ? h('div', { role: 'status', style: S.note }, t('cacheRebuilding'), ` ${task.progress?.completed ?? 0}/${task.progress?.total ?? 0}`) : null,
+            cacheTask && task.status === 'ready' ? h('div', { style: S.notice }, t('cacheRebuilt')) : null,
+            cacheTask && ['failed', 'cancelled', 'interrupted'].includes(task.status) ? h('div', { style: S.reason, role: 'alert' }, sourceError(task.error, t)) : null,
+          ) : null,
+          error ? h('div', { style: S.reason, role: 'alert' }, error) : null,
+        ),
+      )
+    }
+
+    function RecoveryCard({ recovery, t }) {
+      if (!recovery?.issues?.length) return null
+      return h('section', { style: S.section, 'data-guide-recovery': true },
+        h('h3', { style: S.sectionTitle }, t('recoveryTitle')),
+        h('div', { style: S.card },
+          h('div', { style: S.note }, t('recoveryHint')),
+          h('ul', { style: S.warningList }, recovery.issues.map((issue, index) => h('li', { key: `${issue.kind}-${issue.id}-${index}` },
+            `${issue.kind} · ${issue.status}${issue.id ? ` · ${issue.id}` : ''} · ${issue.reason}${issue.action ? ` → ${issue.action}` : ''}`))),
+          h('div', { style: S.note }, `${t('recoveryHelper')}:`),
+          h('div', { style: S.mono }, recovery.helper ?? t('none')),
         ),
       )
     }
@@ -1315,6 +1377,8 @@ window.__ModuleLoader__.load({
         state.pending?.error ? h('div', { style: S.banner }, `pending: ${state.pending.error}`) : null,
         h(SourceCard, { distribution: state.distribution, state, t, onChanged: refresh }),
         h(MigrationCard, { migration: state.migration, distribution: state.distribution, state, t, onChanged: refresh }),
+        h(CacheCard, { cache: state.cache, distribution: state.distribution, state, t, onChanged: refresh }),
+        h(RecoveryCard, { recovery: state.recovery, t }),
         h(InstallationCard, { installation: state.installation, components: state.components ?? [], remoteAvailable: state.distribution?.configured, state, t, onChanged: refresh }),
         h(PackageCard, { management: state.packageManagement, components: state.components ?? [], state, t, onChanged: refresh }),
         h(MaintenanceCard, { maintenance: state.maintenance, components: state.components ?? [], state, t, onChanged: refresh, onOpenSkills }),

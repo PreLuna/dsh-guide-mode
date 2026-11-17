@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { COMPONENTS } from '../core.js'
-import { cacheArtifact, cachePath, fingerprint, profileSnapshot, readJson, writeJson } from '../install.js'
+import { cacheArtifact, cachePath, digest, fingerprint, profileSnapshot, readJson, writeJson } from '../install.js'
 import { artifactInventory } from '../artifacts.js'
 import { validateInstallPlan } from '../helper/apply-install.mjs'
 import { createRemoteManager } from '../remote.js'
@@ -98,6 +98,24 @@ test('consumer query, preparation and offline installer bridge', async (t) => {
     assert.equal((await f.remote.wait(job.taskId)).status, 'cancelled')
     assert.doesNotMatch(JSON.stringify(f.remote.view()), /test-secret-token|Authorization/)
     assert.equal(other.view().task.status, 'cancelled')
+  })
+  await t.test('cache rebuild replaces a corrupt pinned artifact and leaves configuration unchanged', async () => {
+    const f = fixture()
+    const snapshotId = await f.check()
+    const artifact = catalog.artifacts.find((item) => item.key === 'goal')
+    const file = cachePath(f.profile.dir, artifact.sha256)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, Buffer.from('corrupt cache bytes'))
+    const manifest = readJson(join(f.profile.dir, 'package.json'))
+    manifest.dependencies[artifact.package] = `file:${file.replaceAll('\\', '/')}`
+    writeJson(join(f.profile.dir, 'package.json'), manifest)
+    const before = profileSnapshot(f.profile.dir)
+    const job = f.remote.rebuildCache(snapshotId)
+    assert.ok(job.taskId)
+    const task = await f.remote.wait(job.taskId)
+    assert.equal(task.status, 'ready', JSON.stringify(task))
+    assert.equal(digest(readFileSync(file)), artifact.sha256)
+    assert.deepEqual(profileSnapshot(f.profile.dir), before)
   })
   await t.test('bounded network retry succeeds; configuration drift invalidates prepared plans', async () => {
     const f = fixture({ retry: true }), snapshotId = await f.check()

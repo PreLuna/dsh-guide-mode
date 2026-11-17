@@ -8,7 +8,7 @@
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。peer 范围收窄到该基线，不表示其他版本一定有缺陷。
 
-`npm test` 运行 32 个无需安装 DSH 的 Node 回归进程（含 manager 145 个用例）与生成物一致性检查；`.github/workflows/test.yml` 为 Windows/Node 24 的最小 CI（`repo:check` + `test`），`.github/workflows/release.yml` 负责 tag/manual 发布，`.github/workflows/live-source-read.yml` 是显式的真实公开源只读检查。托管 CI 状态以 [Actions 实际记录](https://github.com/PreLuna/dsh-guide-mode/actions) 为准；它不能代替真实 Runtime/Host/浏览器验收。
+`npm test` 运行 34 个无需安装 DSH 的 Node 回归进程（含 manager 155 个用例）与生成物一致性检查；`.github/workflows/test.yml` 为 Windows/Node 24 的最小 CI（`repo:check` + `test`），`.github/workflows/release.yml` 负责 tag/manual 发布，`.github/workflows/live-source-read.yml` 是显式的真实公开源只读检查。托管 CI 状态以 [Actions 实际记录](https://github.com/PreLuna/dsh-guide-mode/actions) 为准；它不能代替真实 Runtime/Host/浏览器验收。
 
 `guide-sidebar-adapter/client.js` 是**生成物**，由该包自有 `core.js` + `client.entry.js` 生成。修改后运行 `npm run build --prefix guide-sidebar-adapter`，检查用 `npm run build:check`；安装脚本也会检查。
 
@@ -24,7 +24,7 @@
 | `guide-shield/` | 8 | 0.03 MB | ✅ | 独立 Host 结算防护；`contracts.js` 记契约哈希 |
 | `guide-admission/` | 6 | 0.02 MB | ✅ | 原生 materialize 同步准入、容量／身份／按池快照 |
 | `guide-preset/` | 3 | 0.01 MB | ✅ | `guide` persona 与工具面 |
-| `guide-manager/` | 68 | 0.76 MB | ✅ | 管理页、门禁/冷热切换、安装/升级/维护、远端来源、面板执行、5E 迁移与 helper |
+| `guide-manager/` | 79 | 0.83 MB | ✅ | 管理页、门禁/冷热切换、安装/升级/维护、远端来源、面板执行、5E 迁移、硬中断恢复、缓存重建与 helper |
 | `docs/` | 15 | 0.12 MB | ✅ | 当前事实、阶段实现/验收、维护与历史 |
 | `scripts/` | 15 | 0.07 MB | ✅ | 维护、发布与检查入口 |
 | `.github/workflows/` | 3 | 0 | ✅ | 测试、tag/manual 发布、公开源只读检查 |
@@ -128,8 +128,10 @@ tgz 从 Git ZIP 解出的提交字节生成，避免 Windows 工作树换行转�
 
 Phase 5 的安装/升级/恢复、组件卸载/修复和 manager 自升级都在官方插件页「指导」管理页发起；1.3.0 确认后自动执行并重启返回核对，手动 helper 保留为恢复入口。5E 迁移入口显示 link/固定来源与内容差异，确认后走独立 `migration-pending.json` 事务；管理页不可用时使用 `helper/recover-migration.mjs`/`restart-guide-manager.ps1 -RecoverMigration`。保留 preset 和会话数据，与第 3 节开发环境“完整卸载”不同。页面在升级前给出 profile 自有目录下的外部恢复脚本；组件损坏使桌面插件页打不开时，使用 manager 包内 `helper/repair-components.ps1`。先保留可信包缓存及事务备份，不能把它们当普通可删缓存。详见 [5C](PHASE-5C-MAINTENANCE.md)、[面板执行](PHASE-5-PANEL-EXECUTION.md) 和 [功能测试清单](FUNCTIONAL-TEST-MATRIX.md)。
 
+5F 硬中断恢复（工作区实现，尚未发布）：停止目标 DSH 后，先只读查看 `helper/recover-hard-interrupt.mjs --profile <profile>` 的诊断，再用 `--action install-restore|package-restore|maintenance-restore|manager-restore --id <id>` 执行；脚本会校验备份/事务哈希并保留原回执。缓存缺失/损坏时，管理页「包缓存」可用公开源重建，或离线使用 `helper/rebuild-cache.mjs --profile <profile> --catalog <release-catalog.json> --apply`；只写缓存，不改依赖。迁移事务仍用 `recover-migration.mjs`，不要用 5F 动作替代。
+
 ```powershell
-npm test                 # 32 个 Node 进程，含 manager 145 用例
+npm test                 # 34 个 Node 进程，含 manager 155 用例
 npm run repo:check       # 入库边界 + 文档链接
 npm run doctor           # 七包元数据、公开来源与 guide skill
 npm run build:check      # client.js 生成物一致性

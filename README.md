@@ -2,13 +2,13 @@
 
 在主会话旁边打开继承上下文的指导对话，用独立 `guide` preset 提供建议或按要求执行修改。指导可使用写工具，并可与主会话 goal 并行。
 
-两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。功能主体已完成：指导会话与上下文继承、goal 并行准入、模型投影与控制拦截、结算防护、sidebar 专区、归档、manager 的安装/升级/恢复/卸载/修复/自升级、公开源查询下载、面板内自动执行与重启核对、5E link 来源迁移均已实现，并通过隔离及真实 Edge/独立桌面验收。
+两阶段局部注入与独立 Host 服务已完成并在本机验收：goal 复用原 driver，better-sidebar 使用官方 `0.28.2`，通过两个独立 adapter 添加兼容行为；准入与结算防护拆成两个独立 Host 包。功能主体已完成：指导会话与上下文继承、goal 并行准入、模型投影与控制拦截、结算防护、sidebar 专区、归档、manager 的安装/升级/恢复/卸载/修复/自升级、公开源查询下载、面板内自动执行与重启核对、5E link 来源迁移均已实现，并通过隔离及真实 Edge/独立桌面验收；工作区另完成 5F 硬中断恢复与缓存重建（尚未发布/live）。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。未知版本的 adapter 回退原行为，panel/shield 进入只读或 unsupported；不能据支持基线内的结论推定任意版本免维护。
 
-当前发布与本机安装：最新正式 Release 为 [guide-v1.4.0](https://github.com/PreLuna/dsh-guide-mode/releases/tag/guide-v1.4.0)，内含 manager `1.3.0` 与六组件 `1.1.0`。npm 元数据保持 `private:true`、`UNLICENSED`，未发布 npm/市场。2026-11-10 本机 desktop 已将七个自有包从工作区 link 切换为网络 tgz（SHA 固定缓存）；2026-11-16 已升级到 manager `1.3.0`，六组件保持 `1.1.0`，升级回执为 `verified-running`，源码目录和其他插件/配置保留。见 [早期安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md) / [manager 升级证据](evidence/live-manager-upgrade-2026-11-16/live-manager-upgrade-result.json)。
+当前发布与本机安装：最新正式 Release 为 [guide-v1.4.0](https://github.com/PreLuna/dsh-guide-mode/releases/tag/guide-v1.4.0)，内含 manager `1.3.0` 与六组件 `1.1.0`。npm 元数据保持 `private:true`、`UNLICENSED`，未发布 npm/市场。2026-11-10 本机 desktop 已将七个自有包从工作区 link 切换为网络 tgz（SHA 固定缓存）；2026-11-16 已升级到 manager `1.3.0`，六组件保持 `1.1.0`，升级回执为 `verified-running`，源码目录和其他插件/配置保留。见 [早期安装记录](docs/LOCAL-ONLINE-INSTALL-2026-11-10.md) / [manager 升级证据](evidence/live-manager-upgrade-2026-11-16/live-manager-upgrade-result.json)。工作区 manager 1.4.0 的 5F 恢复/缓存能力尚未发布到该 Release。
 
-剩余范围只有明确列出的扩展能力，不再作为待讨论项：5E-0/1/2 已发布到 `guide-v1.4.0` / manager `1.3.0`，独立 Electron 桌面 E-07 已通过，live 已升级到 manager `1.3.0`；真实 Edge 浏览器 UI 验收仍未单独运行。registry/git 与任意跨 schema 迁移、损坏缓存找回、断电点自动恢复、外部依赖一键代装仍未实现。详见 [项目状态](PROJECT-STATUS.md) 与 [功能检查表](docs/FUNCTIONAL-TEST-MATRIX.md)；各阶段实现细节见 [Phase 5](docs/PHASE-5-ASSESSMENT.md)、[5B](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)、[5C](docs/PHASE-5C-MAINTENANCE.md)、[5D](docs/PHASE-5D-REAL-ACCEPTANCE.md)、[5E 方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md) 与 [面板执行](docs/PHASE-5-PANEL-EXECUTION.md)。
+剩余范围只有明确列出的扩展能力，不再作为待讨论项：5E-0/1/2 已发布到 `guide-v1.4.0` / manager `1.3.0`，独立 Electron 桌面 E-07 已通过，live 已升级到 manager `1.3.0`；工作区 5F 已加入硬中断诊断/显式恢复和缓存重建，尚未发布/live；真实 Edge 浏览器 UI 验收仍未单独运行。registry/git 与任意跨 schema 迁移、损坏缓存找回、断电点自动恢复、外部依赖一键代装仍未实现。详见 [项目状态](PROJECT-STATUS.md) 与 [功能检查表](docs/FUNCTIONAL-TEST-MATRIX.md)；各阶段实现细节见 [Phase 5](docs/PHASE-5-ASSESSMENT.md)、[5B](docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)、[5C](docs/PHASE-5C-MAINTENANCE.md)、[5D](docs/PHASE-5D-REAL-ACCEPTANCE.md)、[5E 方案](docs/PHASE-5D-5E-IMPLEMENTATION-PLAN.md)、[5F 恢复](docs/PHASE-5F-RECOVERY.md) 与 [面板执行](docs/PHASE-5-PANEL-EXECUTION.md)。
 
 从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，通过官方插件页安装，再到“插件 → 指导”检查并准备组件。确认前保存工作；manager 1.3.0 会自动执行、重启并返回指导页核对，旧版或故障恢复仍可使用页面给出的手动助手；link 来源迁移使用独立的「开发 link 来源迁移」区。better-sidebar、guide skill/skills manager 按各自入口管理。版本/宿主与恢复边界见 [5D-4](docs/PHASE-5D-REAL-ACCEPTANCE.md)，面板自动执行说明见 [面板执行](docs/PHASE-5-PANEL-EXECUTION.md)。
 
@@ -58,6 +58,7 @@
 | 嵌套指导 | v1 不专门支持，保留默认 depth 限制 |
 | 版本变化 | 未知 driver/join/sidebar/tool 来源回退明确状态；完整面板预检见 O21 |
 | 管理页 | 官方插件页「指导」tab；Phase 1–4 启停/技能/源码 reload；5A 首次安装；5B 兼容组合升级、旧包/依赖锁备份与版本恢复；5C 卸载、原版本修复、管理器自升级与外部恢复；5D 公开源检查、下载、缓存与计划确认；1.2.0 起确认后自动执行并重启返回核对；5E link 清点、内容差异、迁移计划、停机切换与独立恢复已在 1.3.0 发布并部署。开发 link 受保护，远端与本地包操作共用官方锁 |
+| 故障恢复/缓存 | 5F 工作区：install/package/maintenance 中断诊断与显式恢复；缓存缺失/损坏按 SHA 重建；尚未发布/live |
 | 远端分发 | 公开 GitHub Releases，默认免 token/source.json；查询、按依赖闭包下载、SHA/tar/契约校验、离线缓存与来源不可用恢复 |
 | 面板自动执行 | manager 1.3.0 支持首次安装、独立/联动升级、版本恢复、修复、卸载及同协议管理器升级；确认后自动停机执行、重启、返回指导页并核对实际运行状态，手动助手保留为恢复入口 |
 | 本机来源 | 自 2026-11-10 起七个自有包为网络发布包固定缓存；开发工作区继续作为源码、测试和隔离验证来源 |
@@ -111,7 +112,7 @@ node guide-sidebar-adapter/scripts/prepare-official.mjs
 本机基线（无需安装 DSH）：
 
 ```powershell
-npm test          # 32 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter + 16 manager
+npm test          # 34 个 Node 进程：生成物检查 + 12 panel + 1 admission + 2 sidebar adapter + 18 manager
 npm run build:check
 npm run doctor    # 版本、公开来源、私有许可、用户级 guide skill
 npm run repo:check # 仓库文件边界与当前文档链接
@@ -130,7 +131,7 @@ node guide-panel/scripts/lifecycle-smoke.mjs   # 隔离真实 Host、HMR 与跨�
 
 浏览器 UI 使用 `guide-sidebar-adapter/test/browser_test.py`（stdin 传配置、Edge/Playwright、隔离 profile，不读取真实用户凭据）；manager 的远端与面板执行使用 `guide-manager/test/remote-acceptance.py`、`one-click-acceptance.py`，真实匿名后端另运行 `node guide-manager/test/remote-live.mjs <新目录> --public`。
 
-最近结果：默认 `npm test` 32 个 Node 进程全部通过，其中 manager 145 个测试用例；manager 1.2.0 面板执行在真实 Edge 与独立桌面各完成 8 次自动安装/升级/恢复/修复/卸载/自升级操作，均返回可见指导页并核对 `verified-running`、0 page error。5E-0/1/2 已覆盖清点/差异、计划指纹、迁移执行、失败回源、源码快照恢复与执行预览；隔离 profile 用真实官方 pnpm 完成七包迁移，独立 Electron 桌面 E-07 通过，live 已升级至 manager 1.3.0。历史结果仍为原 driver/join 12/12、sidebar 核心及官方消费函数 5/5、B′ 真实 Runtime 34 组、真实隔离 Host 86 项断言、浏览器 11 项通过；模型使用本机确定性 fixture，没有调用用户外部模型。逐项证据与未覆盖项见 [PROJECT-STATUS](PROJECT-STATUS.md) 与 [证据索引](evidence/README.md)。
+最近结果：默认 `npm test` 34 个 Node 进程全部通过，其中 manager 155 个测试用例；manager 1.2.0 面板执行在真实 Edge 与独立桌面各完成 8 次自动安装/升级/恢复/修复/卸载/自升级操作，均返回可见指导页并核对 `verified-running`、0 page error。5E-0/1/2 已覆盖清点/差异、计划指纹、迁移执行、失败回源、源码快照恢复与执行预览；隔离 profile 用真实官方 pnpm 完成七包迁移，独立 Electron 桌面 E-07 通过，live 已升级至 manager 1.3.0；工作区 5F 硬中断恢复/缓存重建已通过默认测试，尚未发布/live。历史结果仍为原 driver/join 12/12、sidebar 核心及官方消费函数 5/5、B′ 真实 Runtime 34 组、真实隔离 Host 86 项断言、浏览器 11 项通过；模型使用本机确定性 fixture，没有调用用户外部模型。逐项证据与未覆盖项见 [PROJECT-STATUS](PROJECT-STATUS.md) 与 [证据索引](evidence/README.md)。
 
 ## 诊断
 

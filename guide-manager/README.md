@@ -1,6 +1,6 @@
 # Guide manager
 
-manager 1.3.0：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态；新增 link 来源清点/差异/迁移与恢复。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
+manager 1.3.0 已发布：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态；新增 link 来源清点/差异/迁移与恢复。工作区 1.4.0 增加硬中断恢复与缓存重建（尚未发布/live）。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
 
 2026-11-09：manager 1.1.2 增加默认公开发布来源。通过官方插件页安装本仓库 manager tgz 后，直接进入“插件 → 指导 → 远端发布来源”检查并下载，无需配置 token 或 source.json。公开模式使用 Release 直链与 Git 智能 HTTP 的 tag/commit 核验，不消耗匿名 REST API 配额；保留包 SHA/tar/契约与现有冷事务门禁。实际整体验收进展见 [5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 
@@ -98,7 +98,7 @@ Host config.source 或 sourcePath（默认 profile/.guide-manager/source.json）
 
 “远端发布来源”区接入检查、安装缺失组件/升级组件/升级 manager、进度、取消/重试、刷新恢复，以及精确计划预览/确认。manager 1.3.0 确认后自动执行并重启返回核对（旧版/故障恢复仍可用原助手），manager 自升级保留外部恢复入口。source/check、prepare、task、cancel、plan、stage 均为受 connection 围栏保护的 POST；浏览器不传凭据或任意来源。未配置远端时使用内置公开源或保留本地功能。HTTP/客户端回归、隔离 Edge 交互与真实公开源 Edge/独立桌面整体链路均已完成，详见 [接口、流程与测试](../docs/PHASE-5D-HTTP-UI.md) 和 [真实 5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 
-## Phase 5E：link 来源迁移（工作区）
+## Phase 5E：link 来源迁移（已发布）
 
 “开发 link 来源迁移”区只读列出七个自有包的 `link:`/固定来源、源码路径与版本；点击“下载并准备迁移”后，从当前 Release 准备六个组件与 manager 的目标 tgz，并生成绑定四文件、源码文件哈希、目标 SHA 和 catalog 的迁移计划。确认后写入 `migration-pending.json`，由 execution 自动执行或手动 `helper/migrate-guide-manager.cmd` 执行。
 
@@ -111,7 +111,50 @@ POST /guide-manager/api/migration/cancel  # { planId, confirm:true }
 GET  /guide-manager/api/state             # migration.inventory/pending/result/verification
 ```
 
-默认测试在 `test/migration.test.mjs`，覆盖清点/差异、源码漂移、计划指纹、成功迁移、失败回源、快照恢复、execution 预览与 Host API；真实两端验收仍为后续门禁。
+默认测试在 `test/migration.test.mjs`，覆盖清点/差异、源码漂移、计划指纹、成功迁移、失败回源、快照恢复、execution 预览与 Host API；独立 Electron 桌面 E-07 已通过，live 已升级；真实 Edge 浏览器 UI 仍为后续门禁。
+
+## 硬中断恢复与缓存重建
+
+### 硬中断恢复
+
+管理页 `state.recovery` 只读诊断以下中断信号：`install-result.json` 的 `installing`/`recovery-required`、`package-result.json` 的 `upgrading`/`restoring`/`recovery-required`、`maintenance-result.json` 的 `applying`/`recovery-required`、`migration-result.json` 的 `migrating`/`recovery-required`，以及 `install-backups` 和各类 transaction。页面显示可恢复动作与助手路径，不盲删 pending。
+
+外部恢复助手 `helper/recover-hard-interrupt.mjs`：
+
+```powershell
+# 只读诊断（也可用 node 直接运行）
+node guide-manager/helper/recover-hard-interrupt.mjs --profile C:\Users\...\profiles\desktop
+
+# 停止目标 DSH 后，用安装目录的 Electron Node 执行；.cmd 是同一入口
+guide-manager/helper/recover-hard-interrupt.cmd -Profile C:\Users\...\profiles\desktop `
+  -Action package-restore -Id 1750000000000-abcdef123456
+
+# 等价的长命令
+$env:ELECTRON_RUN_AS_NODE = '1'
+& "C:\...\DeepSeek Harness.exe" --expose-internals guide-manager/helper/recover-hard-interrupt.mjs `
+  --profile C:\Users\...\profiles\desktop --action package-restore --id 1750000000000-abcdef123456
+```
+
+动作：
+
+- `install-restore`：从 `install-backups/<id>` 恢复四文件，重装旧依赖图；
+- `package-restore`：从 package transaction 恢复四文件、旧 tgz 缓存和旧 lock 图；
+- `maintenance-restore`：恢复卸载/修复事务前的组件图；
+- `manager-restore`：恢复 manager-upgrade 事务前的 manager 与四文件；
+- `migration-recover`：沿用 `helper/recover-migration.mjs`，不重复实现。
+
+所有动作先校验备份哈希，再在官方 profile 锁内恢复；恢复完成后把对应 result 标记为 `failed-restored`，并写 `hard-interrupt-result.json`。缺失备份、损坏事务或未知 pending 只报告，不自动删除。该助手不能处理没有事务备份的任意断电点，也不能替代 5E migration 的源快照恢复。
+
+### 缓存重建
+
+- 管理页「包缓存」区只读检查七个自有包的 `.guide-manager/package-cache/<sha256>.tgz` 是否缺失或损坏；
+- 检查更新后，可用公开源按 catalog 附件 SHA 重建缺失/损坏缓存，**只写缓存，不改依赖**；
+- 离线/本地发布目录使用：
+  ```powershell
+  node guide-manager/helper/rebuild-cache.mjs --profile <profile> --catalog <release-catalog.json> [--catalog <manager-catalog.json>] --apply
+  ```
+  先不带 `--apply` 查看计划；执行器会再次校验源文件 SHA，不会覆盖已完整的缓存。
+- 缓存重建不能绕过未知来源、错误版本或损坏 tar；源不可用/字节不符会明确阻断。
 
 ## Phase 1–4 基线机制
 
@@ -299,7 +342,7 @@ POST /guide-manager/api/action  # set-component-enabled
 本机 desktop 已安装并验证「指导」tab；live 为 manager 1.3.0 + 六组件 1.1.0 的固定缓存包，工作区开发 link 修改后仍需重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
-npm test                     # 32 个 Node 进程，manager 145 个用例
+npm test                     # 34 个 Node 进程，manager 155 个用例
 npm run build:check
 npm run doctor
 node guide-manager/test/remote-live.mjs dist/remote-live --public

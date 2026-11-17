@@ -1,6 +1,6 @@
 # 功能核对与测试清单
 
-更新：2026-11-16。当前交付/待办以 [项目状态](../PROJECT-STATUS.md) 为准。功能主体已完成；本表第 1 节记录**按现有实现生效**的能力，第 2 节只列真正未实现的扩展能力，第 3 节列实现已有但覆盖仍需扩展的验证。5A～5E 与 manager 1.3.0 已发布并完成独立 Electron E-07；真实 Edge 浏览器 UI 仍未单独验收。
+更新：2026-11-17。当前交付/待办以 [项目状态](../PROJECT-STATUS.md) 为准。功能主体已完成；本表第 1 节记录**按现有实现生效**的能力，第 2 节只列真正未实现的扩展能力，第 3 节列实现已有但覆盖仍需扩展的验证。5A～5E 与 manager 1.3.0 已发布并完成独立 Electron E-07；5F 硬中断恢复/缓存重建已在工作区实现并通过默认测试，尚未发布/live；真实 Edge 浏览器 UI 仍未单独验收。
 
 ## 1. 已完成的能力（按现有实现）
 
@@ -19,17 +19,19 @@
 | 5C 卸载、修复、自升级 | 依赖卸载与 preset 保护、goal 原生 driver 恢复、SHA 原包修复、独立控制器自升级与外部恢复 | [5C 证据](../evidence/phase5c-2026-11-07/report.md) |
 | 5D 发布与公开源 | schema 4 发布清单、固定提交七包、草稿/正式发布；默认公开源检查、按闭包下载、SHA/tar 校验、缓存与离线恢复 | [发布格式](PHASE-5D-RELEASE-FORMAT.md) / [真实 5D-4](../evidence/phase5d4-2026-11-09/report.md) |
 | 5E link 来源迁移 | 七包 link 清点、源码内容差异、目标 tgz 准备、精确迁移计划、停机执行器、四文件/源码快照、旧 importer 清理、失败回源、快照恢复、`/migration` API 与 MigrationCard；真实 pnpm 隔离迁移及独立 Electron E-07 通过 | [5E 方案](PHASE-5D-5E-IMPLEMENTATION-PLAN.md) / `guide-manager/test/migration.test.mjs` / [隔离证据](../evidence/migration-acceptance-2026-11-16/report.md) / [E-07](../evidence/migration-e07-2026-11-16/report.md) |
+| 5F 硬中断恢复（工作区） | 只读诊断 install/package/maintenance/migration 中断信号；显式恢复 install/package/maintenance/manager 备份，校验四文件、事务 artifact 和缓存 SHA；不盲删 pending | `guide-manager/test/recovery.test.mjs` / `helper/recover-hard-interrupt.mjs` |
+| 5F 缓存重建（工作区） | 缓存缺失/损坏清点；公开源按 catalog SHA 重建或本地目录 `rebuild-cache.mjs`；只写缓存，不覆盖完整缓存 | `guide-manager/test/cache.test.mjs` / `guide-manager/test/remote.test.mjs` |
 | 管理页自动执行 | manager 1.3.0 首次安装、独立/联动升级、版本恢复、修复、卸载及同协议管理器升级；确认后自动停机执行、重启、返回指导页并核对 | [面板执行](PHASE-5-PANEL-EXECUTION.md) / [执行证据](../evidence/one-click-2026-11-09/report.md) |
 | 本机来源切换与升级 | 2026-11-10 切到网络 tgz；2026-11-16 升级到 manager 1.3.0、六组件 1.1.0 | [早期安装](LOCAL-ONLINE-INSTALL-2026-11-10.md) / [manager 升级](../evidence/live-manager-upgrade-2026-11-16/live-manager-upgrade-result.json) |
-| 工程与文档 | 32 个 Node 检查进程、manager 145 用例、生成物检查、公开源 doctor、仓库边界与文档链接检查、最小 CI 与 tag/manual 发布 workflow | `npm test` / `npm run build:check` / `npm run doctor` / `npm run repo:check` |
+| 工程与文档 | 34 个 Node 检查进程、manager 155 用例、生成物检查、公开源 doctor、仓库边界与文档链接检查、最小 CI 与 tag/manual 发布 workflow | `npm test` / `npm run build:check` / `npm run doctor` / `npm run repo:check` |
 
 ## 2. 仍需后续施工的能力
 
 | 项目 | 当前事实 | 剩余工作 |
 |---|---|---|
 | registry/git 与任意跨 schema 迁移 | 只支持可信本地/远端包与数据 schema 1；开发 link 受保护，不隐式替换 registry/git 来源 | 出现真实 schema 变化时设计迁移与逆向恢复边界；`registry`/`git` 来源单独定义 |
-| 缓存损坏与配置语义修复 | 可修复安装文件损坏；原包缓存丢失/损坏时阻断；不重置用户配置或会话 | 从可信目录按旧 SHA 找回缓存；配置诊断与用户选择性重置另做 |
-| 中断任务恢复 | 普通异常自动修复、写锁、失败回执与 `recovery-required` 已实现；硬中断可识别并阻止错误重启 | 扩展“只读诊断 → 选择事务 → 恢复”的外部工具，逐个断点验证；不盲删 pending |
+| 配置语义修复 | 缓存文件已可按 SHA 重建；配置语义损坏仍不做自动推断/重置 | 配置诊断与用户选择性重置另做 |
+| 任意断电点的完全自动恢复 | 普通异常自动修复、写锁、失败回执、只读诊断与显式事务恢复已实现；不是所有断点都无人工自动恢复 | 补真实强杀/断电注入与更多断点验证；不盲删 pending |
 | 外部依赖一体化分发 | 展示 `guide` skill、skills manager、better-sidebar 并给出技能设置入口；不代替其安装/升级逻辑 | 为目标渠道写清安装指引；若要一键代装，先定义外部来源与责任 |
 | 可选产品交互 | Q7 折叠、批量操作未实现；跨会话文件锁、嵌套指导不在 v1 范围 | 依实际需求排序；不把已接受边界误列为缺陷 |
 | npm/市场发布 | 仅通过 GitHub Releases 分发；七包 `private:true`、`UNLICENSED`，未发布 npm/市场 | 需要时再决定命名空间、许可证、市场元数据与发布渠道 |
@@ -45,6 +47,7 @@
 | 自动归档 low 600 秒完整实测 | 显式开启 `archive.auto`，保持相应压力与 idle 条件到期；确认只归档符合条件的会话 |
 | PT-6 Windows 沙箱 PTY | 仍为用户暂缓事项；保留沙箱失败与无沙箱对照事实，不以对照结果覆盖失败 |
 | 5E 真实 Edge 浏览器 UI | 独立 Electron 桌面 E-07 已通过；仍需在真实 Edge 中复跑 MigrationCard 的准备/确认/重连链路，并补写锁争用和迁移后普通升级的真实链路 |
+| 5F 真实故障注入 | 在隔离 profile 强杀 install/package/maintenance 中间态并执行显式恢复；删除/篡改缓存后用公开源和本地目录各重建一次；真实 Host 重启核对 |
 | 真实模型长压/故障 | 可选的 30 分钟以上真实模型 soak 与 provider 故障注入；不阻塞当前首轮方案 |
 
 这些是覆盖缺口或已定边界，不表示已发现相应功能缺陷；不要重复开启已完成的 O2/R6/O6/O8/5A～5D 基线整改。
@@ -54,7 +57,7 @@
 先运行确定性工程检查：
 
 ```powershell
-npm test                  # 32 个 Node 进程，含 manager 145 用例
+npm test                  # 34 个 Node 进程，含 manager 155 用例
 npm run build:check
 npm run doctor
 npm run repo:check

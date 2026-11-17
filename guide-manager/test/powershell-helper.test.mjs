@@ -10,7 +10,7 @@ const helper = fileURLToPath(new URL('../helper/restart-guide-manager.ps1', impo
 const setup = `$tokens=$null; $errors=$null; $ast=[System.Management.Automation.Language.Parser]::ParseFile('${helper}',[ref]$tokens,[ref]$errors); if($errors.Count){throw ($errors | Out-String)}`
 
 test('one-click controller parses on Windows built-in PowerShell without PowerShell 7', { skip: process.platform !== 'win32' }, () => {
-  for (const name of ['restart-guide-manager.ps1', 'start-execution.ps1', 'run-execution.ps1', 'recover-manager.ps1', 'repair-components.ps1']) {
+  for (const name of ['restart-guide-manager.ps1', 'start-execution.ps1', 'run-execution.ps1', 'recover-manager.ps1', 'repair-components.ps1', 'recover-hard-interrupt.ps1']) {
     const file = fileURLToPath(new URL(`../helper/${name}`, import.meta.url)).replaceAll("'", "''")
     const code = `$t=$null; $e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile('${file}',[ref]$t,[ref]$e); if($e.Count){throw ($e | Out-String)}; Write-Output 'native-syntax-ok'`
     assert.match(execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', code], { encoding: 'utf8', windowsHide: true }), /native-syntax-ok/)

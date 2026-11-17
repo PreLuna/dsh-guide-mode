@@ -7,6 +7,7 @@ import { PublicGitHubReleaseClient } from './github-public.js'
 import { parseRemoteRelease, RELEASE_FILE, validateSourceConfig } from './release.js'
 import { artifactInventory } from './artifacts.js'
 import { cacheArtifact, cachePath, createInstallPlan, digest, fingerprint, INSTALL_ORDER, profileSnapshot, readCatalog, readJson, selectedKeys, stageInstall, writeJson } from './install.js'
+import { cacheEntries, writeCacheArtifact } from './cache.js'
 import { createUpgradePlan, readUpgradeCatalog, stagePackagePlan } from './upgrade.js'
 import { assertMaintenanceIdle, createMaintenancePlan, readManagerCatalog, stageMaintenance } from './maintenance.js'
 import { createMigrationPlan, stageMigration } from './migration.js'
@@ -214,6 +215,50 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
         catalogHash: digest(readFileSync(catalogPath)), snapshotId: request.snapshotId }
     })
   }
+  const rebuildCache = (snapshotId) => {
+    const saved = snapshot(snapshotId)
+    const issues = cacheEntries(profile).filter((entry) => entry.status !== 'ready')
+    if (!issues.length) return { status: 'healthy', entries: [], issues: [] }
+    const selected = issues.map((issue) => {
+      const artifact = saved.catalog.artifacts.find((entry) => entry.sha256 === issue.sha256 && entry.package === issue.name)
+      if (!artifact) throw new Error('source-cache-target-unavailable')
+      return { issue, artifact }
+    })
+    return start('cache', { snapshotId }, async (task, client, retry, signal) => {
+      task.progress.total = selected.length
+      const entries = []
+      const releases = new Map()
+      for (const { issue, artifact } of selected) {
+        signal.throwIfAborted()
+        const target = cachePath(profile.dir, issue.sha256)
+        if (!existsSync(target) || digest(readFileSync(target)) !== issue.sha256) {
+          let source = releases.get(artifact.source.tag)
+          if (!source) {
+            const release = await retry(() => clientRelease(client, artifact.source.tag))
+            await retry(() => client.verifyTag(artifact.source.tag, artifact.source.commit))
+            source = { release, assets: await retry(() => client.assets(release.id)) }
+            releases.set(artifact.source.tag, source)
+          }
+          const asset = source.assets.find((item) => item.name === artifact.source.asset)
+          if (!asset || asset.size !== artifact.bytes) throw new Error('source-asset-unavailable')
+          const bytes = await retry(() => client.assetBytes(asset))
+          signal.throwIfAborted()
+          if (bytes.length !== artifact.bytes || digest(bytes) !== artifact.sha256) throw new Error('source-integrity-mismatch')
+          const temporary = join(root, `${task.id}-cache.tgz`)
+          try {
+            writeFileSync(temporary, bytes)
+            verify(artifact, temporary)
+            writeCacheArtifact(profile, { ...artifact, file: temporary })
+          } finally { if (existsSync(temporary)) unlinkSync(temporary) }
+        }
+        if (digest(readFileSync(target)) !== issue.sha256) throw new Error('source-cache-integrity-mismatch')
+        entries.push({ key: issue.name, version: artifact.version, sha256: issue.sha256 })
+        task.progress.completed++
+        save(task)
+      }
+      return { entries, snapshotId }
+    })
+  }
   const verify = (entry, file) => {
     if (statSync(file).size !== entry.bytes) throw new Error('source-integrity-mismatch')
     const { manifest } = artifactInventory(file, entry.sha256)
@@ -233,7 +278,7 @@ export function createRemoteManager({ profile, sourceConfig, sourcePath, host, m
     if (request.kind === 'upgrade') return createUpgradePlan(state, readUpgradeCatalog(task.result.catalogPath), request.targets, host)
     return createMaintenancePlan(state, { kind: 'manager-upgrade', version: request.version }, managerRoot, task.result.catalogPath, host)
   }
-  return { check, prepare, plan,
+  return { check, prepare, plan, rebuildCache,
     task: loadTask,
     stage(id, expectedId, state) {
       const current = plan(id, state), task = loadTask(id)
