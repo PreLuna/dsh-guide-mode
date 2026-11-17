@@ -54,4 +54,4 @@ state.distribution 返回配置仓库与最近任务的状态/进度/结果；�
 
 本地测试使用真实离线 tgz、Node Response 和注入传输，覆盖查询不全量下载、单包/闭包、缓存、错 SHA、取消、重试、限流/鉴权、漂移拒绝、三类目录及离线冷安装计划验证；发布工具继续使用抽出的共享传输并保留回归。证据见 [本轮报告](../evidence/phase5d-2026-11-09/report.md)。
 
-5D-4 已实际发布并验证公开源、官方 pnpm 与 Edge/Electron 安装/升级/恢复；无 token/source.json 的默认引导通过。2026-11-10 本机 desktop 已一次性切换到发布包并核对 `verified-running`，这是维护者运维操作；5E 查询准备 kind、迁移界面/事务与恢复入口已随 manager 1.3.0 发布，独立 Electron E-07 通过，live 已升级；真实 Edge UI 待补，也没有发起模型推理。
+5D-4 已实际发布并验证公开源、官方 pnpm 与 Edge/Electron 安装/升级/恢复；无 token/source.json 的默认引导通过。2026-11-10 本机 desktop 已一次性切换到发布包并核对 `verified-running`，这是维护者运维操作；5E 查询准备 kind、迁移界面/事务与恢复入口已随 manager 1.4.0 发布，独立 Electron E-07 通过，live 已升级；真实 Edge UI 待补，也没有发起模型推理。

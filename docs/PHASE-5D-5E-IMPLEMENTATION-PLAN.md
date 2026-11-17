@@ -1,6 +1,6 @@
 # Phase 5D / 5E：远端分发与 link 来源迁移施工方案
 
-更新：2026-11-16（Asia/Shanghai）。5D 的发布端、消费端、管理页与真实公开源验收均已完成。**5E-0/1/2 已实现、发布为 `guide-v1.4.0` / manager 1.3.0，并通过默认/隔离测试、真实 pnpm 隔离迁移及独立 Electron 桌面 E-07；live 已升级到 manager 1.3.0。** 真实 Edge 浏览器 UI 未单独验收。本机 desktop 的 2026-11-10 切换是维护者一次性运维操作，不是 E-07。
+更新：2026-11-17（Asia/Shanghai）。5D 的发布端、消费端、管理页与真实公开源验收均已完成。**5E-0/1/2 已实现、发布为 `guide-v1.5.0` / manager 1.4.0，并通过默认/隔离测试、真实 pnpm 隔离迁移及独立 Electron 桌面 E-07；live 已升级到 manager 1.4.0。** 真实 Edge 浏览器 UI 未单独验收。本机 desktop 的 2026-11-10 切换是维护者一次性运维操作，不是 E-07。
 
 > 阅读方式：§3～§7 记录已实现的 5D；§8～§10 记录已实现并发布的 5E。5E 文件与真实 Electron E-07 证据均已在工作区；真实 Edge 浏览器 UI 缺口见 §10 与 [项目状态](../PROJECT-STATUS.md)。
 
@@ -10,7 +10,7 @@
 
 新用户流程：手动安装一次公开源 manager → 检查默认公开仓库版本 → 选择组件 → 下载准备 → 预览并确认 → 自动停机安装、重启并返回管理页核对结果。manager 1.2.0 增加的自动执行衔接见 [面板执行说明](PHASE-5-PANEL-EXECUTION.md)；旧版与故障恢复继续保留手动助手。无需 token/source.json；其他或私有来源仍可显式配置。
 
-当前环境状态：workspace 保留开发 link/源码与 5E-0/1/2 管理页/执行器；本机 desktop 已于 2026-11-10 手工切到发布包，并于 2026-11-16 升级到 manager 1.3.0。5E 已进入 live 发布包；真实 Edge 浏览器 UI 仍是单独的验收缺口，不把 Electron E-07 自动外推到 Edge。
+当前环境状态：workspace 保留开发 link/源码与 5E-0/1/2 管理页/执行器；本机 desktop 已于 2026-11-10 手工切到发布包，并于 2026-11-17 升级到 manager 1.4.0。5E 已进入 live 发布包；真实 Edge 浏览器 UI 仍是单独的验收缺口，不把 Electron E-07 自动外推到 Edge。
 
 用户于 2026-11-09 自行公开 `PreLuna/dsh-guide-mode`，当前使用匿名 Release 直链与 Git tag/commit 核验，保留七个独立包、独立版本和现有包名/private 元数据。无需另建下载服务器或 npm publish。私有/API 连接兼容保留，不能从 git remote 或浏览器登录状态推定访问成功。
 
@@ -21,8 +21,8 @@
 | 5D-2 | 后端查询、鉴权、下载、缓存与本地目录适配 | 5D-3 |
 | 5D-3 | 管理页连接/检查/准备/重试与既有操作衔接 | 5D-4 |
 | 5D-4 | 故障测试、真实公开远端与干净 profile UI 验收（已完成） | 5E-0 |
-| 5E-0 | link 来源清点、内容比较与迁移计划（工作区实现，默认测试通过） | 5E-1 |
-| 5E-1 | 独立冷迁移执行器、备份及外部恢复（工作区实现，默认/隔离测试通过） | 5E-2 |
+| 5E-0 | link 来源清点、内容比较与迁移计划（已发布，默认测试通过） | 5E-1 |
+| 5E-1 | 独立冷迁移执行器、备份及外部恢复（已发布，默认/隔离测试通过） | 5E-2 |
 | 5E-2 | 迁移 UI、故障注入、隔离桌面/浏览器验收（UI、真实 pnpm 隔离迁移、独立 Electron E-07 与 live 部署完成；真实 Edge UI 待补） | 后续维护与 Edge 复验 |
 
 代码施工按 5D-0/5D-1 → 5D-2/3/4 → 5E 推进；各项结果分别记录“未开始／实施中／代码验证通过／隔离整体验收通过／实际部署”，不以文档完成替代代码完成。5D 的工具已真实发布并完成公开源 Edge/独立桌面验收；5E 已完成默认/隔离测试、真实 pnpm 隔离迁移、独立 Electron E-07、正式发布和 live 升级，真实 Edge UI 仍未单独验收。
@@ -144,7 +144,7 @@ D-01～D-07 已在公开源层级通过并记录证据；5E-0/1/2 已实现并�
 
 迁移计划绑定源码内容指纹、原 spec、已下载产物、四文件、loader 启停与独立控制器内容。确认前/停机执行前再次检查；源码编辑、目标变化、配置变化、其他 pending 或未恢复事务均拒绝过期计划。
 
-若迁移包含 manager，目标 manager 必须包含 `migration.js`、`helper/apply-migration.mjs` 与 `helper/recover-migration.mjs`；缺少这些文件的目标会把计划标记为 `manager-target-lacks-migration`，避免迁移后丢失 5E 能力。旧正式 Release manager 1.2.0 不包含这些文件；当前 `guide-v1.4.0` / manager 1.3.0 已包含，因此 manager 迁移需要以该版本或更高为目标。只迁移六个组件且 manager 不是 link 时不受此限。
+若迁移包含 manager，目标 manager 必须包含 `migration.js`、`helper/apply-migration.mjs` 与 `helper/recover-migration.mjs`；缺少这些文件的目标会把计划标记为 `manager-target-lacks-migration`，避免迁移后丢失 5E 能力。旧正式 Release manager 1.2.0 不包含这些文件；当前 `guide-v1.5.0` / manager 1.4.0 已包含，因此 manager 迁移需要以该版本或更高为目标。只迁移六个组件且 manager 不是 link 时不受此限。
 
 ## 9. 5E-1：独立停机切换与恢复
 
@@ -178,7 +178,7 @@ D-01～D-07 已在公开源层级通过并记录证据；5E-0/1/2 已实现并�
 
 当前默认/隔离测试覆盖 E-01～E-05 的代码路径：清点、内容差异、源码漂移拒绝、精确计划、成功迁移、失败回源、源码目录缺失时的快照恢复、外部恢复与 execution/Host API 预览。隔离 profile 已用真实官方 pnpm 和真实 tgz 完成七包迁移，结果见 [隔离证据](../evidence/migration-acceptance-2026-11-16/report.md)。独立 Electron 桌面 E-07 已完成真实 UI 准备、确认、自动重启/重连和 `verified-running` 核对，见 [E-07 证据](../evidence/migration-e07-2026-11-16/report.md)；live 四文件与既有进程在隔离验收期间未变。真实 Edge 浏览器 UI、写锁争用和迁移后普通升级的真实链路仍需补验。
 
-`guide-v1.4.0` / manager 1.3.0 已发布并部署到 live（事务 `1794804099896-c6899047a1f0`）。本机 live 已不再是 2026-11-10 的旧 manager；后续若再切来源仍须重新制定计划、备份和外部恢复入口。
+`guide-v1.5.0` / manager 1.4.0 已发布并部署到 live（事务 `1794885362327-eeb2563958de`）。本机 live 已不再是 2026-11-10 的旧 manager；后续若再切来源仍须重新制定计划、备份和外部恢复入口。
 
 ## 11. 文件交付与验证记录
 

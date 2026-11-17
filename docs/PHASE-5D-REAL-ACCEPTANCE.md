@@ -1,6 +1,6 @@
 # Phase 5D-4：真实远端整体验收
 
-更新：2026-11-16，**公开源首版实现与隔离整体验收完成**。实际 Edge/独立桌面各 6 组断言通过，关键安装/升级/恢复终态均 verified-running，0 page error。结果与边界见 [项目状态](../PROJECT-STATUS.md) / [完整报告](../evidence/phase5d4-2026-11-09/report.md)。5E-0/1/2 已发布为 `guide-v1.4.0` / manager 1.3.0，独立 Electron E-07 通过，live 已升级；真实 Edge UI 待补。本机 desktop 已于 2026-11-10 一次性切到发布包，见 [安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md)。
+更新：2026-11-16，**公开源首版实现与隔离整体验收完成**。实际 Edge/独立桌面各 6 组断言通过，关键安装/升级/恢复终态均 verified-running，0 page error。结果与边界见 [项目状态](../PROJECT-STATUS.md) / [完整报告](../evidence/phase5d4-2026-11-09/report.md)。5E-0/1/2 与 5F 已发布为 `guide-v1.5.0` / manager 1.4.0，独立 Electron E-07 通过，live 已升级；真实 Edge UI 待补。本机 desktop 已于 2026-11-10 一次性切到发布包，见 [安装记录](LOCAL-ONLINE-INSTALL-2026-11-10.md)。
 
 本页记录 guide-v1.2.2 / manager 1.1.3 的历史真实远端验收，manager 1.1.2 是公开源功能起始版本，当时确认准备后仍需手动运行助手。后续 manager 1.2.0 增加面板自动执行与重启返回，当前方式见 [面板执行说明](PHASE-5-PANEL-EXECUTION.md)。新用户从 [最新 Release](https://github.com/PreLuna/dsh-guide-mode/releases/latest) 下载 manager tgz，在官方插件页安装后进入“指导 → 远端发布来源”。
 

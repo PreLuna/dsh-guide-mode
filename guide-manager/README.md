@@ -1,6 +1,6 @@
 # Guide manager
 
-manager 1.3.0 已发布：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态；新增 link 来源清点/差异/迁移与恢复。工作区 1.4.0 增加硬中断恢复与缓存重建（尚未发布/live）。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
+manager 1.4.0 已发布：支持面板内确认后自动安装、重启、返回指导页并核对实际运行状态；新增 link 来源清点/差异/迁移与恢复、硬中断恢复和缓存重建。首次安装、组件升级/恢复、修复/卸载与支持同一执行协议的管理器升级共用此流程，无需手动运行助手，也无需另外安装 PowerShell 7。确认前保存工作并结束运行任务；手动命令作为故障恢复入口保留。支持方式与测试边界见 [面板执行说明](../docs/PHASE-5-PANEL-EXECUTION.md)。以下 5A/5B/5C 章节记录底层准备、执行及恢复协议；新版页面已自动衔接这些步骤。
 
 2026-11-09：manager 1.1.2 增加默认公开发布来源。通过官方插件页安装本仓库 manager tgz 后，直接进入“插件 → 指导 → 远端发布来源”检查并下载，无需配置 token 或 source.json。公开模式使用 Release 直链与 Git 智能 HTTP 的 tag/commit 核验，不消耗匿名 REST API 配额；保留包 SHA/tar/契约与现有冷事务门禁。实际整体验收进展见 [5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 
@@ -10,7 +10,7 @@ manager 1.3.0 已发布：支持面板内确认后自动安装、重启、返回
 
 ## Phase 5A：安装入口
 
-管理页增加“安装组件”区：选择组件 → 预览依赖与精确版本 → 保存工作 → 确认执行并重启；manager 1.3.0 会自动停机安装、重启并返回核对，旧版或故障恢复仍可运行页面给出的安装助手。选择 panel 自动补齐 preset/shield/admission；选择 admission 自动补齐 shield。推荐组合为六组件，sidebar 需要匹配的官方 better-sidebar；缺少时可取消该可选组件。已安装的同版本组件只保留，不覆盖 link；不同版本、未启用依赖或未验收版本必须先处理，不能借首次安装执行升级。
+管理页增加“安装组件”区：选择组件 → 预览依赖与精确版本 → 保存工作 → 确认执行并重启；manager 1.4.0 会自动停机安装、重启并返回核对，旧版或故障恢复仍可运行页面给出的安装助手。选择 panel 自动补齐 preset/shield/admission；选择 admission 自动补齐 shield。推荐组合为六组件，sidebar 需要匹配的官方 better-sidebar；缺少时可取消该可选组件。已安装的同版本组件只保留，不覆盖 link；不同版本、未启用依赖或未验收版本必须先处理，不能借首次安装执行升级。
 
 ### 本机生成可安装包
 
@@ -25,7 +25,7 @@ npm run manager:release -- --output dist/phase5a-local-01
 ### 执行与恢复
 
 - 预览绑定 profile 的 package.json、pnpm-lock.yaml、cordis.patch.yml、pnpm-workspace.yaml 和发布目录；确认或执行时变化会拒绝过期计划。
-- 确认先写 `.guide-manager/install-pending.json`。manager 1.3.0 在用户再次确认“执行并重启”后自动启动执行器、停 DSH、安装并重启返回；旧版或故障恢复仍可使用页面给出的助手命令，`helper/install-guide-manager.cmd` 通过原 PowerShell wrapper 的 `-Install` 模式停 DSH 后执行。
+- 确认先写 `.guide-manager/install-pending.json`。manager 1.4.0 在用户再次确认“执行并重启”后自动启动执行器、停 DSH、安装并重启返回；旧版或故障恢复仍可使用页面给出的助手命令，`helper/install-guide-manager.cmd` 通过原 PowerShell wrapper 的 `-Install` 模式停 DSH 后执行。
 - 独立 `apply-install.mjs` 在官方 `withFileLock(package.json)` 内调用共享 `runProfilePnpm`，将 tgz 固定到 profile `.guide-manager/package-cache/<sha256>.tgz`，一次解析全部新增包，禁用自动 peer 安装与构建脚本。安装成功、包名/版本/契约、宿主产物核对完成后才登记 bundle，并经官方 patch writer 启用组件、配对关闭原 goal driver；最后复核组合配置。
 - profile 原文件备份到 `.guide-manager/install-backups/`。失败时恢复文件并用宿主 pnpm 修复旧依赖图。`failed-restored` 可重试；`recovery-required` 保留备份和回执，wrapper 不自动重启 DSH。硬崩溃中断不能据普通异常恢复测试宣称自动恢复；应按备份人工处理，后续包版本事务在 5B 实施。
 - 回执 `.guide-manager/install-result.json` 可在刷新后读取。`installed-awaiting-restart` 不等于已运行；新的 Host 启动后，版本、组件状态与依赖边通过才显示已就绪。home overlay 和其他启动配置仍可能覆盖 profile，必须查看实际运行状态。
@@ -68,7 +68,7 @@ POST /guide-manager/api/packages/cancel        # { planId, confirm:true }
 GET  /guide-manager/api/state                  # packageManagement: catalog/pending/result/transactions/verification
 ```
 
-5B 设计见 [事务说明](../docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)。`test/acceptance.py` 测真实 UI 与生产助手；`test/run-package-host.mjs` 测真实官方 pnpm 的故障与恢复。5B/5C/5D 的测试版与故障版只在独立夹具生成，生产组合由 manager BOM 和 Release 清单声明（当前 manager 1.3.0 + 六组件 1.1.0）。
+5B 设计见 [事务说明](../docs/PHASE-5B-PACKAGE-TRANSACTIONS.md)。`test/acceptance.py` 测真实 UI 与生产助手；`test/run-package-host.mjs` 测真实官方 pnpm 的故障与恢复。5B/5C/5D 的测试版与故障版只在独立夹具生成，生产组合由 manager BOM 和 Release 清单声明（当前 manager 1.4.0 + 六组件 1.1.0）。
 
 ## Phase 5C：卸载、修复与管理器升级
 
@@ -88,7 +88,7 @@ DSH 桌面合并加载客户端时，缺失的组件 manifest 可能导致整个
 
 ## Phase 5D-0/1：发布端
 
-5D-0/1 已提供独立的远端 schema 4 契约和维护端发布工具：`npm run manager:remote-release` 从明确提交生成七包与远端清单；`npm run manager:github-release -- verify|draft|publish` 校验/准备发布，写远端需显式 `--execute`。开发快照不可上传发布，旧版本与兼容组合保留，同版本改字节拒绝。详见 [格式与使用](../docs/PHASE-5D-RELEASE-FORMAT.md)。消费端已由下述 5D-2/3 接入；真实公开发布与 Edge/独立桌面整体验收已在 5D-4 完成，最新正式版本为 `guide-v1.4.0`（manager 1.3.0）。
+5D-0/1 已提供独立的远端 schema 4 契约和维护端发布工具：`npm run manager:remote-release` 从明确提交生成七包与远端清单；`npm run manager:github-release -- verify|draft|publish` 校验/准备发布，写远端需显式 `--execute`。开发快照不可上传发布，旧版本与兼容组合保留，同版本改字节拒绝。详见 [格式与使用](../docs/PHASE-5D-RELEASE-FORMAT.md)。消费端已由下述 5D-2/3 接入；真实公开发布与 Edge/独立桌面整体验收已在 5D-4 完成，最新正式版本为 `guide-v1.5.0`（manager 1.4.0）。
 
 ## Phase 5D-2：后端准备服务
 
@@ -96,7 +96,7 @@ Host config.source 或 sourcePath（默认 profile/.guide-manager/source.json）
 
 ## Phase 5D-3：HTTP 与管理页
 
-“远端发布来源”区接入检查、安装缺失组件/升级组件/升级 manager、进度、取消/重试、刷新恢复，以及精确计划预览/确认。manager 1.3.0 确认后自动执行并重启返回核对（旧版/故障恢复仍可用原助手），manager 自升级保留外部恢复入口。source/check、prepare、task、cancel、plan、stage 均为受 connection 围栏保护的 POST；浏览器不传凭据或任意来源。未配置远端时使用内置公开源或保留本地功能。HTTP/客户端回归、隔离 Edge 交互与真实公开源 Edge/独立桌面整体链路均已完成，详见 [接口、流程与测试](../docs/PHASE-5D-HTTP-UI.md) 和 [真实 5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
+“远端发布来源”区接入检查、安装缺失组件/升级组件/升级 manager、进度、取消/重试、刷新恢复，以及精确计划预览/确认。manager 1.4.0 确认后自动执行并重启返回核对（旧版/故障恢复仍可用原助手），manager 自升级保留外部恢复入口。source/check、prepare、task、cancel、plan、stage 均为受 connection 围栏保护的 POST；浏览器不传凭据或任意来源。未配置远端时使用内置公开源或保留本地功能。HTTP/客户端回归、隔离 Edge 交互与真实公开源 Edge/独立桌面整体链路均已完成，详见 [接口、流程与测试](../docs/PHASE-5D-HTTP-UI.md) 和 [真实 5D-4](../docs/PHASE-5D-REAL-ACCEPTANCE.md)。
 
 ## Phase 5E：link 来源迁移（已发布）
 
@@ -114,6 +114,8 @@ GET  /guide-manager/api/state             # migration.inventory/pending/result/v
 默认测试在 `test/migration.test.mjs`，覆盖清点/差异、源码漂移、计划指纹、成功迁移、失败回源、快照恢复、execution 预览与 Host API；独立 Electron 桌面 E-07 已通过，live 已升级；真实 Edge 浏览器 UI 仍为后续门禁。
 
 ## 硬中断恢复与缓存重建
+
+已随 manager 1.4.0 / guide-v1.5.0 发布并部署到 live；默认测试与隔离夹具通过，真实进程强杀/断电注入仍未执行。
 
 ### 硬中断恢复
 
@@ -339,7 +341,7 @@ POST /guide-manager/api/action  # set-component-enabled
 
 ## 安装与测试
 
-本机 desktop 已安装并验证「指导」tab；live 为 manager 1.3.0 + 六组件 1.1.0 的固定缓存包，工作区开发 link 修改后仍需重启一次 DSH 才能加载新的 Host 代码。
+本机 desktop 已安装并验证「指导」tab；live 为 manager 1.4.0 + 六组件 1.1.0 的固定缓存包，工作区开发 link 修改后仍需重启一次 DSH 才能加载新的 Host 代码。
 
 ```powershell
 npm test                     # 34 个 Node 进程，manager 155 个用例
@@ -378,9 +380,9 @@ node guide-manager/test/remote-live.mjs dist/remote-live --public
 
 - 组件启停只开放 panel/sidebar 热切换，以及 admission/shield/goal 的 pending 冷切换；preset 和 manager 自身受保护。安装/升级/恢复/卸载/修复/自升级是独立的包事务入口。
 - 操作前门禁只阻断明确不兼容的组合；宿主版本、产物不可用、版本漂移、skill 未就绪作为警告，不把“未验证”伪称为“不兼容”。
-- 本地 link 的“升级”是源码更新 + reload helper；可信本地 tarball 与公开 Release 包使用 5A/5B/5C/5D 事务；其余 registry/git 来源仍由官方插件页维护。5E link 来源迁移已在 manager 1.3.0 发布，独立 Electron 桌面 E-07 通过，live 已升级；真实 Edge 浏览器 UI 未单独验收。
+- 本地 link 的“升级”是源码更新 + reload helper；可信本地 tarball 与公开 Release 包使用 5A/5B/5C/5D 事务；其余 registry/git 来源仍由官方插件页维护。5E link 来源迁移与 5F 硬中断恢复/缓存重建已在 manager 1.4.0 发布，独立 Electron 桌面 E-07 通过，live 已升级；真实 Edge 浏览器 UI 未单独验收。
 - 技能安装、禁用、来源管理由 `@michengai/dsh-skills-manager` 负责；本 manager 只读状态并深链到它的设置 section。
 - rollback helper 只恢复最新一份 patch 备份，不等同于完整的包版本回滚。
-- manager 1.3.0 在用户确认后会自动执行、重启并返回核对；手动 helper 保留给旧版、未知启动方式与故障恢复。执行前仍须保存工作。
+- manager 1.4.0 在用户确认后会自动执行、重启并返回核对；手动 helper 保留给旧版、未知启动方式与故障恢复。执行前仍须保存工作。
 - 冷切换写的是 profile patch，不修改 `package.json`、lockfile 或官方包。
 - 不是兼容性证明：`ready` 只表示该组合在已验证 BOM 内；`ready-unverified` 明确表示未验证。

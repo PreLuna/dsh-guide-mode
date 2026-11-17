@@ -1,10 +1,10 @@
 # Release history
 
-## manager 1.4.0（工作区，未发布）— 2026-11-17
+## manager 1.4.0 / guide-v1.5.0 — 2026-11-17
 
 - 新增硬中断恢复：`recovery.js` 只读诊断 install/package/maintenance/migration 事务；`helper/recover-hard-interrupt.mjs` 可在 DSH 停止后显式恢复 install/package/maintenance/manager 备份，校验四文件与事务 artifact；管理页显示中断与恢复助手。
 - 新增包缓存重建：`cache.js` 清点七个自有包的固定缓存；公开源 `/source/cache` 按 catalog SHA 补齐，离线 `helper/rebuild-cache.mjs` 支持本地发布目录；只写缓存，不覆盖完整文件。
-- 测试：新增 4 个缓存用例、5 个恢复用例及 1 个远端缓存重建用例；workspace manager 1.4.0 尚未发布到 GitHub Release 或部署 live。
+- 测试与发布：新增 4 个缓存用例、5 个恢复用例及 1 个远端缓存重建用例；隔离缓存重建与 install 恢复夹具通过；已发布 `guide-v1.5.0`（commit `47fc5f4`）并部署 live manager 1.4.0。
 
 ## manager 1.3.0 / guide-v1.4.0 — 2026-11-16
 

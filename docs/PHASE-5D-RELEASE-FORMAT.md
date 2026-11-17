@@ -47,11 +47,11 @@
 
 ## 3. 固定提交生成与本地检查
 
-以下是形成正式提交后的维护命令；从明确提交生成，未提交实现不会因命令默认选择 HEAD 就自动纳入发布。当前最新正式 tag 为 `guide-v1.4.0`，下例用下一版本 tag 占位：
+以下是形成正式提交后的维护命令；从明确提交生成，未提交实现不会因命令默认选择 HEAD 就自动纳入发布。当前最新正式 tag 为 `guide-v1.5.0`，下例用下一版本 tag 占位：
 
 ```powershell
 $sourceCommit = (git rev-parse HEAD).Trim()
-npm run manager:remote-release -- --repository PreLuna/dsh-guide-mode --commit $sourceCommit --tag guide-v1.4.0 --output dist/remote-candidate-01
+npm run manager:remote-release -- --repository PreLuna/dsh-guide-mode --commit $sourceCommit --tag guide-v1.5.0 --output dist/remote-candidate-01
 npm run manager:github-release -- verify --bundle dist/remote-candidate-01
 npm run manager:github-release -- draft --bundle dist/remote-candidate-01
 ```
@@ -112,4 +112,4 @@ npm run manager:github-release -- publish --bundle dist/remote-candidate-01 --ex
 
 prepare job 权限 Contents read，upload job 才有 Contents write；写凭据仅传给对应步骤。上传 job checkout 的是 prepare 输出的固定提交，按仓库串行发布，避免两次发布读到不同历史后互相覆盖。源码 ref/tag 通过环境变量传递给严格参数解析器，不拼接成 shell 代码。
 
-代码和模拟 API 回归不等于 GitHub 托管 runner 或真实草稿链路验收。实际执行情况必须另记证据；本仓库已实际创建 tag、草稿与正式 Release，最新稳定版本为 `guide-v1.4.0`（commit `bf9e51e`），记录见 [5D-4 报告](../evidence/phase5d4-2026-11-09/report.md)、[5E E-07](../evidence/migration-e07-2026-11-16/report.md) 与发布回执。以后每次发布仍须另记证据，不能沿用本次结论。
+代码和模拟 API 回归不等于 GitHub 托管 runner 或真实草稿链路验收。实际执行情况必须另记证据；本仓库已实际创建 tag、草稿与正式 Release，最新稳定版本为 `guide-v1.5.0`（commit `47fc5f4`），记录见 [5D-4 报告](../evidence/phase5d4-2026-11-09/report.md)、[5E E-07](../evidence/migration-e07-2026-11-16/report.md) 与发布回执。以后每次发布仍须另记证据，不能沿用本次结论。

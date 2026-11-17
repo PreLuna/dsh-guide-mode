@@ -1,10 +1,10 @@
 # 工程维护手册
 
-更新：2026-11-16（Asia/Shanghai）。当前生产安装为 `guide-manager` 1.3.0 + 六个运行组件 1.1.0，来自公开 Release `guide-v1.4.0` 的网络 tgz，固定到 profile `.guide-manager/package-cache/<sha256>.tgz`；工作区仍是开发、测试和隔离验证来源。七包均 `private:true`、`UNLICENSED`，未发布 npm/市场。Phase 5 的安装、升级、恢复、卸载、修复、自升级、面板自动执行与 5E link 来源迁移均已发布；独立 Electron E-07 通过，live 已升级。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与剩余范围见 [项目状态](../PROJECT-STATUS.md)。
+更新：2026-11-17（Asia/Shanghai）。当前生产安装为 `guide-manager` 1.4.0 + 六个运行组件 1.1.0，来自公开 Release `guide-v1.5.0` 的网络 tgz，固定到 profile `.guide-manager/package-cache/<sha256>.tgz`；工作区仍是开发、测试和隔离验证来源。七包均 `private:true`、`UNLICENSED`，未发布 npm/市场。Phase 5 的安装、升级、恢复、卸载、修复、自升级、面板自动执行、5E link 来源迁移与 5F 硬中断恢复/缓存重建均已发布；独立 Electron E-07 通过，live 已升级。已接受的产品边界见 [已定边界](DECISIONS.md)；当前交付与剩余范围见 [项目状态](../PROJECT-STATUS.md)。
 
 ## 1. 版本、基线与 CI
 
-一个工作区 Git 仓库管理七个自有包（六个运行组件 + manager）、当前文档与测试。当前生产安装为 manager 1.3.0 + 六组件 1.1.0；源码版本可以独立推进，兼容性由 peer、契约、维护者声明的精确版本组合以及重启后的健康核对约束，不再用“版本齐平”代替兼容性检查。
+一个工作区 Git 仓库管理七个自有包（六个运行组件 + manager）、当前文档与测试。当前生产安装为 manager 1.4.0 + 六组件 1.1.0；源码版本可以独立推进，兼容性由 peer、契约、维护者声明的精确版本组合以及重启后的健康核对约束，不再用“版本齐平”代替兼容性检查。
 
 支持基线：DSH `0.2.1-rc.3`（build `be72761ee1a6736ebcdf4f3739363b083ae53c98`）、Cordis `4.0.5`、官方 `dsh-better-sidebar@0.28.2`。peer 范围收窄到该基线，不表示其他版本一定有缺陷。
 
@@ -38,7 +38,7 @@
 
 ## 3. 安装、升级、卸载与回退
 
-日常 live 的安装、升级、恢复、卸载与修复从官方插件页「指导」管理页发起；manager 1.3.0 支持确认后自动执行并重启返回核对，手动 helper 只用于旧版或故障恢复。当前 live 依赖为固定缓存包，不应再用下面的 workspace 路径覆盖。以下编号保留给**开发 link 部署**和完整卸载/回退演练：
+日常 live 的安装、升级、恢复、卸载与修复从官方插件页「指导」管理页发起；manager 1.4.0 支持确认后自动执行并重启返回核对，手动 helper 只用于旧版或故障恢复。当前 live 依赖为固定缓存包，不应再用下面的 workspace 路径覆盖。以下编号保留给**开发 link 部署**和完整卸载/回退演练：
 
 1. `npm run doctor` 检查版本、公开来源与外部 guide skill。缺技能采用明确降级，不联网安装。
 2. 在隔离副本修改，运行 Node、真实 Host 与浏览器回归。开发 link 部署的 junction 指向工作区，**禁止先直接覆盖源码再等停机**；live 发布包不受此影响。
@@ -105,13 +105,13 @@ npm run manager:github-release -- publish --bundle dist/remote-candidate --execu
 
 `pack:local` 输出在忽略的 `dist/<版本>-<commit>/`：七个自有包的 tgz、该 commit 的源码 ZIP、用于独立复核的 `source-for-verification/`、`manifest.json` 与 `SHA256SUMS.txt`。`manager:remote-release` 另输出 `guide-release.json`、连接配置示例、发布说明、`SHA256SUMS.txt`、`publish-plan.json` 与历史包缓存；上传白名单与草稿回读规则见 [发布格式](PHASE-5D-RELEASE-FORMAT.md)。
 
-tgz 从 Git ZIP 解出的提交字节生成，避免 Windows 工作树换行转换造成来源偏差；使用离线 npm pack 且禁用生命周期脚本，不下载、不安装第三方依赖、不执行 publish。正式发布通过 GitHub Release 和 tag/manual workflow，当前最新为 `guide-v1.4.0`；npm 仍 `private:true`/`UNLICENSED`，未发布 npm/市场。发布可信度依赖仓库和发布权限，SHA 用于字节一致性，不构成独立签名。
+tgz 从 Git ZIP 解出的提交字节生成，避免 Windows 工作树换行转换造成来源偏差；使用离线 npm pack 且禁用生命周期脚本，不下载、不安装第三方依赖、不执行 publish。正式发布通过 GitHub Release 和 tag/manual workflow，当前最新为 `guide-v1.5.0`；npm 仍 `private:true`/`UNLICENSED`，未发布 npm/市场。发布可信度依赖仓库和发布权限，SHA 用于字节一致性，不构成独立签名。
 
 ## 6. `dist/` 与 `evidence/` 的去留
 
 **`dist/`**：整目录可由 `pack:local`／发布工具重建，但包含隔离验收与发布缓存（2026-11-10 约 3300 文件 / 34 MB），是“换台机器不 clone 也能装”的凭据，建议保留。`.npm-cache/` 与可重建的测试目录可按需清理。
 
-**`evidence/`**：39 个按日期命名的验收现场（2026-11-17 约 5.8 万文件 / 3.0 GB，其中 `install-online-2026-11-10` 的官方包解包内容占主要体积），**不可按缓存删**。
+**`evidence/`**：40 个按日期命名的验收现场（2026-11-17 约 5.8 万文件 / 3.0 GB，其中 `install-online-2026-11-10` 的官方包解包内容占主要体积），**不可按缓存删**。
 
 | 可以做 | 不要做 |
 |---|---|
@@ -128,7 +128,7 @@ tgz 从 Git ZIP 解出的提交字节生成，避免 Windows 工作树换行转�
 
 Phase 5 的安装/升级/恢复、组件卸载/修复和 manager 自升级都在官方插件页「指导」管理页发起；1.3.0 确认后自动执行并重启返回核对，手动 helper 保留为恢复入口。5E 迁移入口显示 link/固定来源与内容差异，确认后走独立 `migration-pending.json` 事务；管理页不可用时使用 `helper/recover-migration.mjs`/`restart-guide-manager.ps1 -RecoverMigration`。保留 preset 和会话数据，与第 3 节开发环境“完整卸载”不同。页面在升级前给出 profile 自有目录下的外部恢复脚本；组件损坏使桌面插件页打不开时，使用 manager 包内 `helper/repair-components.ps1`。先保留可信包缓存及事务备份，不能把它们当普通可删缓存。详见 [5C](PHASE-5C-MAINTENANCE.md)、[面板执行](PHASE-5-PANEL-EXECUTION.md) 和 [功能测试清单](FUNCTIONAL-TEST-MATRIX.md)。
 
-5F 硬中断恢复（工作区实现，尚未发布）：停止目标 DSH 后，先只读查看 `helper/recover-hard-interrupt.mjs --profile <profile>` 的诊断，再用 `--action install-restore|package-restore|maintenance-restore|manager-restore --id <id>` 执行；脚本会校验备份/事务哈希并保留原回执。缓存缺失/损坏时，管理页「包缓存」可用公开源重建，或离线使用 `helper/rebuild-cache.mjs --profile <profile> --catalog <release-catalog.json> --apply`；只写缓存，不改依赖。迁移事务仍用 `recover-migration.mjs`，不要用 5F 动作替代。
+5F 硬中断恢复（已发布）：停止目标 DSH 后，先只读查看 `helper/recover-hard-interrupt.mjs --profile <profile>` 的诊断，再用 `--action install-restore|package-restore|maintenance-restore|manager-restore --id <id>` 执行；脚本会校验备份/事务哈希并保留原回执。缓存缺失/损坏时，管理页「包缓存」可用公开源重建，或离线使用 `helper/rebuild-cache.mjs --profile <profile> --catalog <release-catalog.json> --apply`；只写缓存，不改依赖。迁移事务仍用 `recover-migration.mjs`，不要用 5F 动作替代。
 
 ```powershell
 npm test                 # 34 个 Node 进程，含 manager 155 用例
