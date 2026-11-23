@@ -14,6 +14,9 @@ export function baselineSource(output, workspace) {
     for (const group of ['dependencies', 'peerDependencies']) for (const name of Object.keys(manifest[group] ?? {})) {
       if (Object.values(RELEASE_PACKAGES).includes(name)) manifest[group][name] = '1.1.0'
     }
+    // The manager BOM is a second version source: freeze it to the same test
+    // baseline, or the synthetic release has no matching install combination.
+    for (const entry of Object.values(manifest.dshGuide?.components ?? {})) entry.version = '1.1.0'
     writeJson(file, manifest)
   }
   return output

@@ -7,6 +7,8 @@ import { apply } from '../index.js'
 import { COMPONENTS } from '../core.js'
 
 const PACKAGES = COMPONENTS.map((component) => component.package)
+const BOM = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dshGuide?.components ?? {}
+const declaredVersion = (name) => BOM[name]?.version ?? '1.1.0'
 
 function writeJson(path, value) {
   mkdirSync(join(path, '..'), { recursive: true })
@@ -33,7 +35,7 @@ function fixture() {
   for (const name of PACKAGES) {
     writeJson(join(profile, 'node_modules', ...name.split('/'), 'package.json'), {
       name,
-      version: '1.1.0',
+      version: declaredVersion(name),
       dshGuide: { component: name.slice('@local/dsh-guide-'.length), contract: 1 },
     })
   }
@@ -61,7 +63,7 @@ function makeCtx(data, { manager = true, bundles, rows, services = {}, setPlugin
     packageOf(name) {
       if (name === '@deepseek-ai/cordis') return { version: '4.0.5' }
       if (name === 'dsh-better-sidebar') return { version: '0.28.2' }
-      if (PACKAGES.includes(name)) return { version: '1.1.0', manifestPath: join(data.profile, 'node_modules', ...name.split('/'), 'package.json') }
+      if (PACKAGES.includes(name)) return { version: declaredVersion(name), manifestPath: join(data.profile, 'node_modules', ...name.split('/'), 'package.json') }
       return undefined
     },
   })
@@ -74,7 +76,7 @@ function makeCtx(data, { manager = true, bundles, rows, services = {}, setPlugin
         ]
       },
       listBundles() {
-        return bundles ?? PACKAGES.map((name) => ({ name, installed: true, enabled: true, version: '1.1.0', rows: [] }))
+        return bundles ?? PACKAGES.map((name) => ({ name, installed: true, enabled: true, version: declaredVersion(name), rows: [] }))
       },
       async setPluginEnabled(id, enabled) {
         calls.push([id, enabled])
@@ -184,7 +186,7 @@ test('host state falls back to the profile manifest without pluginManager', asyn
 test('a disabled panel is reported as disabled and its outgoing edges inactive', async () => {
   const data = fixture()
   try {
-    const bundles = PACKAGES.map((name) => ({ name, installed: true, enabled: name !== '@local/dsh-guide-panel', version: '1.1.0', rows: [] }))
+    const bundles = PACKAGES.map((name) => ({ name, installed: true, enabled: name !== '@local/dsh-guide-panel', version: declaredVersion(name), rows: [] }))
     const { ctx, store } = makeCtx(data, { bundles })
     await apply(ctx, { checkArtifacts: false })
     const state = await store.get('guideManager').getState()
@@ -274,7 +276,7 @@ test('phase 1B stages the goal pair and refuses manager/blocked panel actions', 
       name,
       installed: true,
       enabled: name !== '@local/dsh-guide-panel' && name !== '@local/dsh-guide-admission',
-      version: '1.1.0',
+      version: declaredVersion(name),
       rows: [],
     }))
     const { ctx, store, calls } = makeCtx(blockedData, { bundles, services: componentServices })

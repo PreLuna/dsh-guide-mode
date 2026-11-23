@@ -77,6 +77,7 @@ window.__ModuleLoader__.load({
       taskGroupRootOnly: '根会话指导',
       taskSectionOpenPanel: '打开指导面板',
       taskSectionOpening: '打开中…',
+      retry: '重试',
     }
 
     const en = {
@@ -130,6 +131,7 @@ window.__ModuleLoader__.load({
       taskGroupRootOnly: 'Guidance under the root session',
       taskSectionOpenPanel: 'Open the guidance panel',
       taskSectionOpening: 'Opening…',
+      retry: 'Retry',
     }
 
     // ── styles ────────────────────────────────────────────────────────────
@@ -757,6 +759,8 @@ window.__ModuleLoader__.load({
       const [hostReady, setHostReady] = React.useState(null)
       const [capNote, setCapNote] = React.useState('')
       const [panelSupported, setPanelSupported] = React.useState(null)
+      const [stateAttempt, setStateAttempt] = React.useState(0)
+      const [stateFailed, setStateFailed] = React.useState(false)
       const [goalNote, setGoalNote] = React.useState('')
       const [shieldNote, setShieldNote] = React.useState('')
       const [modelNote, setModelNote] = React.useState('')
@@ -801,7 +805,13 @@ window.__ModuleLoader__.load({
           update()
           return service?.subscribe?.(update)
         })
-        return () => { cancelled = true; if (typeof off === 'function') off() }
+        return () => {
+          cancelled = true
+          // ctx.inject returns a Cordis fiber, not a disposer; without this
+          // every remount leaves a second adapter subscription behind.
+          if (typeof off === 'function') off()
+          else if (typeof off?.dispose === 'function') off.dispose()
+        }
       }, [])
 
       // Display compatibility; the service owns the live per-pool budget.
@@ -810,6 +820,7 @@ window.__ModuleLoader__.load({
         callHost(ctx, 'state', { sessionId }, t)
           .then((value) => {
             if (cancelled || value === null || typeof value !== 'object') return
+            setStateFailed(false)
             setGoalNote(value.goalAdapter?.mode === 'native' ? t('goalNative')
               : value.goalAdapter?.mode === 'absent' ? t('goalAbsent') : '')
             setShieldNote(shieldNoteFor(value.settlementShield, t))
@@ -820,12 +831,13 @@ window.__ModuleLoader__.load({
               ? t('capNote') : '')
           })
           .catch(() => {
+            setStateFailed(true)
             setCapNote(t('capNote'))
           })
         return () => {
           cancelled = true
         }
-      }, [sessionId])
+      }, [sessionId, stateAttempt])
 
       // Restore the draft of the session this seat shows, and put it into the
       // (uncontrolled) field. A seat keeps its body mounted across tab
@@ -887,6 +899,13 @@ window.__ModuleLoader__.load({
       const flash = (text) => {
         setNote(text)
         window.setTimeout(() => setNote((current) => (current === text ? '' : current)), 2200)
+      }
+
+      const retryState = () => {
+        setStateFailed(false)
+        setCapNote('')
+        setPanelSupported(null)
+        setStateAttempt((value) => value + 1)
       }
 
       const start = async () => {
@@ -1060,7 +1079,9 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', style: secondary, onClick: () => void cleanOldTabs() }, t('cleanLegacy'))) : null,
         legacyNote ? h('p', { role: 'status', style: warn }, legacyNote) : null,
         panelSupported === false ? h('p', { role: 'status', style: warn }, t('compatibilityUnavailable')) : null,
-        capNote !== '' ? h('p', { style: warn }, capNote) : null,
+        capNote === '' ? null : h('div', { style: { ...warn, display: 'flex', alignItems: 'center', gap: 8 }, 'data-guide-capacity': true },
+          h('span', null, capNote),
+          stateFailed ? h('button', { type: 'button', style: secondary, onClick: retryState }, t('retry')) : null),
         h('p', { style: fieldLabel }, t('questionLabel')),
         h('textarea', {
           ref: inputRef,

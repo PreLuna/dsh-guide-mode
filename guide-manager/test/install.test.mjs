@@ -9,6 +9,9 @@ import { COMPONENTS } from '../core.js'
 import { createInstallPlan, digest, installView, profileSnapshot, readCatalog, readJson, stageInstall, writeJson } from '../install.js'
 import { applyInstall } from '../helper/apply-install.mjs'
 
+const BOM = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).dshGuide?.components ?? {}
+const declaredVersion = (name) => BOM[name]?.version ?? '1.1.0'
+
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'guide-install-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -19,7 +22,7 @@ function fixture(t) {
   const components = COMPONENTS.map((entry) => {
     const file = join(root, `${entry.key}.tgz`)
     writeFileSync(file, `tarball:${entry.key}`)
-    return { key: entry.key, package: entry.package, version: '1.1.0', contract: 1, file, sha256: digest(readFileSync(file)) }
+    return { key: entry.key, package: entry.package, version: declaredVersion(entry.package), contract: 1, file, sha256: digest(readFileSync(file)) }
   })
   const catalogPath = join(root, 'catalog.json')
   writeJson(catalogPath, { schema: 1, product: 'dsh-guide-mode', components })
@@ -28,7 +31,7 @@ function fixture(t) {
     pending: { present: false },
     host: { verified: true, dsh: { match: true }, cordis: { match: true }, betterSidebar: { match: true }, artifacts: { verified: true } },
     skills: { status: 'missing' },
-    components: components.map((item) => ({ ...item, installed: false, version: null, expectedVersion: '1.1.0', expectedContract: 1, contract: null })),
+    components: components.map((item) => ({ ...item, installed: false, version: null, expectedVersion: declaredVersion(item.package), expectedContract: 1, contract: null })),
   }
   return { root, profile, state, catalogPath, release: () => readCatalog(catalogPath) }
 }

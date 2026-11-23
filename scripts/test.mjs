@@ -1,8 +1,17 @@
-import { readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, writeFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
-import { resolve, dirname } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..')
+// `npm test` exports npm_execpath; a direct `node scripts/test.mjs` does not.
+// The release/remote tests need an npm CLI to pack, so fall back to the npm
+// shipped with the running Node instead of failing five suites with
+// "run-through-npm".
+if(!process.env.npm_execpath){
+  const npmCli=[join(dirname(process.execPath),'node_modules','npm','bin','npm-cli.js'),
+    join(dirname(process.execPath),'..','lib','node_modules','npm','bin','npm-cli.js')].find(path=>existsSync(path))
+  if(npmCli)process.env.npm_execpath=npmCli
+}
 const paths=['guide-sidebar-adapter/scripts/build.mjs --check']
 for(const dir of ['guide-panel','guide-admission','guide-sidebar-adapter','guide-manager'])for(const name of readdirSync(resolve(root,dir,'test'))){
   if(!name.endsWith('.test.mjs')||['projection-runtime.test.mjs','official-consumers.test.mjs'].includes(name))continue
