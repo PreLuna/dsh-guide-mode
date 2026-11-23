@@ -95,7 +95,7 @@ test('existing link packages are retained and mismatched versions require a sepa
   manifest.dependencies['@local/dsh-guide-shield'] = 'link:shield'
   manifest.dsh.profile.bundles.push('@local/dsh-guide-shield')
   writeJson(join(data.profile, 'package.json'), manifest)
-  Object.assign(data.state.components.find((item) => item.key === 'shield'), { installed: true, version: '1.1.0', enabled: true, contract: 1 })
+  Object.assign(data.state.components.find((item) => item.key === 'shield'), { installed: true, version: declaredVersion('@local/dsh-guide-shield'), enabled: true, contract: 1 })
   const plan = createInstallPlan(data.state, data.release(), ['panel'])
   assert.equal(plan.entries.find((item) => item.key === 'shield').action, 'retain')
   assert.deepEqual(plan.blockers, [])

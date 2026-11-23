@@ -1,11 +1,12 @@
 # Release history
 
-## Unreleased — manager 1.4.1 / panel 1.2.1
+## Unreleased — manager 1.4.1 / 六组件 1.2.1
 
 - Panel: retry the Host `state` request after a transient failure instead of leaving Start disabled; dispose the `guideSidebarAdapter` injection on unmount; add zh/en retry copy.
-- Manager: declare panel 1.2.1 in the component BOM.
+- Unify the six-component baseline at 1.2.1. The packaged component READMEs changed after `guide-v1.5.0`, so repacking them at 1.1.0 would violate the same-version/different-bytes release gate; a new baseline is the only way to ship the current docs without reverting them.
+- Manager: declare all six 1.2.1 components in the component BOM and publish manager 1.4.1.
 - Tooling: `node scripts/test.mjs` falls back to the Node-bundled npm CLI when `npm_execpath` is absent.
-- Docs: record why the 1.1.1/1.2.0 acceptance-branch versions exist and that the next panel version starts at 1.2.1.
+- Docs: record why the 1.1.1/1.2.0 acceptance-branch versions exist and that the next component change needs a fresh version.
 - Validation: `npm test` and direct `node scripts/test.mjs` (34 processes, 155 manager cases), `build:check`, `repo:check`. Not published or deployed yet.
 
 ## manager 1.4.0 / guide-v1.5.0 — 2026-11-17

@@ -32,7 +32,10 @@ test('source HTTP uses async tasks, guarded payloads and the existing offline st
   })
   process.env.DSH_GUIDE_GITHUB_TOKEN = 'fixture-secret-never-render'
   const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-  const bundle = prepareRemoteRelease({ development: true, sourceRoot: baselineSource(join(root, 'source'), workspace), repository: { owner: 'fixture', repo: 'guide' }, tag: 'guide-http-test', output: join(root, 'bundle') })
+  const manager = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  const versions = Object.fromEntries(Object.entries(manager.dshGuide?.components ?? {}).map(([name, entry]) => [name, entry.version]))
+  versions[manager.name] = manager.version
+  const bundle = prepareRemoteRelease({ development: true, sourceRoot: baselineSource(join(root, 'source'), workspace, versions), repository: { owner: 'fixture', repo: 'guide' }, tag: 'guide-http-test', output: join(root, 'bundle') })
   const catalog = structuredClone(bundle.catalog)
   catalog.release = { tag: 'guide-http-test', commit: 'b'.repeat(40), channel: 'stable', source: 'git-commit' }
   catalog.artifacts.forEach((a) => { a.source.commit = catalog.release.commit })

@@ -72,24 +72,24 @@
     "controlSchema": 1,
     "dataSchema": 1,
     "product": "dsh-guide-mode",
-    "release": "1.1.0",
+    "release": "1.2.1",
     "readOnly": false,
     "actionScope": "phase-4",
     "components": {
       "@local/dsh-guide-preset": {
         "component": "preset",
         "contract": 1,
-        "version": "1.1.0"
+        "version": "1.2.1"
       },
       "@local/dsh-guide-shield": {
         "component": "shield",
         "contract": 1,
-        "version": "1.1.0"
+        "version": "1.2.1"
       },
       "@local/dsh-guide-admission": {
         "component": "admission",
         "contract": 1,
-        "version": "1.1.0"
+        "version": "1.2.1"
       },
       "@local/dsh-guide-panel": {
         "component": "panel",
@@ -99,12 +99,12 @@
       "@local/dsh-guide-sidebar-adapter": {
         "component": "sidebar",
         "contract": 1,
-        "version": "1.1.0"
+        "version": "1.2.1"
       },
       "@local/dsh-guide-goal-adapter": {
         "component": "goal",
         "contract": 1,
-        "version": "1.1.0"
+        "version": "1.2.1"
       }
     },
     "edges": [
