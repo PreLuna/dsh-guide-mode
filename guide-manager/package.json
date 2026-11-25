@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-guide-manager",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "type": "module",
   "description": "Product manager for the DSH guidance mode components with link-source migration, hard-interrupt recovery and cache rebuild",

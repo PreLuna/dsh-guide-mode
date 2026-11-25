@@ -1,5 +1,10 @@
 # Release history
 
+## manager 1.4.2 / guide-v1.6.1 — 2026-11-25
+
+- Manager: show the installed manager package version as "管理器版本" and label the existing `dshGuide.release` value as "组件基线"; no runtime behavior change.
+- Validation: `npm test`, direct `node scripts/test.mjs`, `build:check`, `repo:check`. Published `guide-v1.6.1`; live manager self-upgrade pending.
+
 ## manager 1.4.1 / guide-v1.6.0 — 2026-11-23
 
 - Panel: retry the Host `state` request after a transient failure instead of leaving Start disabled; dispose the `guideSidebarAdapter` injection on unmount; add zh/en retry copy.
@@ -7,7 +12,7 @@
 - Manager: declare all six 1.2.1 components in the component BOM and publish manager 1.4.1.
 - Tooling: `node scripts/test.mjs` falls back to the Node-bundled npm CLI when `npm_execpath` is absent.
 - Docs: record why the 1.1.1/1.2.0 acceptance-branch versions exist and that the next component change needs a fresh version.
-- Validation: `npm test` and direct `node scripts/test.mjs` (34 processes, 155 manager cases), `build:check`, `repo:check`. Published `guide-v1.6.0` (commit `886a3bf`) with eleven verified assets and marked latest; live deployment is still pending.
+- Validation: `npm test` and direct `node scripts/test.mjs` (34 processes, 155 manager cases), `build:check`, `repo:check`. Published `guide-v1.6.0` (commit `886a3bf`) with eleven verified assets and marked latest; deployed live manager 1.4.1 and components 1.2.1.
 
 ## manager 1.4.0 / guide-v1.5.0 — 2026-11-17
 
