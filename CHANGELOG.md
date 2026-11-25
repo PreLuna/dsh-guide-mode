@@ -3,7 +3,7 @@
 ## manager 1.4.2 / guide-v1.6.1 — 2026-11-25
 
 - Manager: show the installed manager package version as "管理器版本" and label the existing `dshGuide.release` value as "组件基线"; no runtime behavior change.
-- Validation: `npm test`, direct `node scripts/test.mjs`, `build:check`, `repo:check`. Published `guide-v1.6.1`; live manager self-upgrade pending.
+- Validation: `npm test`, direct `node scripts/test.mjs`, `build:check`, `repo:check`. Published `guide-v1.6.1`; deployed live manager 1.4.2.
 
 ## manager 1.4.1 / guide-v1.6.0 — 2026-11-23
 
